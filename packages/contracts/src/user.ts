@@ -1,0 +1,74 @@
+import { z } from 'zod';
+
+/** NUL, C0 and C1 control characters (includes tab and newline). */
+const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/u;
+/** Bidi overrides, embeddings and isolates (ADR-0002). */
+const BIDI_OVERRIDES = /[‪-‮⁦-⁩]/u;
+
+const codePointLength = (value: string): number => [...value].length;
+
+/**
+ * Text that is Unicode-NFC normalized and free of control characters; the base of every
+ * user-supplied string (ADR-0002: validate, never rewrite beyond NFC and trimming of names).
+ */
+const plainText = z
+  .string()
+  .transform((value) => value.normalize('NFC'))
+  .refine((value) => !CONTROL_CHARS.test(value), 'must not contain control characters');
+
+/** Same, and additionally free of bidi-override characters (names). */
+const nameText = (trim: boolean) =>
+  z
+    .string()
+    .transform((value) => (trim ? value.normalize('NFC').trim() : value.normalize('NFC')))
+    .refine((value) => !CONTROL_CHARS.test(value), 'must not contain control characters')
+    .refine((value) => !BIDI_OVERRIDES.test(value), 'must not contain bidirectional overrides');
+
+/** 3-32 letters, digits or underscores; case is preserved, uniqueness is case-insensitive. */
+export const UsernameSchema = nameText(false).refine(
+  (value) => /^[A-Za-z0-9_]{3,32}$/.test(value),
+  {
+    message: 'must be 3-32 characters: letters, digits or underscore',
+  },
+);
+
+/** Valid email format, at most 254 characters; stored as typed, compared case-insensitively. */
+export const EmailSchema = plainText.pipe(z.email().max(254));
+
+/** 8-128 characters (counted as characters, not UTF-16 units); never trimmed. */
+export const PasswordSchema = plainText.refine(
+  (value) => {
+    const length = codePointLength(value);
+    return length >= 8 && length <= 128;
+  },
+  { message: 'must be 8-128 characters' },
+);
+
+/** Optional display name: trimmed, 1-50 characters, no control or bidi-override characters. */
+export const NicknameSchema = nameText(true).refine(
+  (value) => {
+    const length = codePointLength(value);
+    return length >= 1 && length <= 50;
+  },
+  { message: 'must be 1-50 characters' },
+);
+
+export const RegisterRequestSchema = z.object({
+  username: UsernameSchema,
+  email: EmailSchema,
+  password: PasswordSchema,
+  nickname: NicknameSchema.optional(),
+});
+
+export type RegisterRequest = z.input<typeof RegisterRequestSchema>;
+
+export const RegisterResponseSchema = z.object({
+  user: z.object({
+    id: z.uuid(),
+    username: z.string(),
+    email: z.string(),
+    nickname: z.string().nullable(),
+  }),
+});
+
+export type RegisterResponse = z.infer<typeof RegisterResponseSchema>;
