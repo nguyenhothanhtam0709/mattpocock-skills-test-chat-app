@@ -10,3 +10,9 @@
 - [x] Username cannot be changed through any endpoint
 - [x] Invalid Nickname returns `VALIDATION_FAILED`
 - [x] SPA: Profile `Dialog` with a `Field` for Nickname and inline errors; save updates the User menu; tested
+
+## Comments
+
+**Implementation notes (spec drift, PR #12):**
+- `PATCH /api/v1/users/me` takes `{ nickname: string | null }` (strict object; extra fields are `VALIDATION_FAILED`). No schema change.
+- The API rejects whitespace-only Nicknames; the SPA treats an empty or whitespace-only field as clear (sends `null`).

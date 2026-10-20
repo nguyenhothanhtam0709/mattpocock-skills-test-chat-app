@@ -165,10 +165,10 @@ A person registers as a User (Username, email, password, optional Nickname) and 
 
 ### Identity and sessions
 
-- Access token: JWT signed with EdDSA (Ed25519, key pair from config) via `@nestjs/jwt`, lifetime ~15 minutes. Claims: `sub` (User ID), `sid` (session ID), `jti`, `iat`, `exp`. Held only in SPA memory.
-- Refresh token: opaque random value in an `httpOnly`, `Secure`, `SameSite=Strict` cookie (via `@fastify/cookie`), stored hashed in a sessions table, rotated on every refresh. Presenting an already-rotated refresh token revokes the whole session (reuse detection).
+- Access token: JWT signed with EdDSA (Ed25519, key pair from config) via `jose` (not `@nestjs/jwt`: it wraps `jsonwebtoken` 9, which rejects EdDSA; decided in ticket 04), lifetime ~15 minutes. Claims: `sub` (User ID), `sid` (session ID), `jti`, `iat`, `exp`. Held only in SPA memory.
+- Refresh token: opaque random value in an `httpOnly`, `Secure`, `SameSite=Strict` cookie (via `@fastify/cookie`), stored hashed in a sessions table, rotated on every refresh. Presenting an already-rotated refresh token revokes the whole session (reuse detection; implemented by remembering only the previous hash, so a token older than one rotation gets a plain 401 without revoking the session; see ticket 05).
 - Logout: the access token's `jti` is added to the deny-list until its expiry, the session is revoked, and a `session.revoked` event is pushed to that session's sockets, which are then disconnected.
-- **Token deny-list as a port/adapter**: a `TokenDenyList` port (add with expiry, check, sweep expired) with a Postgres adapter for MVP1; a Redis adapter can be added later without touching callers. Checked on every authenticated HTTP request and on socket handshake.
+- **Token deny-list as a port/adapter**: a `TokenDenyList` port (add with expiry, check, sweep expired) with a Postgres adapter for MVP1; a Redis adapter can be added later without touching callers. Checked on every authenticated HTTP request and on socket handshake. `AuthGuard` also rejects an access token whose session row no longer exists (`SESSION_REVOKED`), so a session revoked by refresh reuse stops working immediately; the socket handshake must apply the same check.
 - Sign-in accepts Username or email plus password and returns one generic `INVALID_CREDENTIALS` error for any failure, doing comparable hashing work whether or not the User exists.
 - Access-token expiry does not close an open socket; only session revocation does.
 - An injectable clock is used for all time-dependent logic (token expiry, rotation, sweeps).
