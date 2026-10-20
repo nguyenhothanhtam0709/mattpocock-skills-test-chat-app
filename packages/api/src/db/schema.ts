@@ -165,7 +165,7 @@ export const membershipPeriods = pgTable(
     index('membership_periods_user_idx').on(t.userId),
     uniqueIndex('membership_periods_open_unique')
       .on(t.conversationId, t.userId)
-      .where(sql`${t.endSequence} = 2147483647`),
+      .where(sql`${t.endSequence} = ${sql.raw(String(OPEN_PERIOD_END))}`),
     check('membership_periods_range_check', sql`${t.endSequence} >= ${t.startSequence}`),
   ],
 );

@@ -66,6 +66,10 @@ const conversationNotFound = () =>
     'Conversation not found',
   );
 
+/** `get` is typed for any Conversation; the Group routes know theirs is a Group. */
+const asGroup = (conversation: GetConversationResponse['conversation']) =>
+  conversation as GroupMembershipResponse['conversation'];
+
 @Injectable()
 export class MessagesService {
   private readonly db: NodePgDatabase;
@@ -213,10 +217,7 @@ export class MessagesService {
         message.conversationId,
       );
     } catch (error) {
-      this.logger.error(
-        { err: error, conversationId: message.conversationId },
-        'socket push failed',
-      );
+      this.logPushFailure(error, message.conversationId);
     }
   }
 
@@ -362,6 +363,21 @@ export class MessagesService {
     return { conversation: { id, kind: 'group', name, ownerId, members } };
   }
 
+  /** Serialises membership changes and Message sends on one Conversation. */
+  private async lockConversation(
+    tx: Pick<NodePgDatabase, 'execute'>,
+    conversationId: string,
+  ): Promise<void> {
+    await tx.execute(
+      sql`select 1 from ${conversations} where ${conversations.id} = ${conversationId} for update`,
+    );
+  }
+
+  /** Pushes are best-effort (ADR-0001): a failure is logged, never surfaced. */
+  private logPushFailure(error: unknown, conversationId: string): void {
+    this.logger.error({ err: error, conversationId }, 'socket push failed');
+  }
+
   private async pushGroupCreated(conversationId: string, memberIds: string[]) {
     try {
       const [conversation] = await this.summaries(memberIds[0]!, conversationId);
@@ -372,7 +388,7 @@ export class MessagesService {
         conversationId,
       );
     } catch (error) {
-      this.logger.error({ err: error, conversationId }, 'socket push failed');
+      this.logPushFailure(error, conversationId);
     }
   }
 
@@ -500,9 +516,7 @@ export class MessagesService {
       throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found');
     }
     await this.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
-      );
+      await this.lockConversation(tx, groupId);
       const current = await tx
         .select({ userId: conversationMembers.userId })
         .from(conversationMembers)
@@ -548,9 +562,9 @@ export class MessagesService {
         groupId,
       );
     } catch (error) {
-      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+      this.logPushFailure(error, groupId);
     }
-    return { conversation: conversation as GroupMembershipResponse['conversation'] };
+    return { conversation: asGroup(conversation) };
   }
 
   /** The Owner removes a Member (never themselves). The removed User gets no more pushes. */
@@ -570,9 +584,7 @@ export class MessagesService {
     const member = await this.memberRow(userId);
     const removed = await this.db.transaction(async (tx) => {
       // Lock the Conversation so the period ends exactly at the newest Message.
-      await tx.execute(
-        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
-      );
+      await this.lockConversation(tx, groupId);
       const deleted = await tx
         .delete(conversationMembers)
         .where(
@@ -598,7 +610,7 @@ export class MessagesService {
     if (!removed || !member) {
       throw new DomainException(
         ErrorCode.NOT_A_MEMBER,
-        HttpStatus.NOT_FOUND,
+        HttpStatus.FORBIDDEN,
         'That User is not a Member of this Group',
       );
     }
@@ -612,9 +624,9 @@ export class MessagesService {
         groupId,
       );
     } catch (error) {
-      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+      this.logPushFailure(error, groupId);
     }
-    return { conversation: conversation as GroupMembershipResponse['conversation'] };
+    return { conversation: asGroup(conversation) };
   }
 
   /**
@@ -633,9 +645,7 @@ export class MessagesService {
     await this.requireMember(groupId, callerId, true);
 
     const outcome = await this.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
-      );
+      await this.lockConversation(tx, groupId);
       const deleted = await tx
         .delete(conversationMembers)
         .where(
@@ -715,9 +725,9 @@ export class MessagesService {
         }
       }
     } catch (error) {
-      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+      this.logPushFailure(error, groupId);
     }
-    return { conversation: conversation as GroupMembershipResponse['conversation'] };
+    return { conversation: asGroup(conversation) };
   }
 
   private async findByClientMessageId(
