@@ -16,7 +16,7 @@ import {
   type UIEvent,
 } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
-import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
+import { useReconnected, useRealtimeEvents } from '@/realtime/RealtimeProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import {
@@ -190,7 +190,7 @@ export function ConversationView({
     if (!openedWith) return;
     const controller = new AbortController();
     void (async () => {
-      const result = await messagesPage(openedWith, undefined, controller.signal);
+      const result = await messagesPage(openedWith, {}, controller.signal);
       if (controller.signal.aborted || !result.ok) return;
       setHasMore(result.hasMore);
       setMessages((current) => mergeMessages(current, result.messages));
@@ -203,7 +203,7 @@ export function ConversationView({
     if (!openedWith || !hasMore || !oldest || loadingOlder.current) return;
     loadingOlder.current = true;
     try {
-      const result = await messagesPage(openedWith, oldest.sequence);
+      const result = await messagesPage(openedWith, { before: oldest.sequence });
       if (!result.ok) return;
       setHasMore(result.hasMore);
       setMessages((current) => mergeMessages(current, result.messages));
@@ -223,6 +223,26 @@ export function ConversationView({
       void loadOlder();
     }
   }, [messages, loadOlder]);
+
+  // Messages pushed while the connection was down are gone for good: fetch what came after the
+  // last one seen, page by page. Duplicates with pushes are merged by ID.
+  useReconnected(() => {
+    const id = conversationId;
+    if (!id) return;
+    void (async () => {
+      // Resume from the page's own newest Message, not the newest seen: a push that lands
+      // meanwhile must not make the fetch skip the Messages before it.
+      let after = messagesRef.current.at(-1)?.sequence;
+      for (;;) {
+        const result = await messagesPage(id, after === undefined ? {} : { after });
+        if (!result.ok) return;
+        setMessages((current) => mergeMessages(current, result.messages));
+        const newest = result.messages.at(-1);
+        if (after === undefined || !result.hasMore || !newest) return;
+        after = newest.sequence;
+      }
+    })();
+  });
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
 

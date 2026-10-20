@@ -4,10 +4,10 @@
 
 **Blocked by:** 10, 12
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Realtime client reconnects automatically and re-authenticates with the current access token
-- [ ] On reconnect, the open Conversation is gap-filled via `after=<last seen sequence>`, paging until `hasMore` is false; duplicate Messages from push + fetch are de-duplicated by ID
-- [ ] Sidebar Conversation list is refreshed on reconnect
-- [ ] SPA shows an `Alert` while disconnected and hides it when reconnected
-- [ ] Tests cover: Messages sent while disconnected appear after reconnect exactly once
+- [x] Realtime client reconnects automatically and re-authenticates with the current access token
+- [x] On reconnect, the open Conversation is gap-filled via `after=<last seen sequence>`, paging until `hasMore` is false; duplicate Messages from push + fetch are de-duplicated by ID
+- [x] Sidebar Conversation list is refreshed on reconnect
+- [x] SPA shows an `Alert` while disconnected and hides it when reconnected
+- [x] Tests cover: Messages sent while disconnected appear after reconnect exactly once

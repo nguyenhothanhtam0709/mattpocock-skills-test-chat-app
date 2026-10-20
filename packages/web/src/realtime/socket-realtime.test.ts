@@ -113,6 +113,23 @@ describe('Socket.IO RealtimeEvents', () => {
     unsubscribe();
   }, 15_000);
 
+  it('reports the connection as lost and back again', async () => {
+    const realtime = createSocketRealtime({ url, getAccessToken: () => 'tok-1' });
+    const statuses: string[] = [];
+    realtime.subscribeStatus((status) => statuses.push(status));
+    const { unsubscribe } = await connected(realtime);
+    await vi.waitFor(() => expect(statuses).toEqual(['connecting', 'connected']));
+
+    io.sockets.sockets.forEach((socket) => socket.conn.close());
+
+    await vi.waitFor(() => expect(statuses).toEqual(['connecting', 'connected', 'disconnected']));
+    await vi.waitFor(
+      () => expect(statuses).toEqual(['connecting', 'connected', 'disconnected', 'connected']),
+      { timeout: 10_000 },
+    );
+    unsubscribe();
+  }, 15_000);
+
   it('closes the connection when the last listener unsubscribes', async () => {
     const { unsubscribe } = await connected();
 

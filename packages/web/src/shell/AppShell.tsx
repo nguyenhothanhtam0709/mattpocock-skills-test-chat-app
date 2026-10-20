@@ -1,6 +1,8 @@
 import type { User, UserSearchResult } from '@chat/contracts';
 import { ChevronsUpDown, LogOut, Moon, SquarePen, Sun, UserRound } from 'lucide-react';
 import { useState } from 'react';
+import { WifiOff } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,11 +26,26 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/auth/AuthProvider';
+import { useConnectionStatus } from '@/realtime/RealtimeProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ConversationList } from './ConversationList';
 import { ConversationView } from './ConversationView';
 import { NewConversationDialog } from './NewConversationDialog';
 import { ProfileDialog } from './ProfileDialog';
+
+/** Shown while the live connection is down; Messages missed meanwhile are filled in on return. */
+function ConnectionAlert() {
+  if (useConnectionStatus() !== 'disconnected') return null;
+  return (
+    <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+      <WifiOff />
+      <AlertTitle>Connection lost</AlertTitle>
+      <AlertDescription>
+        Reconnecting. Missed messages will appear when it is back.
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function UserMenu({ user }: { user: User }) {
   const { theme, setTheme } = useTheme();
@@ -114,6 +131,7 @@ export function AppShell({ user }: { user: User }) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
+        <ConnectionAlert />
         {open ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex h-12 items-center border-b px-3 md:hidden">

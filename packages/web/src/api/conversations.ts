@@ -8,6 +8,8 @@ import {
 export type ListConversationsResult =
   { ok: true; conversations: ConversationSummary[] } | { ok: false; error: string };
 
+export type MessagesCursor = { before?: number; after?: number };
+
 export type MessagesPageResult =
   { ok: true; messages: Message[]; hasMore: boolean } | { ok: false; error: string };
 
@@ -37,15 +39,21 @@ export async function listConversations(
 
 /**
  * `GET /api/v1/conversations/:id/messages`: a page of Messages, returned oldest first. Without
- * `before` it is the newest page; with it, the page of Messages just older than that sequence.
+ * a cursor it is the newest page; `before` gives the page just older than that sequence, and
+ * `after` the page just newer (to fill a gap).
  */
 export async function messagesPage(
   accessToken: string,
   conversationId: string,
-  before?: number,
+  cursor: MessagesCursor = {},
   signal?: AbortSignal,
 ): Promise<MessagesPageResult> {
-  const query = before === undefined ? '' : `?before=${before}`;
+  const query =
+    cursor.before !== undefined
+      ? `?before=${cursor.before}`
+      : cursor.after !== undefined
+        ? `?after=${cursor.after}`
+        : '';
   const res = await get(
     accessToken,
     `/api/v1/conversations/${conversationId}/messages${query}`,
@@ -53,5 +61,10 @@ export async function messagesPage(
   );
   if (!res.ok) return res;
   const { messages, hasMore } = GetMessagesResponseSchema.parse(res.payload);
-  return { ok: true, messages: [...messages].reverse(), hasMore };
+  // `before` and the default come newest first; `after` already comes oldest first.
+  return {
+    ok: true,
+    messages: cursor.after === undefined ? [...messages].reverse() : messages,
+    hasMore,
+  };
 }
