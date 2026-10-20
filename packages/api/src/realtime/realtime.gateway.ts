@@ -5,7 +5,7 @@ import {
   type OnGatewayConnection,
   type OnGatewayInit,
 } from '@nestjs/websockets';
-import type { RealtimeEventName } from '@chat/contracts';
+import { RealtimeEvent, type RealtimeEventName } from '@chat/contracts';
 import type { Logger } from 'pino';
 import type { IoServer as Server, IoSocket as Socket } from './socket-types.js';
 import { AccessTokenAuthenticator } from '../auth/access-token-authenticator.js';
@@ -63,5 +63,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   ): void {
     this.server.to(userIds.map(userRoom)).emit(event, payload);
     this.logger.info({ event, targetUsers: userIds.length, conversationId }, 'socket push');
+  }
+
+  /** Tells every socket of the session it is over, then disconnects them. Other sessions stay. */
+  revokeSession(sessionId: string): void {
+    const room = sessionRoom(sessionId);
+    this.server.to(room).emit(RealtimeEvent.SESSION_REVOKED, {});
+    this.server.in(room).disconnectSockets(true);
+    this.logger.info({ event: RealtimeEvent.SESSION_REVOKED, sessionId }, 'socket session revoked');
   }
 }

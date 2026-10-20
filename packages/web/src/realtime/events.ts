@@ -3,7 +3,8 @@ import type { ConversationCreatedEvent, MessageCreatedEvent } from '@chat/contra
 /** An already-decoded, contracts-validated server push. */
 export type RealtimeEvent =
   | ({ type: 'message.created' } & MessageCreatedEvent)
-  | ({ type: 'conversation.created' } & ConversationCreatedEvent);
+  | ({ type: 'conversation.created' } & ConversationCreatedEvent)
+  | { type: 'session.revoked' };
 
 /**
  * Server-push events. The socket is receive-only (ADR-0001): everything the User does goes

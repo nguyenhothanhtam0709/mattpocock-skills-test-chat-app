@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConversationCreatedEventSchema,
+  SessionRevokedEventSchema,
   MessageCreatedEventSchema,
   RealtimeEvent,
   RealtimeEventSchemas,
@@ -18,14 +19,16 @@ const message = {
 };
 
 describe('realtime event contracts', () => {
-  it('names the two server-push events', () => {
+  it('names the server-push events', () => {
     expect(RealtimeEvent).toEqual({
       MESSAGE_CREATED: 'message.created',
       CONVERSATION_CREATED: 'conversation.created',
+      SESSION_REVOKED: 'session.revoked',
     });
     expect(Object.keys(RealtimeEventSchemas).sort()).toEqual([
       'conversation.created',
       'message.created',
+      'session.revoked',
     ]);
   });
 
@@ -47,5 +50,9 @@ describe('realtime event contracts', () => {
     };
     expect(ConversationCreatedEventSchema.safeParse({ conversation }).success).toBe(true);
     expect(ConversationCreatedEventSchema.safeParse({ conversation: { id } }).success).toBe(false);
+  });
+
+  it('session.revoked carries nothing', () => {
+    expect(SessionRevokedEventSchema.safeParse({}).success).toBe(true);
   });
 });

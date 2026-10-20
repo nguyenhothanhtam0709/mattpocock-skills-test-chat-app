@@ -10,6 +10,7 @@ import {
   type RegisterResponse,
 } from '@chat/contracts';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { Auth, AuthGuard, type AuthContext } from './auth.guard.js';
 import { AuthService, type IssuedSession } from './auth.service.js';
@@ -31,7 +32,10 @@ function setRefreshCookie(reply: FastifyReply, session: IssuedSession): void {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   /** 5 registrations per hour per IP. */
   @Post('register')
@@ -79,6 +83,7 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<void> {
     await this.auth.logout(auth);
+    this.realtime.revokeSession(auth.sessionId);
     void reply.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
   }
 }

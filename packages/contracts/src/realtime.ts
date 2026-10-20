@@ -5,6 +5,7 @@ import { ConversationSummarySchema, MessageSchema } from './message.js';
 export const RealtimeEvent = {
   MESSAGE_CREATED: 'message.created',
   CONVERSATION_CREATED: 'conversation.created',
+  SESSION_REVOKED: 'session.revoked',
 } as const;
 
 export type RealtimeEventName = (typeof RealtimeEvent)[keyof typeof RealtimeEvent];
@@ -19,7 +20,11 @@ export const ConversationCreatedEventSchema = z.object({ conversation: Conversat
 
 export type ConversationCreatedEvent = z.infer<typeof ConversationCreatedEventSchema>;
 
+/** Pushed to every socket of a session that was ended (logout); the server then disconnects them. */
+export const SessionRevokedEventSchema = z.object({});
+
 export const RealtimeEventSchemas = {
   [RealtimeEvent.MESSAGE_CREATED]: MessageCreatedEventSchema,
   [RealtimeEvent.CONVERSATION_CREATED]: ConversationCreatedEventSchema,
+  [RealtimeEvent.SESSION_REVOKED]: SessionRevokedEventSchema,
 } as const;

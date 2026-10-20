@@ -54,6 +54,8 @@ interface AuthContextValue {
   ): Promise<MessagesPageResult>;
   /** The current access token (renewed in the background), if signed in. */
   getAccessToken(): string | undefined;
+  /** Signs out here only, because the server already ended the session. */
+  endSession(): void;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -189,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listConversations: conversationList,
       messagesPage: page,
       getAccessToken,
+      endSession: signOut,
       logOut,
     }),
     [
@@ -201,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       conversationList,
       page,
       getAccessToken,
+      signOut,
       logOut,
     ],
   );
