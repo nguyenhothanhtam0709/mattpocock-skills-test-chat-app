@@ -64,6 +64,13 @@
       "when": 1792523690008,
       "tag": "0008_gray_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792524289774,
+      "tag": "0009_jittery_black_knight",
+      "breakpoints": true
     }
   ]
 }

@@ -87,7 +87,12 @@ function UserMenu({ user }: { user: User }) {
 
 function targetOf(conversation: ConversationSummary, user: User): ConversationTarget | undefined {
   if (conversation.kind === 'group') {
-    return { kind: 'group', name: conversation.name, memberCount: conversation.members.length };
+    return {
+      kind: 'group',
+      name: conversation.name,
+      memberCount: conversation.members.length,
+      isMember: conversation.isMember,
+    };
   }
   const peer = conversation.members.find((m) => m.id !== user.id);
   return peer && { kind: 'direct', peer };
@@ -114,7 +119,12 @@ export function AppShell({ user }: { user: User }) {
         onOpenChange={setNewGroupOpen}
         onCreated={(group) => {
           setOpen({
-            target: { kind: 'group', name: group.name, memberCount: group.members.length },
+            target: {
+              kind: 'group',
+              name: group.name,
+              memberCount: group.members.length,
+              isMember: true,
+            },
             conversationId: group.id,
           });
           setRefreshKey((k) => k + 1);

@@ -18,7 +18,7 @@ import {
   type SendDirectMessageRequest,
   type SendMessageRequest,
 } from '@chat/contracts';
-import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, inArray, lt, lte, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { Logger } from 'pino';
@@ -31,8 +31,9 @@ import {
   conversations,
   directConversations,
   groups,
+  membershipPeriods,
   messages,
-  removedGroupMembers,
+  OPEN_PERIOD_END,
   users,
 } from '../db/schema.js';
 
@@ -147,7 +148,7 @@ export class MessagesService {
     conversationId: string,
     { limit, before, after }: GetMessagesQuery,
   ): Promise<GetMessagesResponse> {
-    await this.requireMember(conversationId, userId);
+    await this.requireReader(conversationId, userId);
     const forward = after !== undefined;
     const rows = await this.db
       .select()
@@ -155,6 +156,19 @@ export class MessagesService {
       .where(
         and(
           eq(messages.conversationId, conversationId),
+          exists(
+            this.db
+              .select({ one: sql`1` })
+              .from(membershipPeriods)
+              .where(
+                and(
+                  eq(membershipPeriods.conversationId, messages.conversationId),
+                  eq(membershipPeriods.userId, userId),
+                  gt(messages.sequence, membershipPeriods.startSequence),
+                  lte(messages.sequence, membershipPeriods.endSequence),
+                ),
+              ),
+          ),
           before === undefined ? undefined : lt(messages.sequence, before),
           forward ? gt(messages.sequence, after) : undefined,
         ),
@@ -210,9 +224,21 @@ export class MessagesService {
     userId: string,
     onlyConversationId?: string,
   ): Promise<ConversationSummary[]> {
+    // The newest Message inside one of the caller's membership periods (Former Members must
+    // not see a preview of anything said after they left).
+    const lastVisibleSequence = sql`(
+      select max(vm.sequence) from messages vm
+      join membership_periods vp on vp.conversation_id = vm.conversation_id
+      where vm.conversation_id = ${conversations.id} and vp.user_id = ${userId}
+        and vm.sequence > vp.start_sequence and vm.sequence <= vp.end_sequence
+    )`;
     const rows = await this.db
       .select({
         id: conversations.id,
+        isMember: sql<boolean>`exists (
+          select 1 from conversation_members cm
+          where cm.conversation_id = ${conversations.id} and cm.user_id = ${userId}
+        )`,
         kind: conversations.kind,
         groupName: groups.name,
         senderId: messages.senderId,
@@ -221,19 +247,28 @@ export class MessagesService {
         >`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
         createdAt: messages.createdAt,
       })
-      .from(conversationMembers)
-      .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+      .from(conversations)
       .leftJoin(groups, eq(groups.conversationId, conversations.id))
       .leftJoin(
         messages,
         and(
           eq(messages.conversationId, conversations.id),
-          eq(messages.sequence, conversations.lastSequence),
+          eq(messages.sequence, lastVisibleSequence),
         ),
       )
       .where(
         and(
-          eq(conversationMembers.userId, userId),
+          exists(
+            this.db
+              .select({ one: sql`1` })
+              .from(membershipPeriods)
+              .where(
+                and(
+                  eq(membershipPeriods.conversationId, conversations.id),
+                  eq(membershipPeriods.userId, userId),
+                ),
+              ),
+          ),
           onlyConversationId === undefined ? undefined : eq(conversations.id, onlyConversationId),
         ),
       )
@@ -250,6 +285,7 @@ export class MessagesService {
         kind: row.groupName === null ? ('direct' as const) : ('group' as const),
         name: row.groupName ?? other.nickname ?? other.username,
         members: all,
+        isMember: row.isMember,
         lastMessage:
           row.senderId === null
             ? null
@@ -263,7 +299,7 @@ export class MessagesService {
   }
 
   async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
-    await this.requireMember(conversationId, userId);
+    await this.requireReader(conversationId, userId);
     const members = (await this.membersOf([conversationId])).get(conversationId)!;
     const [group] = await this.db
       .select({ name: groups.name, ownerId: groups.ownerId })
@@ -311,6 +347,13 @@ export class MessagesService {
       await tx
         .insert(conversationMembers)
         .values(memberIds.map((userId) => ({ conversationId: created!.id, userId })));
+      await tx.insert(membershipPeriods).values(
+        memberIds.map((userId) => ({
+          conversationId: created!.id,
+          userId,
+          startSequence: 0,
+        })),
+      );
       return created!.id;
     });
 
@@ -353,7 +396,25 @@ export class MessagesService {
     return byConversation;
   }
 
-  /** With `forPosting`, a User the Owner removed is told so instead of getting a 404. */
+  /** Anyone with a membership period, current or past, may read; else 404 (never a Member). */
+  private async requireReader(conversationId: string, userId: string): Promise<void> {
+    const [period] = await this.db
+      .select({ id: membershipPeriods.id })
+      .from(membershipPeriods)
+      .where(
+        and(
+          eq(membershipPeriods.conversationId, conversationId),
+          eq(membershipPeriods.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (!period) throw conversationNotFound();
+  }
+
+  /**
+   * With `forPosting`, a Former Member is told so (`NOT_A_MEMBER`); otherwise, and for a
+   * never-Member, the Conversation is not found.
+   */
   private async requireMember(
     conversationId: string,
     userId: string,
@@ -370,22 +431,12 @@ export class MessagesService {
       );
     if (member) return;
     if (forPosting) {
-      const [removed] = await this.db
-        .select({ userId: removedGroupMembers.userId })
-        .from(removedGroupMembers)
-        .where(
-          and(
-            eq(removedGroupMembers.conversationId, conversationId),
-            eq(removedGroupMembers.userId, userId),
-          ),
-        );
-      if (removed) {
-        throw new DomainException(
-          ErrorCode.NOT_A_MEMBER,
-          HttpStatus.FORBIDDEN,
-          'You are no longer a Member of this Group',
-        );
-      }
+      await this.requireReader(conversationId, userId);
+      throw new DomainException(
+        ErrorCode.NOT_A_MEMBER,
+        HttpStatus.FORBIDDEN,
+        'You are no longer a Member of this Group',
+      );
     }
     throw conversationNotFound();
   }
@@ -452,14 +503,14 @@ export class MessagesService {
         );
       }
       await tx.insert(conversationMembers).values({ conversationId: groupId, userId });
+      // Messages up to now stay out of reach; the new period starts after the newest one.
+      const [counter] = await tx
+        .select({ lastSequence: conversations.lastSequence })
+        .from(conversations)
+        .where(eq(conversations.id, groupId));
       await tx
-        .delete(removedGroupMembers)
-        .where(
-          and(
-            eq(removedGroupMembers.conversationId, groupId),
-            eq(removedGroupMembers.userId, userId),
-          ),
-        );
+        .insert(membershipPeriods)
+        .values({ conversationId: groupId, userId, startSequence: counter!.lastSequence });
     });
 
     const { conversation } = await this.get(callerId, groupId);
@@ -499,6 +550,10 @@ export class MessagesService {
     }
     const member = await this.memberRow(userId);
     const removed = await this.db.transaction(async (tx) => {
+      // Lock the Conversation so the period ends exactly at the newest Message.
+      await tx.execute(
+        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
+      );
       const deleted = await tx
         .delete(conversationMembers)
         .where(
@@ -510,9 +565,15 @@ export class MessagesService {
         .returning({ userId: conversationMembers.userId });
       if (deleted.length === 0) return false;
       await tx
-        .insert(removedGroupMembers)
-        .values({ conversationId: groupId, userId })
-        .onConflictDoNothing();
+        .update(membershipPeriods)
+        .set({ endSequence: sql`(select last_sequence from conversations where id = ${groupId})` })
+        .where(
+          and(
+            eq(membershipPeriods.conversationId, groupId),
+            eq(membershipPeriods.userId, userId),
+            eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
+          ),
+        );
       return true;
     });
     if (!removed || !member) {
@@ -598,6 +659,10 @@ export class MessagesService {
       await tx.insert(conversationMembers).values([
         { conversationId: created!.id, userId: low },
         { conversationId: created!.id, userId: high },
+      ]);
+      await tx.insert(membershipPeriods).values([
+        { conversationId: created!.id, userId: low, startSequence: 0 },
+        { conversationId: created!.id, userId: high, startSequence: 0 },
       ]);
       return { id: created!.id, created: true };
     }
