@@ -18,7 +18,10 @@ export const ConfigSchema = z.object({
   /** The one origin CORS allows (the SPA), e.g. http://localhost:5173. */
   SPA_ORIGIN: z
     .url()
-    .refine((v) => URL.canParse(v) && new URL(v).origin === v, 'must be an origin without path or trailing slash')
+    .refine(
+      (v) => URL.canParse(v) && new URL(v).origin === v,
+      'must be an origin without path or trailing slash',
+    )
     .default('http://localhost:5173'),
 
   /** Global log level, the fallback for every target without its own level. */

@@ -37,10 +37,12 @@ export class PinoLoggerService implements LoggerService {
     const context = typeof last === 'string' ? last : undefined;
     const rest = context === undefined ? params : params.slice(0, -1);
     const stack = method === 'error' && typeof rest[0] === 'string' ? rest[0] : undefined;
-    const text = typeof message === 'string' ? message : message instanceof Error ? message.message : JSON.stringify(message);
-    this.logger[method](
-      { ...(context ? { context } : {}), ...(stack ? { stack } : {}) },
-      text,
-    );
+    const text =
+      typeof message === 'string'
+        ? message
+        : message instanceof Error
+          ? message.message
+          : JSON.stringify(message);
+    this.logger[method]({ ...(context ? { context } : {}), ...(stack ? { stack } : {}) }, text);
   }
 }

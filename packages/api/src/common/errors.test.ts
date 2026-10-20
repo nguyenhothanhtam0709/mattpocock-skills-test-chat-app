@@ -58,7 +58,11 @@ afterEach(async () => {
 describe('validation failures', () => {
   it('maps an invalid body to 400 VALIDATION_FAILED with Zod issues in details', async () => {
     const app = await probeApp();
-    const res = await app.inject({ method: 'POST', url: '/probe', payload: { name: '', age: 1.5 } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/probe',
+      payload: { name: '', age: 1.5 },
+    });
 
     expect(res.statusCode).toBe(400);
     const body = ErrorResponseSchema.parse(res.json());

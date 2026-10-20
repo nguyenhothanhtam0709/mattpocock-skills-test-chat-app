@@ -89,7 +89,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return {
         status: clientStatus,
         body: {
-          error: { code: codeForStatus(clientStatus), message: 'The request could not be processed' },
+          error: {
+            code: codeForStatus(clientStatus),
+            message: 'The request could not be processed',
+          },
         },
       };
     }

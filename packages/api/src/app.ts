@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import helmet from '@fastify/helmet';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module.js';
@@ -47,6 +48,25 @@ export async function createApp(
   }
   app.useLogger(new PinoLoggerService(logger));
   app.setGlobalPrefix('api/v1');
+  // The API serves JSON only, so the CSP forbids loading or framing anything.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  });
+  // A function (not a string) so other origins get no CORS headers at all, rather than the
+  // SPA origin echoed back.
+  app.enableCors({
+    origin: (origin: string | undefined, callback: (err: Error | null, allow: boolean) => void) =>
+      callback(null, origin === config.SPA_ORIGIN),
+    credentials: true,
+  });
   adapter.getInstance().addHook('onClose', (_instance, done) => {
     closeLogger();
     done();
