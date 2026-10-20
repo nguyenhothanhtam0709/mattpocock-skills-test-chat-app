@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConversationCreatedEventSchema,
+  GroupMemberAddedEventSchema,
+  GroupMemberRemovedEventSchema,
   SessionRevokedEventSchema,
   MessageCreatedEventSchema,
   RealtimeEvent,
@@ -23,13 +25,26 @@ describe('realtime event contracts', () => {
     expect(RealtimeEvent).toEqual({
       MESSAGE_CREATED: 'message.created',
       CONVERSATION_CREATED: 'conversation.created',
+      GROUP_MEMBER_ADDED: 'group.member_added',
+      GROUP_MEMBER_REMOVED: 'group.member_removed',
       SESSION_REVOKED: 'session.revoked',
     });
     expect(Object.keys(RealtimeEventSchemas).sort()).toEqual([
       'conversation.created',
+      'group.member_added',
+      'group.member_removed',
       'message.created',
       'session.revoked',
     ]);
+  });
+
+  it('group.member_added and group.member_removed carry the Group and the Member', () => {
+    const member = { id, username: 'Bob', nickname: null };
+    for (const schema of [GroupMemberAddedEventSchema, GroupMemberRemovedEventSchema]) {
+      expect(schema.safeParse({ conversationId: id, member }).success).toBe(true);
+      expect(schema.safeParse({ conversationId: id }).success).toBe(false);
+      expect(schema.safeParse({ member }).success).toBe(false);
+    }
   });
 
   it('message.created carries the Message', () => {

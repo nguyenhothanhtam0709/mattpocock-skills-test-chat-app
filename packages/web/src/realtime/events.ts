@@ -1,9 +1,16 @@
-import type { ConversationCreatedEvent, MessageCreatedEvent } from '@chat/contracts';
+import type {
+  ConversationCreatedEvent,
+  GroupMemberAddedEvent,
+  GroupMemberRemovedEvent,
+  MessageCreatedEvent,
+} from '@chat/contracts';
 
 /** An already-decoded, contracts-validated server push. */
 export type RealtimeEvent =
   | ({ type: 'message.created' } & MessageCreatedEvent)
   | ({ type: 'conversation.created' } & ConversationCreatedEvent)
+  | ({ type: 'group.member_added' } & GroupMemberAddedEvent)
+  | ({ type: 'group.member_removed' } & GroupMemberRemovedEvent)
   | { type: 'session.revoked' };
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';

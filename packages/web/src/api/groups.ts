@@ -1,5 +1,7 @@
 import {
   CreateGroupResponseSchema,
+  GetConversationResponseSchema,
+  GroupMembershipResponseSchema,
   ErrorCode,
   ErrorResponseSchema,
   type CreateGroupRequest,
@@ -37,3 +39,75 @@ export async function createGroup(
   }
   return { ok: false, error: 'Something went wrong. Try again.' };
 }
+
+export type GroupResult = { ok: true; group: Group } | { ok: false; error: string };
+
+const GENERIC_ERROR = 'Something went wrong. Try again.';
+const UNREACHABLE = 'Could not reach the server. Try again.';
+
+/** `GET /api/v1/conversations/:id` for a Group: its Members and Owner. */
+export async function getGroup(
+  accessToken: string,
+  groupId: string,
+  signal?: AbortSignal,
+): Promise<GroupResult> {
+  let res: Response;
+  try {
+    res = await fetch(new URL(`/api/v1/conversations/${groupId}`, window.location.origin), {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal,
+    });
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+  if (!res.ok) return { ok: false, error: GENERIC_ERROR };
+  const { conversation } = GetConversationResponseSchema.parse(await res.json());
+  return conversation.kind === 'group'
+    ? { ok: true, group: conversation }
+    : { ok: false, error: GENERIC_ERROR };
+}
+
+async function changeMembers(
+  accessToken: string,
+  groupId: string,
+  method: 'POST' | 'DELETE',
+  path: string,
+  body: object | undefined,
+): Promise<GroupResult> {
+  let res: Response;
+  try {
+    res = await fetch(new URL(`/api/v1/groups/${groupId}/members${path}`, window.location.origin), {
+      method,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+  const payload: unknown = await res.json().catch(() => undefined);
+  if (res.ok) return { ok: true, group: GroupMembershipResponseSchema.parse(payload).conversation };
+  const code = ErrorResponseSchema.safeParse(payload).data?.error.code;
+  if (code === ErrorCode.ALREADY_A_MEMBER)
+    return { ok: false, error: 'They are already a Member.' };
+  if (code === ErrorCode.GROUP_FULL) {
+    return { ok: false, error: 'A Group can have at most 256 Members.' };
+  }
+  if (code === ErrorCode.USER_NOT_FOUND)
+    return { ok: false, error: 'That person no longer exists.' };
+  if (code === ErrorCode.NOT_GROUP_OWNER) {
+    return { ok: false, error: 'Only the Owner can change the Members.' };
+  }
+  if (code === ErrorCode.NOT_A_MEMBER) return { ok: false, error: 'They are no longer a Member.' };
+  return { ok: false, error: GENERIC_ERROR };
+}
+
+/** `POST /api/v1/groups/:id/members`: Owner only. */
+export const addGroupMember = (accessToken: string, groupId: string, userId: string) =>
+  changeMembers(accessToken, groupId, 'POST', '', { userId });
+
+/** `DELETE /api/v1/groups/:id/members/:userId`: Owner only. */
+export const removeGroupMember = (accessToken: string, groupId: string, userId: string) =>
+  changeMembers(accessToken, groupId, 'DELETE', `/${userId}`, undefined);

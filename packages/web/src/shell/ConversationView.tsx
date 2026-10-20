@@ -5,7 +5,7 @@ import {
   type User,
   type UserSearchResult,
 } from '@chat/contracts';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Info } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -26,6 +26,7 @@ import {
   InputGroupText,
   InputGroupTextarea,
 } from '@/components/ui/input-group';
+import { GroupDetailsSheet } from './GroupDetailsSheet';
 import { Marker, MarkerContent } from '@/components/ui/marker';
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message';
 import {
@@ -54,6 +55,11 @@ interface Outgoing {
   createdAt: string;
   status: 'pending' | 'failed';
   error?: string;
+}
+
+interface MembershipNote {
+  key: string;
+  text: string;
 }
 
 interface Row {
@@ -249,6 +255,29 @@ export function ConversationView({
   });
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [memberDelta, setMemberDelta] = useState(0);
+  // Membership notes live only in this view (they are not stored): they appear as they happen.
+  const [notes, setNotes] = useState<MembershipNote[]>([]);
+
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        if (event.type !== 'group.member_added' && event.type !== 'group.member_removed') return;
+        if (event.conversationId !== conversationId) return;
+        const added = event.type === 'group.member_added';
+        setMemberDelta((n) => n + (added ? 1 : -1));
+        setNotes((current) => [
+          ...current,
+          {
+            key: crypto.randomUUID(),
+            text: `${event.member.nickname ?? event.member.username} was ${added ? 'added' : 'removed'}`,
+          },
+        ]);
+      },
+      [conversationId],
+    ),
+  );
 
   useRealtimeEvents(
     useCallback(
@@ -348,8 +377,29 @@ export function ConversationView({
           <>
             <h1 className="truncate text-base font-semibold">{target.name}</h1>
             <span className="shrink-0 text-sm text-muted-foreground">
-              {target.memberCount} {target.memberCount === 1 ? 'member' : 'members'}
+              {target.memberCount + memberDelta}{' '}
+              {target.memberCount + memberDelta === 1 ? 'member' : 'members'}
             </span>
+            {conversationId && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="ml-auto"
+                  aria-label="Group details"
+                  onClick={() => setDetailsOpen(true)}
+                >
+                  <Info />
+                </Button>
+                <GroupDetailsSheet
+                  groupId={conversationId}
+                  user={user}
+                  open={detailsOpen}
+                  onOpenChange={setDetailsOpen}
+                />
+              </>
+            )}
           </>
         ) : (
           <>
@@ -365,7 +415,7 @@ export function ConversationView({
         )}
       </header>
       <div className="relative min-h-0 flex-1">
-        {rows.length === 0 ? (
+        {rows.length === 0 && notes.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">
             No messages yet.{' '}
             {target.kind === 'group'
@@ -424,6 +474,13 @@ export function ConversationView({
                           </MessageFooter>
                         )}
                       </Message>
+                    </MessageScrollerItem>
+                  ))}
+                  {notes.map((note) => (
+                    <MessageScrollerItem key={note.key} messageId={note.key}>
+                      <Marker>
+                        <MarkerContent>{note.text}</MarkerContent>
+                      </Marker>
                     </MessageScrollerItem>
                   ))}
                 </MessageScrollerContent>
