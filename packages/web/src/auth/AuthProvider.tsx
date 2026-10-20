@@ -18,9 +18,9 @@ import {
   type LoginResult,
 } from '@/api/auth';
 import {
-  latestMessages,
   listConversations,
-  type LatestMessagesResult,
+  messagesPage,
+  type MessagesPageResult,
   type ListConversationsResult,
 } from '@/api/conversations';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
@@ -43,8 +43,15 @@ interface AuthContextValue {
   sendMessage(conversationId: string, request: SendMessageRequest): Promise<SendResult>;
   /** The User's Conversations, most recently active first. */
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
-  /** The newest page of a Conversation's Messages, oldest first. */
-  latestMessages(conversationId: string, signal?: AbortSignal): Promise<LatestMessagesResult>;
+  /**
+   * A page of a Conversation's Messages, oldest first: the newest page, or with `before` (a
+   * sequence number) the page just older than it.
+   */
+  messagesPage(
+    conversationId: string,
+    before?: number,
+    signal?: AbortSignal,
+  ): Promise<MessagesPageResult>;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -152,11 +159,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return listConversations(accessToken, signal);
   }, []);
 
-  const latest = useCallback(async (conversationId: string, signal?: AbortSignal) => {
-    const accessToken = accessTokenRef.current;
-    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
-    return latestMessages(accessToken, conversationId, signal);
-  }, []);
+  const page = useCallback(
+    async (conversationId: string, before?: number, signal?: AbortSignal) => {
+      const accessToken = accessTokenRef.current;
+      if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+      return messagesPage(accessToken, conversationId, before, signal);
+    },
+    [],
+  );
 
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
@@ -173,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
       listConversations: conversationList,
-      latestMessages: latest,
+      messagesPage: page,
       logOut,
     }),
     [
@@ -184,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendDirect,
       sendToConversation,
       conversationList,
-      latest,
+      page,
       logOut,
     ],
   );

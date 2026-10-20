@@ -55,10 +55,16 @@ describe('GetMessagesQuerySchema', () => {
     });
   });
 
-  it.each([{ limit: '0' }, { limit: '101' }, { limit: 'x' }, { before: '0' }, { before: '-1' }])(
-    'rejects %j',
-    (query) => {
-      expect(GetMessagesQuerySchema.safeParse(query).success).toBe(false);
-    },
-  );
+  it.each([
+    { limit: '0' },
+    { limit: '101' },
+    { limit: 'x' },
+    { before: '0' },
+    { before: '-1' },
+    { after: '0' },
+    { before: '2147483648' },
+    { before: '1', after: '2' },
+  ])('rejects %j', (query) => {
+    expect(GetMessagesQuerySchema.safeParse(query).success).toBe(false);
+  });
 });
