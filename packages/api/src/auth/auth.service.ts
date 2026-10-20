@@ -12,6 +12,8 @@ import { DomainException } from '../common/all-exceptions.filter.js';
 import type { Config } from '../config/config.js';
 import { PG_POOL } from '../db/database.module.js';
 import { sessions, users } from '../db/schema.js';
+import { TOKEN_DENY_LIST, type TokenDenyList } from './token-deny-list.js';
+import type { AuthContext } from './auth.guard.js';
 import { TokenService } from './token.service.js';
 
 export interface NewUser {
@@ -48,6 +50,7 @@ export class AuthService {
     @Inject(PG_POOL) pool: Pool,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly tokens: TokenService,
+    @Inject(TOKEN_DENY_LIST) private readonly denyList: TokenDenyList,
     config: ConfigService<Config, true>,
   ) {
     this.db = drizzle(pool);
@@ -110,6 +113,7 @@ export class AuthService {
     const [session] = await this.db
       .update(sessions)
       .set({
+        previousRefreshTokenHash: sessions.refreshTokenHash,
         refreshTokenHash: this.tokens.hashRefreshToken(next),
         rotatedAt: now,
         expiresAt: refreshExpiresAt,
@@ -121,13 +125,36 @@ export class AuthService {
         ),
       )
       .returning({ id: sessions.id, userId: sessions.userId });
-    if (!session) throw unauthenticated();
+    if (!session) {
+      // A token that was already rotated away is being replayed: assume it was stolen and
+      // end the whole session, so neither the thief nor the owner can keep refreshing.
+      await this.db
+        .delete(sessions)
+        .where(eq(sessions.previousRefreshTokenHash, this.tokens.hashRefreshToken(refreshToken)));
+      throw unauthenticated();
+    }
 
     return {
       accessToken: await this.tokens.signAccessToken(session.userId, session.id),
       refreshToken: next,
       refreshExpiresAt,
     };
+  }
+
+  /** Ends the session now: its access token is denied until it would expire anyway. */
+  async logout(auth: AuthContext): Promise<void> {
+    await this.denyList.add(auth.jti, new Date(auth.expiresAt * 1000));
+    await this.db.delete(sessions).where(eq(sessions.id, auth.sessionId));
+    await this.denyList.sweepExpired();
+  }
+
+  async isSessionActive(sessionId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    return rows.length > 0;
   }
 
   async getUser(userId: string): Promise<RegisterResponse['user']> {

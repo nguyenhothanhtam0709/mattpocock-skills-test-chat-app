@@ -1,5 +1,6 @@
 import {
   HttpStatus,
+  Inject,
   createParamDecorator,
   Injectable,
   type CanActivate,
@@ -9,6 +10,8 @@ import { ErrorCode } from '@chat/contracts';
 import type { FastifyRequest } from 'fastify';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import { setRequestUserId } from '../logging/request-context.js';
+import { AuthService } from './auth.service.js';
+import { TOKEN_DENY_LIST, type TokenDenyList } from './token-deny-list.js';
 import { TokenService, type AccessClaims } from './token.service.js';
 
 export interface AuthContext {
@@ -23,7 +26,11 @@ type AuthedRequest = FastifyRequest & { auth?: AuthContext };
 /** Requires a valid, unexpired access token in `Authorization: Bearer`. */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly tokens: TokenService) {}
+  constructor(
+    private readonly tokens: TokenService,
+    @Inject(TOKEN_DENY_LIST) private readonly denyList: TokenDenyList,
+    private readonly auth: AuthService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthedRequest>();
@@ -37,6 +44,17 @@ export class AuthGuard implements CanActivate {
         ErrorCode.UNAUTHENTICATED,
         HttpStatus.UNAUTHORIZED,
         'Authentication required',
+      );
+    }
+    // Logout denies the token; a session ended any other way (refresh-token reuse) is gone.
+    if (
+      (await this.denyList.isDenied(claims.jti)) ||
+      !(await this.auth.isSessionActive(claims.sid))
+    ) {
+      throw new DomainException(
+        ErrorCode.SESSION_REVOKED,
+        HttpStatus.UNAUTHORIZED,
+        'Session has ended',
       );
     }
     request.auth = {

@@ -4,12 +4,12 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `TokenDenyList` port (add with expiry, check, sweep expired) with a Postgres adapter
-- [ ] One shared contract test suite for the port, run against the Postgres adapter (and reusable for future adapters)
-- [ ] Logout adds the access token's `jti` to the deny-list until its expiry and revokes the session
-- [ ] A denied access token returns `401` (`SESSION_REVOKED`) on any authenticated request
-- [ ] Presenting a rotated (already-used) refresh token revokes the session; subsequent refreshes fail
-- [ ] Expired deny-list entries are swept (tested with the injectable clock)
-- [ ] SPA: Log out in the User menu clears auth state and returns to login; tested
+- [x] `TokenDenyList` port (add with expiry, check, sweep expired) with a Postgres adapter
+- [x] One shared contract test suite for the port, run against the Postgres adapter (and reusable for future adapters)
+- [x] Logout adds the access token's `jti` to the deny-list until its expiry and revokes the session
+- [x] A denied access token returns `401` (`SESSION_REVOKED`) on any authenticated request
+- [x] Presenting a rotated (already-used) refresh token revokes the session; subsequent refreshes fail
+- [x] Expired deny-list entries are swept (tested with the injectable clock)
+- [x] SPA: Log out in the User menu clears auth state and returns to login; tested

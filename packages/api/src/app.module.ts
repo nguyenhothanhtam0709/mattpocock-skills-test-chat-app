@@ -4,16 +4,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
 import type { Logger } from 'pino';
+import type { Pool } from 'pg';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
+import { PostgresTokenDenyList } from './auth/postgres-token-deny-list.js';
+import { TOKEN_DENY_LIST } from './auth/token-deny-list.js';
 import { TokenService } from './auth/token.service.js';
 import { UsersController } from './auth/users.controller.js';
 import { AppThrottlerGuard } from './common/app-throttler.guard.js';
 import { CLOCK, type Clock } from './clock/clock.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig, type Config } from './config/config.js';
-import { DatabaseModule } from './db/database.module.js';
+import { DatabaseModule, PG_POOL } from './db/database.module.js';
 import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
 
@@ -69,6 +72,11 @@ export class AppModule {
         AuthGuard,
         TokenService,
         { provide: CLOCK, useValue: clock },
+        {
+          provide: TOKEN_DENY_LIST,
+          inject: [PG_POOL, CLOCK],
+          useFactory: (pool: Pool, appClock: Clock) => new PostgresTokenDenyList(pool, appClock),
+        },
         // Rate limit every route by default.
         { provide: APP_GUARD, useClass: AppThrottlerGuard },
       ],
