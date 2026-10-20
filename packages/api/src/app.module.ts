@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CLOCK, type Clock } from './clock/clock.js';
 import { loadConfig } from './config/config.js';
 import { DatabaseModule } from './db/database.module.js';
+import { ErrorsModule } from './common/errors.module.js';
 import { HealthController } from './health/health.controller.js';
 
 @Module({})
@@ -20,6 +21,7 @@ export class AppModule {
           validate: () => loadConfig(rawConfig),
         }),
         DatabaseModule,
+        ErrorsModule,
       ],
       controllers: [HealthController],
       providers: [{ provide: CLOCK, useValue: clock }],
