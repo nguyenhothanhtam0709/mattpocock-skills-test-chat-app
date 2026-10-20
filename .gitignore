@@ -1,0 +1,3 @@
+# Agent skills installed from skills-lock.json
+.agents/skills/shadcn/
+.claude/skills/shadcn
