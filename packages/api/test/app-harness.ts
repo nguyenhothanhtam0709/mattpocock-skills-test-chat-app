@@ -1,6 +1,7 @@
 import { inject } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp, type AppOverrides } from '../src/app.js';
+import { testJwtKeys } from './keys.js';
 import { LogCapture } from './log-capture.js';
 
 export interface HarnessOptions extends Omit<AppOverrides, 'logDestination'> {
@@ -28,7 +29,7 @@ export async function withApp(
   } = options;
   const logs = new LogCapture();
   const app = await createApp(
-    { DATABASE_URL: databaseUrl, ...config },
+    { DATABASE_URL: databaseUrl, ...testJwtKeys, ...config },
     { ...overrides, ...(useRealLogTransports ? {} : { logDestination: logs }) },
   );
   try {

@@ -1,3 +1,4 @@
+import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { z } from 'zod';
 
 const LogLevel = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']);
@@ -9,6 +10,22 @@ const EnvBoolean = z.enum(['true', 'false']).transform((v) => v === 'true');
 const LogFileFrequency = z
   .union([z.enum(['daily', 'hourly']), z.coerce.number().int().positive()])
   .describe("'daily', 'hourly' or milliseconds");
+
+/** A PEM-encoded Ed25519 key. Env vars often carry newlines as the two characters `\n`. */
+function PemKey(kind: 'private' | 'public') {
+  return z
+    .string()
+    .min(1)
+    .transform((value) => value.replace(/\\n/g, '\n'))
+    .refine((pem) => {
+      try {
+        const key = kind === 'private' ? createPrivateKey(pem) : createPublicKey(pem);
+        return key.asymmetricKeyType === 'ed25519';
+      } catch {
+        return false;
+      }
+    }, `must be a PEM-encoded Ed25519 ${kind} key`);
+}
 
 export const ConfigSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -40,6 +57,16 @@ export const ConfigSchema = z.object({
   /** Number of rotated files to keep. */
   LOG_FILE_RETENTION: z.coerce.number().int().min(1).default(7),
   LOG_FILE_LEVEL: LogLevel.optional(),
+
+  /** Ed25519 key pair (PEM; literal `\n` sequences are accepted) that signs access tokens. */
+  JWT_PRIVATE_KEY: PemKey('private'),
+  JWT_PUBLIC_KEY: PemKey('public'),
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(15 * 60),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(30),
 
   /** Database queries slower than this are logged at warn. */
   DB_SLOW_QUERY_MS: z.coerce.number().int().min(0).default(200),

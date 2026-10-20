@@ -1,12 +1,18 @@
+import { randomBytes } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ErrorCode, type RegisterResponse } from '@chat/contracts';
 import * as argon2 from 'argon2';
+import { and, eq, gt, or, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import { v7 as uuidv7 } from 'uuid';
+import { CLOCK, type Clock } from '../clock/clock.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
+import type { Config } from '../config/config.js';
 import { PG_POOL } from '../db/database.module.js';
-import { users } from '../db/schema.js';
+import { sessions, users } from '../db/schema.js';
+import { TokenService } from './token.service.js';
 
 export interface NewUser {
   username: string;
@@ -17,12 +23,123 @@ export interface NewUser {
 
 const UNIQUE_VIOLATION = '23505';
 
+export interface IssuedSession {
+  accessToken: string;
+  /** The opaque refresh token; goes into the cookie, never into a response body or a log. */
+  refreshToken: string;
+  refreshExpiresAt: Date;
+}
+
+const publicUser = {
+  id: users.id,
+  username: users.username,
+  email: users.email,
+  nickname: users.nickname,
+};
+
 @Injectable()
 export class AuthService {
   private readonly db: NodePgDatabase;
+  private readonly refreshTtlMs: number;
+  /** Verified against when the User does not exist, so both paths do the same hashing work. */
+  private readonly dummyHash: Promise<string>;
 
-  constructor(@Inject(PG_POOL) pool: Pool) {
+  constructor(
+    @Inject(PG_POOL) pool: Pool,
+    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly tokens: TokenService,
+    config: ConfigService<Config, true>,
+  ) {
     this.db = drizzle(pool);
+    this.refreshTtlMs = config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }) * 24 * 60 * 60 * 1000;
+    this.dummyHash = argon2.hash(randomBytes(16).toString('hex'), { type: argon2.argon2id });
+  }
+
+  /** Any failure is the same generic INVALID_CREDENTIALS. */
+  async login(
+    identifier: string,
+    password: string,
+  ): Promise<IssuedSession & { user: RegisterResponse['user'] }> {
+    const needle = identifier.normalize('NFC').toLowerCase();
+    const [row] = await this.db
+      .select({ ...publicUser, passwordHash: users.passwordHash })
+      .from(users)
+      .where(or(sql`lower(${users.username}) = ${needle}`, sql`lower(${users.email}) = ${needle}`))
+      .limit(1);
+
+    const matches = await argon2.verify(row?.passwordHash ?? (await this.dummyHash), password);
+    if (!row || !matches) {
+      throw new DomainException(
+        ErrorCode.INVALID_CREDENTIALS,
+        HttpStatus.UNAUTHORIZED,
+        'Invalid credentials',
+      );
+    }
+
+    const user = { id: row.id, username: row.username, email: row.email, nickname: row.nickname };
+    const now = this.clock.now();
+    const sessionId = uuidv7();
+    const refreshToken = this.tokens.newRefreshToken();
+    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlMs);
+    await this.db.insert(sessions).values({
+      id: sessionId,
+      userId: user.id,
+      refreshTokenHash: this.tokens.hashRefreshToken(refreshToken),
+      createdAt: now,
+      rotatedAt: now,
+      expiresAt: refreshExpiresAt,
+    });
+    return {
+      accessToken: await this.tokens.signAccessToken(user.id, sessionId),
+      refreshToken,
+      refreshExpiresAt,
+      user,
+    };
+  }
+
+  /** Swaps a live refresh token for a new one and a fresh access token. */
+  async refresh(refreshToken: string | undefined): Promise<IssuedSession> {
+    const unauthenticated = () =>
+      new DomainException(ErrorCode.UNAUTHENTICATED, HttpStatus.UNAUTHORIZED, 'Not signed in');
+    if (!refreshToken) throw unauthenticated();
+
+    const now = this.clock.now();
+    const next = this.tokens.newRefreshToken();
+    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlMs);
+    // One conditional UPDATE, so two concurrent refreshes with the same token cannot both win.
+    const [session] = await this.db
+      .update(sessions)
+      .set({
+        refreshTokenHash: this.tokens.hashRefreshToken(next),
+        rotatedAt: now,
+        expiresAt: refreshExpiresAt,
+      })
+      .where(
+        and(
+          eq(sessions.refreshTokenHash, this.tokens.hashRefreshToken(refreshToken)),
+          gt(sessions.expiresAt, now),
+        ),
+      )
+      .returning({ id: sessions.id, userId: sessions.userId });
+    if (!session) throw unauthenticated();
+
+    return {
+      accessToken: await this.tokens.signAccessToken(session.userId, session.id),
+      refreshToken: next,
+      refreshExpiresAt,
+    };
+  }
+
+  async getUser(userId: string): Promise<RegisterResponse['user']> {
+    const [user] = await this.db.select(publicUser).from(users).where(eq(users.id, userId));
+    if (!user) {
+      throw new DomainException(
+        ErrorCode.UNAUTHENTICATED,
+        HttpStatus.UNAUTHORIZED,
+        'Not signed in',
+      );
+    }
+    return user;
   }
 
   async register(input: NewUser): Promise<RegisterResponse> {

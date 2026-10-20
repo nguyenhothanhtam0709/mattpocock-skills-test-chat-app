@@ -20,3 +20,22 @@ export const users = pgTable(
     uniqueIndex('users_email_lower_unique').on(sql`lower(${t.email})`),
   ],
 );
+
+/**
+ * A signed-in device. The refresh token is an opaque random value; only its SHA-256 hash is
+ * stored, and the hash is replaced on every rotation.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    refreshTokenHash: text('refresh_token_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    rotatedAt: timestamp('rotated_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex('sessions_refresh_token_hash_unique').on(t.refreshTokenHash)],
+);

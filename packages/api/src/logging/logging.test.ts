@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withApp } from '../../test/app-harness.js';
+import { testJwtKeys } from '../../test/keys.js';
 import { LEVEL, LogCapture } from '../../test/log-capture.js';
 import { loadConfig } from '../config/config.js';
 import { createLogger } from './logger.js';
 import { runWithRequestContext, setRequestUserId } from './request-context.js';
 
-const validConfig = { DATABASE_URL: 'postgres://chat:chat@127.0.0.1:1/chat' };
+const validConfig = { DATABASE_URL: 'postgres://chat:chat@127.0.0.1:1/chat', ...testJwtKeys };
 
 describe('database query logging', () => {
   it('logs SQL text and duration at debug, tagged with the request ID', async () => {
