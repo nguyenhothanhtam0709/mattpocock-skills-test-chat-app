@@ -19,6 +19,7 @@
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "socket.io-client": "^4.8.4",
     "testcontainers": "^12.2.1",
     "typescript": "~5.9.3",
     "unplugin-swc": "^2.0.0",
@@ -32,7 +33,9 @@
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.2.0",
     "@nestjs/platform-fastify": "^12.2.0",
+    "@nestjs/platform-socket.io": "^12.2.0",
     "@nestjs/throttler": "^6.7.1",
+    "@nestjs/websockets": "^12.2.0",
     "argon2": "^0.45.1",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
@@ -43,6 +46,7 @@
     "pino-roll": "^4.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io-msgpack-parser": "^3.0.2",
     "uuid": "^14.0.3",
     "zod": "^4.6.7"
   }

@@ -45,6 +45,8 @@ interface AuthContextValue {
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
   /** The newest page of a Conversation's Messages, oldest first. */
   latestMessages(conversationId: string, signal?: AbortSignal): Promise<LatestMessagesResult>;
+  /** The current access token (renewed in the background), if signed in. */
+  getAccessToken(): string | undefined;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -158,6 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return latestMessages(accessToken, conversationId, signal);
   }, []);
 
+  const getAccessToken = useCallback(() => accessTokenRef.current, []);
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
@@ -174,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendMessage: sendToConversation,
       listConversations: conversationList,
       latestMessages: latest,
+      getAccessToken,
       logOut,
     }),
     [
@@ -185,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendToConversation,
       conversationList,
       latest,
+      getAccessToken,
       logOut,
     ],
   );

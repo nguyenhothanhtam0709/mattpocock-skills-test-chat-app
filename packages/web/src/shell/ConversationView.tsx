@@ -6,8 +6,9 @@ import {
   type UserSearchResult,
 } from '@chat/contracts';
 import { ArrowUp } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
+import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import {
   InputGroup,
@@ -173,6 +174,27 @@ export function ConversationView({
     })();
     return () => controller.abort();
   }, [openedWith, latestMessages]);
+
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        if (event.type !== 'message.created') return;
+        const { message } = event;
+        // A Message from the peer starts the Conversation this view was opened without.
+        const ours = conversationId
+          ? message.conversationId === conversationId
+          : message.senderId === peer.id;
+        if (!ours) return;
+        if (!conversationId) setConversationId(message.conversationId);
+        setMessages((current) =>
+          [...current.filter((m) => m.id !== message.id), message].sort(
+            (a, b) => a.sequence - b.sequence,
+          ),
+        );
+      },
+      [conversationId, peer.id],
+    ),
+  );
 
   async function send(body: string): Promise<string | undefined> {
     const clientMessageId = crypto.randomUUID();
