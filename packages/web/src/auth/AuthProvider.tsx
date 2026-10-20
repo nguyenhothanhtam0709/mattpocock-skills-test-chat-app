@@ -29,7 +29,14 @@ import {
   type MessagesPageResult,
   type ListConversationsResult,
 } from '@/api/conversations';
-import { createGroup, type CreateGroupResult } from '@/api/groups';
+import {
+  addGroupMember,
+  createGroup,
+  getGroup,
+  removeGroupMember,
+  type CreateGroupResult,
+  type GroupResult,
+} from '@/api/groups';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
 import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
@@ -50,6 +57,12 @@ interface AuthContextValue {
   sendMessage(conversationId: string, request: SendMessageRequest): Promise<SendResult>;
   /** Creates a Group owned by the User. */
   createGroup(request: CreateGroupRequest): Promise<CreateGroupResult>;
+  /** A Group with its Members and Owner. */
+  getGroup(groupId: string, signal?: AbortSignal): Promise<GroupResult>;
+  /** Owner only: adds a User to the Group. */
+  addGroupMember(groupId: string, userId: string): Promise<GroupResult>;
+  /** Owner only: removes a Member from the Group. */
+  removeGroupMember(groupId: string, userId: string): Promise<GroupResult>;
   /** The User's Conversations, most recently active first. */
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
   /**
@@ -172,6 +185,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return createGroup(accessToken, request);
   }, []);
 
+  const group = useCallback(async (groupId: string, signal?: AbortSignal) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return getGroup(accessToken, groupId, signal);
+  }, []);
+
+  const addMember = useCallback(async (groupId: string, userId: string) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return addGroupMember(accessToken, groupId, userId);
+  }, []);
+
+  const removeMember = useCallback(async (groupId: string, userId: string) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return removeGroupMember(accessToken, groupId, userId);
+  }, []);
+
   const conversationList = useCallback(async (signal?: AbortSignal) => {
     const accessToken = accessTokenRef.current;
     if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
@@ -204,6 +235,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
       createGroup: makeGroup,
+      getGroup: group,
+      addGroupMember: addMember,
+      removeGroupMember: removeMember,
       listConversations: conversationList,
       messagesPage: page,
       getAccessToken,
@@ -218,6 +252,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendDirect,
       sendToConversation,
       makeGroup,
+      group,
+      addMember,
+      removeMember,
       conversationList,
       page,
       getAccessToken,

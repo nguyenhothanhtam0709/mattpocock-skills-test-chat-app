@@ -11,6 +11,7 @@ import {
   GROUP_MEMBERS_MAX,
   type GetConversationResponse,
   type GetMessagesQuery,
+  type GroupMembershipResponse,
   type GetMessagesResponse,
   type ListConversationsResponse,
   type Message,
@@ -31,6 +32,7 @@ import {
   directConversations,
   groups,
   messages,
+  removedGroupMembers,
   users,
 } from '../db/schema.js';
 
@@ -123,7 +125,7 @@ export class MessagesService {
     conversationId: string,
     request: SendMessageRequest,
   ): Promise<SentMessage> {
-    await this.requireMember(conversationId, senderId);
+    await this.requireMember(conversationId, senderId, true);
     try {
       const message = await this.db.transaction((tx) =>
         this.insertMessage(tx, conversationId, senderId, request),
@@ -351,7 +353,12 @@ export class MessagesService {
     return byConversation;
   }
 
-  private async requireMember(conversationId: string, userId: string): Promise<void> {
+  /** With `forPosting`, a User the Owner removed is told so instead of getting a 404. */
+  private async requireMember(
+    conversationId: string,
+    userId: string,
+    forPosting = false,
+  ): Promise<void> {
     const [member] = await this.db
       .select({ userId: conversationMembers.userId })
       .from(conversationMembers)
@@ -361,7 +368,173 @@ export class MessagesService {
           eq(conversationMembers.userId, userId),
         ),
       );
-    if (!member) throw conversationNotFound();
+    if (member) return;
+    if (forPosting) {
+      const [removed] = await this.db
+        .select({ userId: removedGroupMembers.userId })
+        .from(removedGroupMembers)
+        .where(
+          and(
+            eq(removedGroupMembers.conversationId, conversationId),
+            eq(removedGroupMembers.userId, userId),
+          ),
+        );
+      if (removed) {
+        throw new DomainException(
+          ErrorCode.NOT_A_MEMBER,
+          HttpStatus.FORBIDDEN,
+          'You are no longer a Member of this Group',
+        );
+      }
+    }
+    throw conversationNotFound();
+  }
+
+  /** The Group the caller is a Member of, and whether the caller owns it; else 404. */
+  private async requireOwner(callerId: string, groupId: string): Promise<void> {
+    const [group] = await this.db
+      .select({ ownerId: groups.ownerId })
+      .from(groups)
+      .where(eq(groups.conversationId, groupId));
+    if (!group) throw conversationNotFound();
+    await this.requireMember(groupId, callerId);
+    if (group.ownerId !== callerId) {
+      throw new DomainException(
+        ErrorCode.NOT_GROUP_OWNER,
+        HttpStatus.FORBIDDEN,
+        'Only the Owner can change the Members',
+      );
+    }
+  }
+
+  private async memberRow(userId: string) {
+    const [row] = await this.db
+      .select({ id: users.id, username: users.username, nickname: users.nickname })
+      .from(users)
+      .where(eq(users.id, userId));
+    return row;
+  }
+
+  /**
+   * The Owner adds a User, who is a Member at once. The Conversation row is locked so that the
+   * 256-Member cap holds under concurrent adds. Pushes are best-effort (ADR-0001).
+   */
+  async addGroupMember(
+    callerId: string,
+    groupId: string,
+    userId: string,
+  ): Promise<GroupMembershipResponse> {
+    await this.requireOwner(callerId, groupId);
+    const member = await this.memberRow(userId);
+    if (!member) {
+      throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found');
+    }
+    await this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
+      );
+      const current = await tx
+        .select({ userId: conversationMembers.userId })
+        .from(conversationMembers)
+        .where(eq(conversationMembers.conversationId, groupId));
+      if (current.some((m) => m.userId === userId)) {
+        throw new DomainException(
+          ErrorCode.ALREADY_A_MEMBER,
+          HttpStatus.CONFLICT,
+          'Already a Member of this Group',
+        );
+      }
+      if (current.length >= GROUP_MEMBERS_MAX) {
+        throw new DomainException(
+          ErrorCode.GROUP_FULL,
+          HttpStatus.CONFLICT,
+          `A Group has at most ${GROUP_MEMBERS_MAX} Members`,
+        );
+      }
+      await tx.insert(conversationMembers).values({ conversationId: groupId, userId });
+      await tx
+        .delete(removedGroupMembers)
+        .where(
+          and(
+            eq(removedGroupMembers.conversationId, groupId),
+            eq(removedGroupMembers.userId, userId),
+          ),
+        );
+    });
+
+    const { conversation } = await this.get(callerId, groupId);
+    try {
+      const [summary] = await this.summaries(userId, groupId);
+      this.realtime.push(
+        RealtimeEvent.CONVERSATION_CREATED,
+        [userId],
+        { conversation: summary },
+        groupId,
+      );
+      this.realtime.push(
+        RealtimeEvent.GROUP_MEMBER_ADDED,
+        conversation.members.map((m) => m.id),
+        { conversationId: groupId, member },
+        groupId,
+      );
+    } catch (error) {
+      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+    }
+    return { conversation: conversation as GroupMembershipResponse['conversation'] };
+  }
+
+  /** The Owner removes a Member (never themselves). The removed User gets no more pushes. */
+  async removeGroupMember(
+    callerId: string,
+    groupId: string,
+    userId: string,
+  ): Promise<GroupMembershipResponse> {
+    await this.requireOwner(callerId, groupId);
+    if (userId === callerId) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_FAILED,
+        HttpStatus.BAD_REQUEST,
+        'The Owner cannot be removed from their Group',
+      );
+    }
+    const member = await this.memberRow(userId);
+    const removed = await this.db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(conversationMembers)
+        .where(
+          and(
+            eq(conversationMembers.conversationId, groupId),
+            eq(conversationMembers.userId, userId),
+          ),
+        )
+        .returning({ userId: conversationMembers.userId });
+      if (deleted.length === 0) return false;
+      await tx
+        .insert(removedGroupMembers)
+        .values({ conversationId: groupId, userId })
+        .onConflictDoNothing();
+      return true;
+    });
+    if (!removed || !member) {
+      throw new DomainException(
+        ErrorCode.NOT_A_MEMBER,
+        HttpStatus.NOT_FOUND,
+        'That User is not a Member of this Group',
+      );
+    }
+
+    const { conversation } = await this.get(callerId, groupId);
+    try {
+      this.realtime.push(
+        RealtimeEvent.GROUP_MEMBER_REMOVED,
+        conversation.members.map((m) => m.id),
+        { conversationId: groupId, member },
+        groupId,
+      );
+    } catch (error) {
+      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+    }
+    return { conversation: conversation as GroupMembershipResponse['conversation'] };
   }
 
   private async findByClientMessageId(

@@ -134,6 +134,25 @@ export const groups = pgTable('groups', {
     .references(() => users.id, { onDelete: 'cascade' }),
 });
 
+/**
+ * Users the Owner removed from a Group, so that posting can answer `NOT_A_MEMBER` rather than
+ * `CONVERSATION_NOT_FOUND`. A row goes when the User is added back. Ticket 17 replaces this
+ * with membership periods.
+ */
+export const removedGroupMembers = pgTable(
+  'removed_group_members',
+  {
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => groups.conversationId, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.conversationId, t.userId] })],
+);
+
 /** Immutable once inserted. */
 export const messages = pgTable(
   'messages',

@@ -57,6 +57,13 @@
       "when": 1792523132255,
       "tag": "0007_tranquil_boomerang",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792523690008,
+      "tag": "0008_gray_dagger",
+      "breakpoints": true
     }
   ]
 }

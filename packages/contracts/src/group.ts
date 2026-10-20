@@ -30,3 +30,13 @@ export type CreateGroupRequest = z.input<typeof CreateGroupRequestSchema>;
 export const CreateGroupResponseSchema = z.object({ conversation: GroupSchema });
 
 export type CreateGroupResponse = z.infer<typeof CreateGroupResponseSchema>;
+
+/** `POST /groups/:id/members`: the Owner adds a User, who becomes a Member at once. */
+export const AddGroupMemberRequestSchema = z.object({ userId: z.uuid() });
+
+export type AddGroupMemberRequest = z.input<typeof AddGroupMemberRequestSchema>;
+
+/** The Group as it is after a Member was added or removed. */
+export const GroupMembershipResponseSchema = z.object({ conversation: GroupSchema });
+
+export type GroupMembershipResponse = z.infer<typeof GroupMembershipResponseSchema>;

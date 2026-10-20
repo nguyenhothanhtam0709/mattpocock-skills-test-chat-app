@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { CreateGroupRequestSchema, GroupNameSchema } from './group.js';
+import { AddGroupMemberRequestSchema, CreateGroupRequestSchema, GroupNameSchema } from './group.js';
+
+describe('AddGroupMemberRequestSchema', () => {
+  it('needs a User ID', () => {
+    const userId = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b60';
+    expect(AddGroupMemberRequestSchema.safeParse({ userId }).success).toBe(true);
+    expect(AddGroupMemberRequestSchema.safeParse({ userId: 'bob' }).success).toBe(false);
+    expect(AddGroupMemberRequestSchema.safeParse({}).success).toBe(false);
+  });
+});
 
 describe('GroupNameSchema', () => {
   it('accepts 1 to 100 characters and preserves inner spacing and case', () => {
