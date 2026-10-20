@@ -11,7 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
+import { useReconnected, useRealtimeEvents } from '@/realtime/RealtimeProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
@@ -79,6 +79,8 @@ export function ConversationList({
     })();
     return () => controller.abort();
   }, [listConversations, refreshKey, pushedReloads]);
+
+  useReconnected(() => setPushedReloads((n) => n + 1));
 
   const listed = state.status === 'ready' ? state.list : undefined;
   useRealtimeEvents(
