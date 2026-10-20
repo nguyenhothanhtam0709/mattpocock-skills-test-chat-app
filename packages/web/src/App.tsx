@@ -3,7 +3,11 @@ import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignupPage } from '@/auth/SignupPage';
 import { HealthPage } from '@/health/HealthPage';
-import { RealtimeProvider, type CreateRealtime } from '@/realtime/RealtimeProvider';
+import {
+  RealtimeProvider,
+  useRealtimeEvents,
+  type CreateRealtime,
+} from '@/realtime/RealtimeProvider';
 import { noRealtime } from '@/realtime/events';
 import { navigate, usePath } from '@/router';
 import { AppShell } from '@/shell/AppShell';
@@ -32,6 +36,19 @@ function Routes() {
   return path === '/login' ? <LoginPage /> : null;
 }
 
+/** The server ended this session (e.g. logout in another tab): sign out and go to login. */
+function SessionRevocationWatcher() {
+  const { state, endSession } = useAuth();
+  return state.status === 'signedIn' ? <WatchRevocation onRevoked={endSession} /> : null;
+}
+
+function WatchRevocation({ onRevoked }: { onRevoked: () => void }) {
+  useRealtimeEvents((event) => {
+    if (event.type === 'session.revoked') onRevoked();
+  });
+  return null;
+}
+
 const noConnection: CreateRealtime = () => noRealtime;
 
 /** `createRealtime` is how server push is connected; without it nothing is pushed. */
@@ -40,6 +57,7 @@ export function App({ createRealtime = noConnection }: { createRealtime?: Create
     <ThemeProvider>
       <AuthProvider>
         <RealtimeProvider create={createRealtime}>
+          <SessionRevocationWatcher />
           <Routes />
         </RealtimeProvider>
       </AuthProvider>

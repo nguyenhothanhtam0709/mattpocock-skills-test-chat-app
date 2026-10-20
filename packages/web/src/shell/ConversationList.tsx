@@ -94,6 +94,7 @@ export function ConversationList({
           setState({ status: 'ready', list: [conversation, ...listed] });
           return;
         }
+        if (event.type !== 'message.created') return;
         const { message } = event;
         const known = listed.find((c) => c.id === message.conversationId);
         if (!known) {

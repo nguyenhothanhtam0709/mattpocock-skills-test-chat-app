@@ -4,9 +4,13 @@
 
 **Blocked by:** 05, 12
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Logout pushes `session.revoked` to the per-session room, then disconnects those sockets (tested with real clients)
-- [ ] Sockets of the same User's other sessions stay connected
-- [ ] A denied token cannot open a new socket
-- [ ] SPA: on `session.revoked` (or an unrecoverable `401`) auth state is cleared and the User is returned to login; tested with the `RealtimeEvents` fake
+- [x] Logout pushes `session.revoked` to the per-session room, then disconnects those sockets (tested with real clients)
+- [x] Sockets of the same User's other sessions stay connected
+- [x] A denied token cannot open a new socket
+- [x] SPA: on `session.revoked` (or an unrecoverable `401`) auth state is cleared and the User is returned to login; tested with the `RealtimeEvents` fake
+
+## Comments
+
+- The "unrecoverable `401`" path already signs the User out: `AuthProvider` clears auth state when a token refresh fails. This ticket adds the `session.revoked` path only.

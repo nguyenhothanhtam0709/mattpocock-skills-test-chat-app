@@ -345,3 +345,56 @@ describe('real-time push', () => {
     });
   });
 });
+
+describe('session revocation over the socket', () => {
+  const logOut = (app: NestFastifyApplication, who: Person) =>
+    app.inject({ method: 'POST', url: '/api/v1/auth/logout', headers: bearer(who) });
+
+  it('pushes session.revoked to every socket of the session, then disconnects them', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const url = await listenOnRandomPort(app);
+      const tabOne = await connectSocket(url, alice.token);
+      const tabTwo = await connectSocket(url, alice.token);
+      const revoked = [tabOne.next('session.revoked'), tabTwo.next('session.revoked')];
+      const closed = [tabOne, tabTwo].map(
+        (tab) => new Promise((resolve) => tab.socket.once('disconnect', resolve)),
+      );
+
+      expect((await logOut(app, alice)).statusCode).toBe(204);
+
+      expect(await Promise.all(revoked)).toEqual([{}, {}]);
+      await Promise.all(closed);
+      expect(tabOne.socket.connected).toBe(false);
+      expect(tabTwo.socket.connected).toBe(false);
+    });
+  });
+
+  it("keeps the same User's other sessions connected", async () => {
+    await withApp({}, async (app) => {
+      const first = await signUp(app, 'Alice');
+      const second = await logIn(app, 'Alice');
+      const url = await listenOnRandomPort(app);
+      const firstSocket = await connectSocket(url, first.token);
+      const secondSocket = await connectSocket(url, second.token);
+      const closed = new Promise((resolve) => firstSocket.socket.once('disconnect', resolve));
+
+      await logOut(app, first);
+      await closed;
+      await settle();
+
+      expect(secondSocket.socket.connected).toBe(true);
+      expect(secondSocket.received.map(([event]) => event)).not.toContain('session.revoked');
+    });
+  });
+
+  it('refuses a new socket with the revoked token', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const url = await listenOnRandomPort(app);
+      await logOut(app, alice);
+
+      await expect(connectSocket(url, alice.token)).rejects.toThrow('SESSION_REVOKED');
+    });
+  });
+});
