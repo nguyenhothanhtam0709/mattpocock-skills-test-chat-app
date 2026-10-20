@@ -156,19 +156,23 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
   );
 }
 
+/** What a view is showing: a Direct Conversation with a peer, or an existing Group. */
+export type ConversationTarget =
+  { kind: 'direct'; peer: UserSearchResult } | { kind: 'group'; name: string; memberCount: number };
+
 /**
- * A Direct Conversation with `peer`. It starts without a Conversation ID: the first Message
- * is sent to the User and creates the Conversation, later ones go to it. Messages are shown
- * as text only (ADR-0002).
+ * A Direct Conversation with a peer, or a Group. A Direct Conversation starts without a
+ * Conversation ID: the first Message is sent to the User and creates the Conversation, later
+ * ones go to it. Messages are shown as text only (ADR-0002).
  */
 export function ConversationView({
   user,
-  peer,
+  target,
   conversationId: initialConversationId,
   onSent,
 }: {
   user: User;
-  peer: UserSearchResult;
+  target: ConversationTarget;
   /** Set when opening an existing Conversation: its newest Messages are loaded. */
   conversationId?: string | undefined;
   /** Called after each send with the Conversation's ID. */
@@ -234,7 +238,7 @@ export function ConversationView({
         // A Message from the peer starts the Conversation this view was opened without.
         const ours = conversationId
           ? message.conversationId === conversationId
-          : message.senderId === peer.id;
+          : target.kind === 'direct' && message.senderId === target.peer.id;
         if (!ours) return;
         if (!conversationId) setConversationId(message.conversationId);
         setMessages((current) => mergeMessages(current, [message]));
@@ -242,16 +246,17 @@ export function ConversationView({
           current.filter((o) => o.clientMessageId !== message.clientMessageId),
         );
       },
-      [conversationId, peer.id],
+      [conversationId, target],
     ),
   );
 
   /** Sends (or re-sends) with the Outgoing's own client message ID, so a retry never duplicates. */
   async function transmit(item: Outgoing) {
     const { clientMessageId, body } = item;
-    const result = conversationId
-      ? await sendMessage(conversationId, { clientMessageId, body })
-      : await sendDirectMessage({ recipientId: peer.id, clientMessageId, body });
+    const result =
+      conversationId || target.kind === 'group'
+        ? await sendMessage(conversationId!, { clientMessageId, body })
+        : await sendDirectMessage({ recipientId: target.peer.id, clientMessageId, body });
     if (!result.ok) {
       setOutgoing((current) =>
         current.map((o) =>
@@ -319,15 +324,33 @@ export function ConversationView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-12 items-center gap-2 border-b px-4">
-        <h1 className="truncate text-base font-semibold">{peer.nickname ?? peer.username}</h1>
-        {peer.nickname !== null && (
-          <span className="truncate text-sm text-muted-foreground">@{peer.username}</span>
+        {target.kind === 'group' ? (
+          <>
+            <h1 className="truncate text-base font-semibold">{target.name}</h1>
+            <span className="shrink-0 text-sm text-muted-foreground">
+              {target.memberCount} {target.memberCount === 1 ? 'member' : 'members'}
+            </span>
+          </>
+        ) : (
+          <>
+            <h1 className="truncate text-base font-semibold">
+              {target.peer.nickname ?? target.peer.username}
+            </h1>
+            {target.peer.nickname !== null && (
+              <span className="truncate text-sm text-muted-foreground">
+                @{target.peer.username}
+              </span>
+            )}
+          </>
         )}
       </header>
       <div className="relative min-h-0 flex-1">
         {rows.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">
-            No messages yet. Say hello to {peer.nickname ?? peer.username}.
+            No messages yet.{' '}
+            {target.kind === 'group'
+              ? 'Say hello to the Group.'
+              : `Say hello to ${target.peer.nickname ?? target.peer.username}.`}
           </p>
         ) : (
           <MessageScrollerProvider>

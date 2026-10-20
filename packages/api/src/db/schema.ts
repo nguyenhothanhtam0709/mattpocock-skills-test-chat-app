@@ -68,7 +68,7 @@ export const tokenDenyList = pgTable('token_deny_list', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
 
-/** A container of Messages. Only Direct Conversations exist so far. */
+/** A container of Messages: a Direct Conversation or a Group. */
 export const conversations = pgTable(
   'conversations',
   {
@@ -80,7 +80,7 @@ export const conversations = pgTable(
     lastSequence: integer('last_sequence').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check('conversations_kind_check', sql`${t.kind} in ('direct')`)],
+  (t) => [check('conversations_kind_check', sql`${t.kind} in ('direct', 'group')`)],
 );
 
 export const conversationMembers = pgTable(
@@ -122,6 +122,17 @@ export const directConversations = pgTable(
     check('direct_conversations_ordered_check', sql`${t.lowUserId} < ${t.highUserId}`),
   ],
 );
+
+/** The name and the single Owner of a Group. */
+export const groups = pgTable('groups', {
+  conversationId: uuid('conversation_id')
+    .primaryKey()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  ownerId: uuid('owner_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+});
 
 /** Immutable once inserted. */
 export const messages = pgTable(

@@ -1,5 +1,5 @@
-import type { User, UserSearchResult } from '@chat/contracts';
-import { ChevronsUpDown, LogOut, Moon, SquarePen, Sun, UserRound } from 'lucide-react';
+import type { ConversationSummary, User } from '@chat/contracts';
+import { ChevronsUpDown, LogOut, Moon, SquarePen, Sun, UserRound, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -26,8 +26,9 @@ import {
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ConversationList } from './ConversationList';
-import { ConversationView } from './ConversationView';
+import { ConversationView, type ConversationTarget } from './ConversationView';
 import { NewConversationDialog } from './NewConversationDialog';
+import { NewGroupDialog } from './NewGroupDialog';
 import { ProfileDialog } from './ProfileDialog';
 
 function UserMenu({ user }: { user: User }) {
@@ -67,10 +68,19 @@ function UserMenu({ user }: { user: User }) {
   );
 }
 
+function targetOf(conversation: ConversationSummary, user: User): ConversationTarget | undefined {
+  if (conversation.kind === 'group') {
+    return { kind: 'group', name: conversation.name, memberCount: conversation.members.length };
+  }
+  const peer = conversation.members.find((m) => m.id !== user.id);
+  return peer && { kind: 'direct', peer };
+}
+
 /** The signed-in frame: the Conversation list in a sidebar (a sheet on mobile) beside the content. */
 export function AppShell({ user }: { user: User }) {
   const [newConversationOpen, setNewConversationOpen] = useState(false);
-  const [open, setOpen] = useState<{ peer: UserSearchResult; conversationId?: string }>();
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [open, setOpen] = useState<{ target: ConversationTarget; conversationId?: string }>();
   const [refreshKey, setRefreshKey] = useState(0);
   return (
     <SidebarProvider>
@@ -78,8 +88,20 @@ export function AppShell({ user }: { user: User }) {
         open={newConversationOpen}
         onOpenChange={setNewConversationOpen}
         onPick={(picked) => {
-          setOpen({ peer: picked });
+          setOpen({ target: { kind: 'direct', peer: picked } });
           setNewConversationOpen(false);
+        }}
+      />
+      <NewGroupDialog
+        open={newGroupOpen}
+        onOpenChange={setNewGroupOpen}
+        onCreated={(group) => {
+          setOpen({
+            target: { kind: 'group', name: group.name, memberCount: group.members.length },
+            conversationId: group.id,
+          });
+          setRefreshKey((k) => k + 1);
+          setNewGroupOpen(false);
         }}
       />
       <Sidebar>
@@ -94,6 +116,14 @@ export function AppShell({ user }: { user: User }) {
             >
               <SquarePen />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New group"
+              onClick={() => setNewGroupOpen(true)}
+            >
+              <Users />
+            </Button>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -103,8 +133,8 @@ export function AppShell({ user }: { user: User }) {
               selectedId={open?.conversationId}
               refreshKey={refreshKey}
               onSelect={(conversation) => {
-                const other = conversation.members.find((m) => m.id !== user.id);
-                if (other) setOpen({ peer: other, conversationId: conversation.id });
+                const target = targetOf(conversation, user);
+                if (target) setOpen({ target, conversationId: conversation.id });
               }}
             />
           </SidebarGroup>
@@ -120,9 +150,9 @@ export function AppShell({ user }: { user: User }) {
               <SidebarTrigger />
             </div>
             <ConversationView
-              key={open.peer.id}
+              key={open.target.kind === 'direct' ? open.target.peer.id : open.conversationId}
               user={user}
-              peer={open.peer}
+              target={open.target}
               conversationId={open.conversationId}
               onSent={(conversationId) => {
                 setOpen((current) => current && { ...current, conversationId });

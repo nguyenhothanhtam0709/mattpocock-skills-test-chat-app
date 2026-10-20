@@ -50,7 +50,14 @@ function useUserSearch(query: string): SearchState {
   return state;
 }
 
-function NewConversationSearch({ onPick }: { onPick: (user: UserSearchResult) => void }) {
+/** Username-prefix search with a keyboard-navigable result list; `onPick` gets the chosen User. */
+export function UserSearchCombobox({
+  onPick,
+  autoFocus = true,
+}: {
+  onPick: (user: UserSearchResult) => void;
+  autoFocus?: boolean;
+}) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const listId = useId();
@@ -83,7 +90,7 @@ function NewConversationSearch({ onPick }: { onPick: (user: UserSearchResult) =>
         aria-label="Username"
         placeholder="Search by Username"
         autoComplete="off"
-        autoFocus
+        autoFocus={autoFocus}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -159,7 +166,7 @@ export function NewConversationDialog({
           <DialogDescription>Find a person by the start of their Username.</DialogDescription>
         </DialogHeader>
         {/* Mounted only while open, so closing discards the query. */}
-        <NewConversationSearch onPick={onPick} />
+        <UserSearchCombobox onPick={onPick} />
       </DialogContent>
     </Dialog>
   );

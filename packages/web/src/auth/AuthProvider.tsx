@@ -1,4 +1,9 @@
-import type { SendDirectMessageRequest, SendMessageRequest, User } from '@chat/contracts';
+import type {
+  CreateGroupRequest,
+  SendDirectMessageRequest,
+  SendMessageRequest,
+  User,
+} from '@chat/contracts';
 import {
   createContext,
   useCallback,
@@ -23,6 +28,7 @@ import {
   type MessagesPageResult,
   type ListConversationsResult,
 } from '@/api/conversations';
+import { createGroup, type CreateGroupResult } from '@/api/groups';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
 import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
@@ -41,6 +47,8 @@ interface AuthContextValue {
   sendDirectMessage(request: SendDirectMessageRequest): Promise<SendResult>;
   /** Sends to an existing Conversation. */
   sendMessage(conversationId: string, request: SendMessageRequest): Promise<SendResult>;
+  /** Creates a Group owned by the User. */
+  createGroup(request: CreateGroupRequest): Promise<CreateGroupResult>;
   /** The User's Conversations, most recently active first. */
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
   /**
@@ -155,6 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const makeGroup = useCallback(async (request: CreateGroupRequest) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return createGroup(accessToken, request);
+  }, []);
+
   const conversationList = useCallback(async (signal?: AbortSignal) => {
     const accessToken = accessTokenRef.current;
     if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
@@ -186,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       searchUsers: searchUsersByPrefix,
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
+      createGroup: makeGroup,
       listConversations: conversationList,
       messagesPage: page,
       getAccessToken,
@@ -198,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       searchUsersByPrefix,
       sendDirect,
       sendToConversation,
+      makeGroup,
       conversationList,
       page,
       getAccessToken,

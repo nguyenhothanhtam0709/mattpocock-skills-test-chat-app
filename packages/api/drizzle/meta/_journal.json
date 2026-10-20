@@ -50,6 +50,13 @@
       "when": 1792512616009,
       "tag": "0006_panoramic_sleeper",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792523132255,
+      "tag": "0007_tranquil_boomerang",
+      "breakpoints": true
     }
   ]
 }
