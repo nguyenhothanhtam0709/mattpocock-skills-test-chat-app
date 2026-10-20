@@ -19,3 +19,7 @@
 - [x] SPA: choosing a User in the search dialog opens a new Conversation view; Messages are rendered as text in `MessageScroller` → `MessageGroup` / `Message` / `Bubble` (own Messages on the end side), day dividers as `Marker`
 - [x] SPA composer: `InputGroup` textarea, Enter sends, Shift+Enter inserts a newline, character counter near the limit
 - [x] SPA tests: send a first Message and see it; a Message containing `<b>hi</b>` is shown literally
+
+## Comments
+
+- `@shadcn/react` was added to `packages/web` (required by the shadcn `message-scroller` component behind `MessageScroller`). The ticket did not name it; the user approved keeping it.
