@@ -6,6 +6,7 @@ import { setupServer } from 'msw/node';
  * By default nobody is signed in: the refresh cookie is missing, so refreshing answers 401.
  */
 export const server = setupServer(
+  http.get('*/api/v1/conversations', () => HttpResponse.json({ conversations: [] })),
   http.post('*/api/v1/auth/refresh', () =>
     HttpResponse.json(
       { error: { code: 'UNAUTHENTICATED', message: 'Not signed in' } },
