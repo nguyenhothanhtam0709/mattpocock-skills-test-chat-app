@@ -1,7 +1,7 @@
 import { RealtimeEventSchemas, type RealtimeEventName } from '@chat/contracts';
 import { io, type Socket } from 'socket.io-client';
 import parser from 'socket.io-msgpack-parser';
-import type { RealtimeEvent, RealtimeEvents } from './events';
+import type { ConnectionStatus, RealtimeEvent, RealtimeEvents } from './events';
 
 export interface SocketRealtimeOptions {
   /** Where the Socket.IO server is; the page's origin in the app. */
@@ -20,7 +20,15 @@ export function createSocketRealtime({
   getAccessToken,
 }: SocketRealtimeOptions): RealtimeEvents {
   const listeners = new Set<(event: RealtimeEvent) => void>();
+  const statusListeners = new Set<(status: ConnectionStatus) => void>();
+  let status: ConnectionStatus = 'connecting';
   let socket: Socket | undefined;
+
+  function setStatus(next: ConnectionStatus) {
+    if (next === status) return;
+    status = next;
+    statusListeners.forEach((listener) => listener(next));
+  }
 
   function connect(): Socket {
     const next = io(url, {
@@ -28,6 +36,9 @@ export function createSocketRealtime({
       transports: ['websocket'],
       auth: (cb) => cb({ token: getAccessToken() }),
     });
+    next.on('connect', () => setStatus('connected'));
+    next.on('disconnect', () => setStatus('disconnected'));
+    next.on('connect_error', () => setStatus('disconnected'));
     next.onAny((name: string, payload: unknown) => {
       if (!(name in RealtimeEventSchemas)) {
         console.warn(`Dropped unknown realtime event "${name}"`);
@@ -45,6 +56,11 @@ export function createSocketRealtime({
   }
 
   return {
+    subscribeStatus(listener) {
+      statusListeners.add(listener);
+      listener(status);
+      return () => statusListeners.delete(listener);
+    },
     subscribe(listener) {
       listeners.add(listener);
       socket ??= connect();
@@ -53,6 +69,7 @@ export function createSocketRealtime({
         if (listeners.size === 0) {
           socket?.close();
           socket = undefined;
+          status = 'connecting';
         }
       };
     },

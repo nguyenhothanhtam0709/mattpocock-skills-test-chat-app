@@ -20,6 +20,7 @@ import {
 import {
   listConversations,
   messagesPage,
+  type MessagesCursor,
   type MessagesPageResult,
   type ListConversationsResult,
 } from '@/api/conversations';
@@ -44,12 +45,12 @@ interface AuthContextValue {
   /** The User's Conversations, most recently active first. */
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
   /**
-   * A page of a Conversation's Messages, oldest first: the newest page, or with `before` (a
-   * sequence number) the page just older than it.
+   * A page of a Conversation's Messages, oldest first: the newest page, or with a cursor the
+   * page just older than `before` or just newer than `after` (sequence numbers).
    */
   messagesPage(
     conversationId: string,
-    before?: number,
+    cursor?: MessagesCursor,
     signal?: AbortSignal,
   ): Promise<MessagesPageResult>;
   /** The current access token (renewed in the background), if signed in. */
@@ -162,10 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const page = useCallback(
-    async (conversationId: string, before?: number, signal?: AbortSignal) => {
+    async (conversationId: string, cursor?: MessagesCursor, signal?: AbortSignal) => {
       const accessToken = accessTokenRef.current;
       if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
-      return messagesPage(accessToken, conversationId, before, signal);
+      return messagesPage(accessToken, conversationId, cursor, signal);
     },
     [],
   );
