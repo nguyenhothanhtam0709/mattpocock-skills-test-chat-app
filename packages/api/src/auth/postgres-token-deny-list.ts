@@ -1,17 +1,13 @@
-import { and, eq, gt, lte } from 'drizzle-orm';
+import { and, eq, gt, lte, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
-import type { Clock } from '../clock/clock.js';
 import { tokenDenyList } from '../db/schema.js';
 import type { TokenDenyList } from './token-deny-list.js';
 
 export class PostgresTokenDenyList implements TokenDenyList {
   private readonly db: NodePgDatabase;
 
-  constructor(
-    pool: Pool,
-    private readonly clock: Clock,
-  ) {
+  constructor(pool: Pool) {
     this.db = drizzle(pool);
   }
 
@@ -26,7 +22,7 @@ export class PostgresTokenDenyList implements TokenDenyList {
     const rows = await this.db
       .select({ jti: tokenDenyList.jti })
       .from(tokenDenyList)
-      .where(and(eq(tokenDenyList.jti, jti), gt(tokenDenyList.expiresAt, this.clock.now())))
+      .where(and(eq(tokenDenyList.jti, jti), gt(tokenDenyList.expiresAt, sql`now()`)))
       .limit(1);
     return rows.length > 0;
   }
@@ -34,7 +30,7 @@ export class PostgresTokenDenyList implements TokenDenyList {
   async sweepExpired(): Promise<number> {
     const removed = await this.db
       .delete(tokenDenyList)
-      .where(lte(tokenDenyList.expiresAt, this.clock.now()))
+      .where(lte(tokenDenyList.expiresAt, sql`now()`))
       .returning({ jti: tokenDenyList.jti });
     return removed.length;
   }
