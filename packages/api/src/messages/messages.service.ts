@@ -3,6 +3,8 @@ import {
   ErrorCode,
   LAST_MESSAGE_PREVIEW_MAX,
   type Conversation,
+  type ConversationSummary,
+  RealtimeEvent,
   type ConversationMember,
   type GetConversationResponse,
   type GetMessagesQuery,
@@ -15,6 +17,9 @@ import {
 import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
+import type { Logger } from 'pino';
+import { PINO } from '../logging/logging.module.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import { PG_POOL } from '../db/database.module.js';
 import {
@@ -58,7 +63,11 @@ const conversationNotFound = () =>
 export class MessagesService {
   private readonly db: NodePgDatabase;
 
-  constructor(@Inject(PG_POOL) pool: Pool) {
+  constructor(
+    @Inject(PG_POOL) pool: Pool,
+    private readonly realtime: RealtimeGateway,
+    @Inject(PINO) private readonly logger: Logger,
+  ) {
     this.db = drizzle(pool);
   }
 
@@ -87,10 +96,15 @@ export class MessagesService {
     if (original) return this.asDirectResult(original);
 
     try {
-      const message = await this.db.transaction(async (tx) => {
-        const conversationId = await this.findOrCreateDirect(tx, senderId, recipientId);
-        return this.insertMessage(tx, conversationId, senderId, { clientMessageId, body });
+      const { message, newConversation } = await this.db.transaction(async (tx) => {
+        const direct = await this.findOrCreateDirect(tx, senderId, recipientId);
+        const inserted = await this.insertMessage(tx, direct.id, senderId, {
+          clientMessageId,
+          body,
+        });
+        return { message: inserted, newConversation: direct.created };
       });
+      await this.pushCreated(message, newConversation ? recipientId : undefined);
       return this.asDirectResult({ message, created: true });
     } catch (error) {
       if (!(error instanceof DuplicateClientMessage)) throw error;
@@ -110,6 +124,7 @@ export class MessagesService {
       const message = await this.db.transaction((tx) =>
         this.insertMessage(tx, conversationId, senderId, request),
       );
+      await this.pushCreated(message, undefined);
       return { message, created: true };
     } catch (error) {
       if (!(error instanceof DuplicateClientMessage)) throw error;
@@ -145,6 +160,50 @@ export class MessagesService {
 
   /** The caller's Conversations, newest last Message first. */
   async list(userId: string): Promise<ListConversationsResponse> {
+    return { conversations: await this.summaries(userId) };
+  }
+
+  /**
+   * Pushes a saved Message to every Member (the sender's other tabs too). When the Direct
+   * Conversation was just created, its recipient first gets the Conversation itself. Push is
+   * best-effort (ADR-0001): a failure is logged and never fails the send.
+   */
+  private async pushCreated(message: Message, newConversationRecipient: string | undefined) {
+    try {
+      const members = await this.db
+        .select({ userId: conversationMembers.userId })
+        .from(conversationMembers)
+        .where(eq(conversationMembers.conversationId, message.conversationId));
+      if (newConversationRecipient) {
+        const [conversation] = await this.summaries(
+          newConversationRecipient,
+          message.conversationId,
+        );
+        this.realtime.push(
+          RealtimeEvent.CONVERSATION_CREATED,
+          [newConversationRecipient],
+          { conversation },
+          message.conversationId,
+        );
+      }
+      this.realtime.push(
+        RealtimeEvent.MESSAGE_CREATED,
+        members.map((m) => m.userId),
+        { message },
+        message.conversationId,
+      );
+    } catch (error) {
+      this.logger.error(
+        { err: error, conversationId: message.conversationId },
+        'socket push failed',
+      );
+    }
+  }
+
+  private async summaries(
+    userId: string,
+    onlyConversationId?: string,
+  ): Promise<ConversationSummary[]> {
     const rows = await this.db
       .select({
         id: conversations.id,
@@ -162,26 +221,29 @@ export class MessagesService {
           eq(messages.sequence, conversations.lastSequence),
         ),
       )
-      .where(eq(conversationMembers.userId, userId))
+      .where(
+        and(
+          eq(conversationMembers.userId, userId),
+          onlyConversationId === undefined ? undefined : eq(conversations.id, onlyConversationId),
+        ),
+      )
       .orderBy(desc(messages.createdAt), desc(conversations.id));
     const members = await this.membersOf(rows.map((r) => r.id));
-    return {
-      conversations: rows.map((row) => {
-        const all = members.get(row.id) ?? [];
-        const other = all.find((m) => m.id !== userId) ?? all[0]!;
-        return {
-          id: row.id,
-          kind: 'direct' as const,
-          name: other.nickname ?? other.username,
-          members: all,
-          lastMessage: {
-            senderId: row.senderId,
-            preview: row.preview,
-            createdAt: row.createdAt.toISOString(),
-          },
-        };
-      }),
-    };
+    return rows.map((row) => {
+      const all = members.get(row.id) ?? [];
+      const other = all.find((m) => m.id !== userId) ?? all[0]!;
+      return {
+        id: row.id,
+        kind: 'direct' as const,
+        name: other.nickname ?? other.username,
+        members: all,
+        lastMessage: {
+          senderId: row.senderId,
+          preview: row.preview,
+          createdAt: row.createdAt.toISOString(),
+        },
+      };
+    });
   }
 
   async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
@@ -257,7 +319,11 @@ export class MessagesService {
    * The pair's unique index decides the winner of concurrent first sends: the loser's insert
    * waits for the winner to commit, does nothing, and the loser discards its own Conversation.
    */
-  private async findOrCreateDirect(tx: Tx, a: string, b: string): Promise<string> {
+  private async findOrCreateDirect(
+    tx: Tx,
+    a: string,
+    b: string,
+  ): Promise<{ id: string; created: boolean }> {
     const [low, high] = a < b ? [a, b] : [b, a];
     const pair = and(
       eq(directConversations.lowUserId, low),
@@ -267,7 +333,7 @@ export class MessagesService {
       .select({ id: directConversations.conversationId })
       .from(directConversations)
       .where(pair);
-    if (existing) return existing.id;
+    if (existing) return { id: existing.id, created: false };
 
     const [created] = await tx
       .insert(conversations)
@@ -283,14 +349,14 @@ export class MessagesService {
         { conversationId: created!.id, userId: low },
         { conversationId: created!.id, userId: high },
       ]);
-      return created!.id;
+      return { id: created!.id, created: true };
     }
     await tx.delete(conversations).where(eq(conversations.id, created!.id));
     const [winner] = await tx
       .select({ id: directConversations.conversationId })
       .from(directConversations)
       .where(pair);
-    return winner!.id;
+    return { id: winner!.id, created: false };
   }
 
   /**

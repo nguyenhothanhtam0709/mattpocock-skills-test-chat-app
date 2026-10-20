@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignupPage } from '@/auth/SignupPage';
 import { HealthPage } from '@/health/HealthPage';
+import { RealtimeProvider, type CreateRealtime } from '@/realtime/RealtimeProvider';
+import { noRealtime } from '@/realtime/events';
 import { navigate, usePath } from '@/router';
 import { AppShell } from '@/shell/AppShell';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -30,11 +32,16 @@ function Routes() {
   return path === '/login' ? <LoginPage /> : null;
 }
 
-export function App() {
+const noConnection: CreateRealtime = () => noRealtime;
+
+/** `createRealtime` is how server push is connected; without it nothing is pushed. */
+export function App({ createRealtime = noConnection }: { createRealtime?: CreateRealtime }) {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Routes />
+        <RealtimeProvider create={createRealtime}>
+          <Routes />
+        </RealtimeProvider>
       </AuthProvider>
     </ThemeProvider>
   );

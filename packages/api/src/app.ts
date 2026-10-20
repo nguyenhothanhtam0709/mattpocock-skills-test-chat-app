@@ -10,6 +10,7 @@ import { loadConfig } from './config/config.js';
 import { installHttpLogging } from './logging/http-logging.js';
 import { createLogger, type LogDestination } from './logging/logger.js';
 import { PinoLoggerService } from './logging/pino-logger.service.js';
+import { RealtimeIoAdapter } from './realtime/realtime.adapter.js';
 
 /** The only things app tests may swap out (see the spec's test-time overrides). */
 export interface AppOverrides {
@@ -48,6 +49,7 @@ export async function createApp(
     throw error;
   }
   app.useLogger(new PinoLoggerService(logger));
+  app.useWebSocketAdapter(new RealtimeIoAdapter(app));
   app.setGlobalPrefix('api/v1');
   // The API serves JSON only, so the CSP forbids loading or framing anything.
   await app.register(helmet, {

@@ -16,6 +16,7 @@ import {
   type UIEvent,
 } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
+import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import {
@@ -224,6 +225,26 @@ export function ConversationView({
   }, [messages, loadOlder]);
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
+
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        if (event.type !== 'message.created') return;
+        const { message } = event;
+        // A Message from the peer starts the Conversation this view was opened without.
+        const ours = conversationId
+          ? message.conversationId === conversationId
+          : message.senderId === peer.id;
+        if (!ours) return;
+        if (!conversationId) setConversationId(message.conversationId);
+        setMessages((current) => mergeMessages(current, [message]));
+        setOutgoing((current) =>
+          current.filter((o) => o.clientMessageId !== message.clientMessageId),
+        );
+      },
+      [conversationId, peer.id],
+    ),
+  );
 
   /** Sends (or re-sends) with the Outgoing's own client message ID, so a retry never duplicates. */
   async function transmit(item: Outgoing) {

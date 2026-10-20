@@ -1,6 +1,7 @@
 import type { ConversationSummary } from '@chat/contracts';
+import { LAST_MESSAGE_PREVIEW_MAX } from '@chat/contracts';
 import { MessageSquare } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -10,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
@@ -26,6 +28,10 @@ function activityLabel(iso: string): string {
   const date = new Date(iso);
   return (date.toDateString() === new Date().toDateString() ? SAME_DAY : OTHER_DAY).format(date);
 }
+
+/** Whitespace collapsed, at most 100 characters: the same preview the server builds. */
+const previewOf = (body: string): string =>
+  [...body.trim().replace(/\s+/g, ' ')].slice(0, LAST_MESSAGE_PREVIEW_MAX).join('');
 
 function ListSkeleton() {
   return (
@@ -58,6 +64,7 @@ export function ConversationList({
 }) {
   const { listConversations } = useAuth();
   const [state, setState] = useState<ListState>({ status: 'loading' });
+  const [pushedReloads, setPushedReloads] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,7 +78,40 @@ export function ConversationList({
       );
     })();
     return () => controller.abort();
-  }, [listConversations, refreshKey]);
+  }, [listConversations, refreshKey, pushedReloads]);
+
+  const listed = state.status === 'ready' ? state.list : undefined;
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        // Until the first load finishes, the fetch itself will include whatever was pushed.
+        if (!listed) return;
+        if (event.type === 'conversation.created') {
+          const { conversation } = event;
+          if (listed.some((c) => c.id === conversation.id)) return;
+          setState({ status: 'ready', list: [conversation, ...listed] });
+          return;
+        }
+        const { message } = event;
+        const known = listed.find((c) => c.id === message.conversationId);
+        if (!known) {
+          // Not listed (e.g. the sender's other tab started it): the server knows the rest.
+          setPushedReloads((n) => n + 1);
+          return;
+        }
+        const updated = {
+          ...known,
+          lastMessage: {
+            senderId: message.senderId,
+            preview: previewOf(message.body),
+            createdAt: message.createdAt,
+          },
+        };
+        setState({ status: 'ready', list: [updated, ...listed.filter((c) => c !== known)] });
+      },
+      [listed],
+    ),
+  );
 
   if (state.status === 'loading') return <ListSkeleton />;
   if (state.status === 'error') {

@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
 import type { Logger } from 'pino';
 import type { Pool } from 'pg';
+import { AccessTokenAuthenticator } from './auth/access-token-authenticator.js';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
@@ -21,6 +22,7 @@ import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { MessagesController } from './messages/messages.controller.js';
 import { MessagesService } from './messages/messages.service.js';
+import { RealtimeGateway } from './realtime/realtime.gateway.js';
 
 const SEARCH_URL = '/api/v1/users/search';
 const SEND_URLS = ['/api/v1/direct-messages', '/api/v1/conversations/:id/messages'];
@@ -110,6 +112,8 @@ export class AppModule {
         AuthService,
         MessagesService,
         AuthGuard,
+        AccessTokenAuthenticator,
+        RealtimeGateway,
         TokenService,
         { provide: CLOCK, useValue: clock },
         {

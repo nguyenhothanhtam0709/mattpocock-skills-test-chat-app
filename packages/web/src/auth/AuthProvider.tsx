@@ -52,6 +52,8 @@ interface AuthContextValue {
     before?: number,
     signal?: AbortSignal,
   ): Promise<MessagesPageResult>;
+  /** The current access token (renewed in the background), if signed in. */
+  getAccessToken(): string | undefined;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -168,6 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const getAccessToken = useCallback(() => accessTokenRef.current, []);
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
@@ -184,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendMessage: sendToConversation,
       listConversations: conversationList,
       messagesPage: page,
+      getAccessToken,
       logOut,
     }),
     [
@@ -195,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendToConversation,
       conversationList,
       page,
+      getAccessToken,
       logOut,
     ],
   );
