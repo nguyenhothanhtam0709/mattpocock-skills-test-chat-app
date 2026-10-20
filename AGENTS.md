@@ -15,3 +15,7 @@ Never push directly to `main`; every commit goes through a PR. See `docs/workflo
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Database
+
+The Drizzle schema is the source of truth; generate migrations with `pnpm db:generate`, never hand-edit them. See `docs/adr/0003-drizzle-schema-is-source-of-truth.md`.
