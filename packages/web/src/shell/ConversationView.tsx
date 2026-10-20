@@ -5,8 +5,17 @@ import {
   type User,
   type UserSearchResult,
 } from '@chat/contracts';
-import { ArrowUp } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type UIEvent,
+} from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import {
@@ -17,7 +26,7 @@ import {
   InputGroupTextarea,
 } from '@/components/ui/input-group';
 import { Marker, MarkerContent } from '@/components/ui/marker';
-import { Message, MessageContent, MessageGroup } from '@/components/ui/message';
+import { Message, MessageContent } from '@/components/ui/message';
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -36,32 +45,40 @@ const dayLabel = (iso: string): string =>
 const timeLabel = (iso: string): string =>
   new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' });
 
-interface Run {
-  /** Set on the first run of a day: the divider rendered above it. */
+/** Reaching within this many pixels of the top counts as the top. */
+const TOP_THRESHOLD = 48;
+
+interface Entry {
+  message: ChatMessage;
+  /** Set on the first Message of a day: the divider rendered inside its item, above it. */
   day?: string;
-  senderId: string;
-  messages: ChatMessage[];
+  /** Continues the previous Message's run: same sender, same day. */
+  continuesRun: boolean;
 }
 
-/** Consecutive Messages by one sender on one day form a run; each new day starts a run. */
-function toRuns(messages: ChatMessage[]): Run[] {
-  const runs: Run[] = [];
-  for (const message of messages) {
-    const last = runs.at(-1);
-    const prev = last?.messages.at(-1);
+/**
+ * One entry per Message, so that prepending older Messages never changes an existing item
+ * (the scroller keeps the reader's place by tracking items). Runs are only styling.
+ */
+function toEntries(messages: ChatMessage[]): Entry[] {
+  return messages.map((message, i) => {
+    const prev = messages[i - 1];
     const newDay = !prev || dayKey(prev.createdAt) !== dayKey(message.createdAt);
-    if (last && prev && !newDay && last.senderId === message.senderId) {
-      last.messages.push(message);
-    } else {
-      runs.push({
-        ...(newDay ? { day: message.createdAt } : {}),
-        senderId: message.senderId,
-        messages: [message],
-      });
-    }
-  }
-  return runs;
+    return {
+      message,
+      ...(newDay ? { day: message.createdAt } : {}),
+      continuesRun: !newDay && prev!.senderId === message.senderId,
+    };
+  });
 }
+
+const bySequence = (a: ChatMessage, b: ChatMessage) => a.sequence - b.sequence;
+
+/** Adds Messages to a list, replacing any already there, oldest first. */
+const mergeMessages = (current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] => {
+  const ids = new Set(incoming.map((m) => m.id));
+  return [...incoming, ...current.filter((m) => !ids.has(m.id))].sort(bySequence);
+};
 
 function Composer({ onSend }: { onSend: (body: string) => Promise<string | undefined> }) {
   const [text, setText] = useState('');
@@ -151,28 +168,55 @@ export function ConversationView({
   /** Called after each send with the Conversation's ID. */
   onSent?: (conversationId: string) => void;
 }) {
-  const { sendDirectMessage, sendMessage, latestMessages } = useAuth();
+  const { sendDirectMessage, sendMessage, messagesPage } = useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
   // just the first send reporting the Conversation it created.
   const [openedWith] = useState(initialConversationId);
   const [conversationId, setConversationId] = useState(openedWith);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const loadingOlder = useRef(false);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!openedWith) return;
     const controller = new AbortController();
     void (async () => {
-      const result = await latestMessages(openedWith, controller.signal);
+      const result = await messagesPage(openedWith, undefined, controller.signal);
       if (controller.signal.aborted || !result.ok) return;
-      setMessages((current) => {
-        const loaded = new Set(result.messages.map((m) => m.id));
-        return [...result.messages, ...current.filter((m) => !loaded.has(m.id))].sort(
-          (a, b) => a.sequence - b.sequence,
-        );
-      });
+      setHasMore(result.hasMore);
+      setMessages((current) => mergeMessages(current, result.messages));
     })();
     return () => controller.abort();
-  }, [openedWith, latestMessages]);
+  }, [openedWith, messagesPage]);
+
+  const loadOlder = useCallback(async () => {
+    const oldest = messagesRef.current[0];
+    if (!openedWith || !hasMore || !oldest || loadingOlder.current) return;
+    loadingOlder.current = true;
+    try {
+      const result = await messagesPage(openedWith, oldest.sequence);
+      if (!result.ok) return;
+      setHasMore(result.hasMore);
+      setMessages((current) => mergeMessages(current, result.messages));
+    } finally {
+      loadingOlder.current = false;
+    }
+  }, [openedWith, hasMore, messagesPage]);
+
+  function onScroll(e: UIEvent<HTMLDivElement>) {
+    if (e.currentTarget.scrollTop <= TOP_THRESHOLD) void loadOlder();
+  }
+
+  // A page that does not fill the viewport can never be scrolled to its top: keep loading.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport && viewport.clientHeight > 0 && viewport.scrollHeight <= viewport.clientHeight) {
+      void loadOlder();
+    }
+  }, [messages, loadOlder]);
 
   async function send(body: string): Promise<string | undefined> {
     const clientMessageId = crypto.randomUUID();
@@ -183,11 +227,7 @@ export function ConversationView({
     const id = result.conversation?.id ?? result.message.conversationId;
     setConversationId(id);
     onSent?.(id);
-    setMessages((current) =>
-      [...current.filter((m) => m.id !== result.message.id), result.message].sort(
-        (a, b) => a.sequence - b.sequence,
-      ),
-    );
+    setMessages((current) => mergeMessages(current, [result.message]));
     return undefined;
   }
 
@@ -207,44 +247,40 @@ export function ConversationView({
         ) : (
           <MessageScrollerProvider>
             <MessageScroller>
-              <MessageScrollerViewport>
+              <MessageScrollerViewport ref={viewportRef} onScroll={onScroll}>
                 <MessageScrollerContent className="p-4">
-                  {toRuns(messages).flatMap((run) => [
-                    ...(run.day
-                      ? [
-                          <MessageScrollerItem key={`day-${run.messages[0]!.id}`}>
-                            <Marker variant="separator">
-                              <MarkerContent>{dayLabel(run.day)}</MarkerContent>
-                            </Marker>
-                          </MessageScrollerItem>,
-                        ]
-                      : []),
+                  {toEntries(messages).map(({ message: m, day, continuesRun }) => (
                     <MessageScrollerItem
-                      key={run.messages[0]!.id}
-                      messageId={run.messages[0]!.id}
+                      key={m.id}
+                      messageId={m.id}
                       scrollAnchor
+                      className={continuesRun ? '-mt-4' : undefined}
                     >
-                      <MessageGroup>
-                        {run.messages.map((m) => (
-                          <Message key={m.id} align={m.senderId === user.id ? 'end' : 'start'}>
-                            <MessageContent>
-                              <Bubble variant={m.senderId === user.id ? 'default' : 'muted'}>
-                                <BubbleContent
-                                  className="whitespace-pre-wrap"
-                                  title={timeLabel(m.createdAt)}
-                                >
-                                  {m.body}
-                                </BubbleContent>
-                              </Bubble>
-                            </MessageContent>
-                          </Message>
-                        ))}
-                      </MessageGroup>
-                    </MessageScrollerItem>,
-                  ])}
+                      {day && (
+                        <Marker variant="separator" className="mb-6">
+                          <MarkerContent>{dayLabel(day)}</MarkerContent>
+                        </Marker>
+                      )}
+                      <Message align={m.senderId === user.id ? 'end' : 'start'}>
+                        <MessageContent>
+                          <Bubble variant={m.senderId === user.id ? 'default' : 'muted'}>
+                            <BubbleContent
+                              className="whitespace-pre-wrap"
+                              title={timeLabel(m.createdAt)}
+                            >
+                              {m.body}
+                            </BubbleContent>
+                          </Bubble>
+                        </MessageContent>
+                      </Message>
+                    </MessageScrollerItem>
+                  ))}
                 </MessageScrollerContent>
               </MessageScrollerViewport>
-              <MessageScrollerButton />
+              <MessageScrollerButton>
+                <ArrowDown />
+                <span className="sr-only">Jump to latest</span>
+              </MessageScrollerButton>
             </MessageScroller>
           </MessageScrollerProvider>
         )}

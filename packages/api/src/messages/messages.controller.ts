@@ -71,12 +71,11 @@ export class MessagesController {
 
   @Get('conversations/:id/messages')
   @UseGuards(AuthGuard)
-  async latest(
+  history(
     @Auth() auth: AuthContext,
     @Param('id', ConversationIdPipe) conversationId: string,
     @Query(new ZodValidationPipe(GetMessagesQuerySchema)) query: GetMessagesQuery,
   ): Promise<GetMessagesResponse> {
-    const { limit, before } = query;
-    return this.messages.latest(auth.userId, conversationId, limit, before);
+    return this.messages.history(auth.userId, conversationId, query);
   }
 }

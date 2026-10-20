@@ -70,11 +70,23 @@ export const SendMessageResponseSchema = z.object({ message: MessageSchema });
 
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
-/** `GET /conversations/:id/messages`: newest first; `before` is a sequence number. */
-export const GetMessagesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(10),
-  before: z.coerce.number().int().positive().optional(),
-});
+/** Sequence numbers are Postgres `integer`s. */
+const SEQUENCE_MAX = 2_147_483_647;
+const SequenceCursorSchema = z.coerce.number().int().positive().max(SEQUENCE_MAX);
+
+/**
+ * `GET /conversations/:id/messages`. `before=<sequence>` returns older Messages newest first;
+ * `after=<sequence>` returns newer Messages oldest first (to fill a gap). Not both.
+ */
+export const GetMessagesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    before: SequenceCursorSchema.optional(),
+    after: SequenceCursorSchema.optional(),
+  })
+  .refine((q) => q.before === undefined || q.after === undefined, {
+    message: 'before and after cannot be combined',
+  });
 
 export type GetMessagesQuery = z.infer<typeof GetMessagesQuerySchema>;
 

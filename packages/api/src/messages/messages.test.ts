@@ -395,6 +395,58 @@ describe('GET /conversations/:id/messages', () => {
     });
   });
 
+  it('pages forward with after, oldest first, reporting hasMore', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const { conversation } = SendDirectMessageResponseSchema.parse(
+        (await sendDirect(app, alice, { recipientId: bob.id, body: 'm1' })).json(),
+      );
+      for (const n of [2, 3, 4, 5]) await sendTo(app, alice, conversation.id, { body: `m${n}` });
+
+      const first = GetMessagesResponseSchema.parse(
+        (await history(app, bob, conversation.id, { limit: '2', after: '1' })).json(),
+      );
+      const rest = GetMessagesResponseSchema.parse(
+        (await history(app, bob, conversation.id, { limit: '5', after: '3' })).json(),
+      );
+      const none = GetMessagesResponseSchema.parse(
+        (await history(app, bob, conversation.id, { after: '5' })).json(),
+      );
+
+      expect(first.messages.map((m) => m.body)).toEqual(['m2', 'm3']);
+      expect(first.hasMore).toBe(true);
+      expect(rest.messages.map((m) => m.body)).toEqual(['m4', 'm5']);
+      expect(rest.hasMore).toBe(false);
+      expect(none).toEqual({ messages: [], hasMore: false });
+    });
+  });
+
+  it.each([
+    { limit: '0' },
+    { limit: '101' },
+    { before: '0' },
+    { before: 'abc' },
+    { before: '2147483648' },
+    { after: '-1' },
+    { after: '1.5' },
+    { after: '2147483648' },
+    { before: '3', after: '1' },
+  ] as Record<string, string>[])('rejects %j with 400 VALIDATION_FAILED', async (query) => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const { conversation } = SendDirectMessageResponseSchema.parse(
+        (await sendDirect(app, alice, { recipientId: bob.id })).json(),
+      );
+
+      const res = await history(app, alice, conversation.id, query);
+
+      expect(res.statusCode).toBe(400);
+      expect(errorCode(res)).toBe(ErrorCode.VALIDATION_FAILED);
+    });
+  });
+
   it('answers a never-Member with 404 CONVERSATION_NOT_FOUND', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
