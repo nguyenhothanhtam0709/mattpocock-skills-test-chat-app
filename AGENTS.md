@@ -20,7 +20,7 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 
 The Drizzle schema is the source of truth; generate migrations with `pnpm db:generate`, never hand-edit them. See `docs/adr/0003-drizzle-schema-is-source-of-truth.md`.
 
-Generated IDs and "created at" timestamps are DB column defaults, not passed from app code. See `docs/adr/0004-db-generates-ids-and-created-timestamps.md`.
+Generated IDs and timestamps are produced by the DB (column defaults, or `now()` / `now() + interval` in SQL), never passed from app code. Pass durations, not `Date`s. See `docs/adr/0004-db-generates-ids-and-created-timestamps.md`.
 
 Avoid nullable columns and prefer DB-generated values (defaults, built-ins like `now()`) for data consistency. See `docs/adr/0005-avoid-nullable-columns-prefer-db-generated-values.md`.
 
