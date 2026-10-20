@@ -14,8 +14,10 @@ export class AppModule {
         ConfigModule.forRoot({
           isGlobal: true,
           ignoreEnvFile: true,
-          // Configuration is passed in explicitly; main.ts hands it process.env.
-          load: [() => loadConfig(rawConfig)],
+          ignoreEnvVars: true,
+          // Configuration is passed in explicitly (main.ts hands it process.env), so the
+          // validate hook ignores what @nestjs/config collected and parses `rawConfig`.
+          validate: () => loadConfig(rawConfig),
         }),
         DatabaseModule,
       ],

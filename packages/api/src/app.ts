@@ -16,7 +16,8 @@ export async function createApp(
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register(rawConfig, overrides.clock ?? systemClock),
     new FastifyAdapter(),
-    { logger: false },
+    // Throw on boot failure (e.g. invalid config) instead of Nest's default process.abort().
+    { logger: false, abortOnError: false },
   );
   app.setGlobalPrefix('api/v1');
   return app;
