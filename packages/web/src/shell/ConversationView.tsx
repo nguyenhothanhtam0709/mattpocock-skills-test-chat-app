@@ -6,9 +6,10 @@ import {
   type UserSearchResult,
 } from '@chat/contracts';
 import { ArrowUp } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
+import { Button } from '@/components/ui/button';
 import {
   InputGroup,
   InputGroupAddon,
@@ -17,7 +18,7 @@ import {
   InputGroupTextarea,
 } from '@/components/ui/input-group';
 import { Marker, MarkerContent } from '@/components/ui/marker';
-import { Message, MessageContent, MessageGroup } from '@/components/ui/message';
+import { Message, MessageContent, MessageFooter, MessageGroup } from '@/components/ui/message';
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -36,15 +37,33 @@ const dayLabel = (iso: string): string =>
 const timeLabel = (iso: string): string =>
   new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' });
 
+/** A Message the User composed that the server has not confirmed yet. */
+interface Outgoing {
+  clientMessageId: string;
+  body: string;
+  /** When it was composed; only used to place it in the day grouping. */
+  createdAt: string;
+  status: 'pending' | 'failed';
+  error?: string;
+}
+
+interface Row {
+  key: string;
+  senderId: string;
+  createdAt: string;
+  body: string;
+  outgoing?: Outgoing;
+}
+
 interface Run {
   /** Set on the first run of a day: the divider rendered above it. */
   day?: string;
   senderId: string;
-  messages: ChatMessage[];
+  messages: Row[];
 }
 
 /** Consecutive Messages by one sender on one day form a run; each new day starts a run. */
-function toRuns(messages: ChatMessage[]): Run[] {
+function toRuns(messages: Row[]): Run[] {
   const runs: Run[] = [];
   for (const message of messages) {
     const last = runs.at(-1);
@@ -63,47 +82,34 @@ function toRuns(messages: ChatMessage[]): Run[] {
   return runs;
 }
 
-function Composer({ onSend }: { onSend: (body: string) => Promise<string | undefined> }) {
+function Composer({ onSend }: { onSend: (body: string) => void }) {
   const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string>();
-  const errorId = useId();
   const length = [...text].length;
-  const sendable = MessageBodySchema.safeParse(text).success && !sending;
+  const sendable = MessageBodySchema.safeParse(text).success;
 
-  async function submit() {
+  function submit() {
     if (!sendable) return;
-    setSending(true);
-    setError(undefined);
-    const failure = await onSend(text);
-    setSending(false);
-    if (failure === undefined) setText('');
-    else setError(failure);
+    onSend(text);
+    setText('');
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      void submit();
+      submit();
     }
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    void submit();
+    submit();
   }
 
   return (
     <form onSubmit={onSubmit} className="grid gap-2 border-t p-3">
-      {error && (
-        <p id={errorId} role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
       <InputGroup>
         <InputGroupTextarea
           aria-label="Message"
-          aria-describedby={error ? errorId : undefined}
           placeholder="Write a message"
           rows={1}
           className="max-h-40 min-h-10"
@@ -174,22 +180,77 @@ export function ConversationView({
     return () => controller.abort();
   }, [openedWith, latestMessages]);
 
-  async function send(body: string): Promise<string | undefined> {
-    const clientMessageId = crypto.randomUUID();
+  const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
+
+  /** Sends (or re-sends) with the Outgoing's own client message ID, so a retry never duplicates. */
+  async function transmit(item: Outgoing) {
+    const { clientMessageId, body } = item;
     const result = conversationId
       ? await sendMessage(conversationId, { clientMessageId, body })
       : await sendDirectMessage({ recipientId: peer.id, clientMessageId, body });
-    if (!result.ok) return result.error;
+    if (!result.ok) {
+      setOutgoing((current) =>
+        current.map((o) =>
+          o.clientMessageId === clientMessageId
+            ? { ...o, status: 'failed', error: result.error }
+            : o,
+        ),
+      );
+      return;
+    }
     const id = result.conversation?.id ?? result.message.conversationId;
     setConversationId(id);
     onSent?.(id);
+    setOutgoing((current) => current.filter((o) => o.clientMessageId !== clientMessageId));
     setMessages((current) =>
-      [...current.filter((m) => m.id !== result.message.id), result.message].sort(
-        (a, b) => a.sequence - b.sequence,
-      ),
+      [
+        ...current.filter(
+          (m) => m.id !== result.message.id && m.clientMessageId !== clientMessageId,
+        ),
+        result.message,
+      ].sort((a, b) => a.sequence - b.sequence),
     );
-    return undefined;
   }
+
+  function send(body: string) {
+    const item: Outgoing = {
+      clientMessageId: crypto.randomUUID(),
+      body,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    };
+    setOutgoing((current) => [...current, item]);
+    void transmit(item);
+  }
+
+  function retry(item: Outgoing) {
+    const pending: Outgoing = {
+      clientMessageId: item.clientMessageId,
+      body: item.body,
+      createdAt: item.createdAt,
+      status: 'pending',
+    };
+    setOutgoing((current) =>
+      current.map((o) => (o.clientMessageId === item.clientMessageId ? pending : o)),
+    );
+    void transmit(pending);
+  }
+
+  const rows: Row[] = [
+    ...messages.map((m) => ({
+      key: m.clientMessageId,
+      senderId: m.senderId,
+      createdAt: m.createdAt,
+      body: m.body,
+    })),
+    ...outgoing.map((o) => ({
+      key: o.clientMessageId,
+      senderId: user.id,
+      createdAt: o.createdAt,
+      body: o.body,
+      outgoing: o,
+    })),
+  ];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -200,7 +261,7 @@ export function ConversationView({
         )}
       </header>
       <div className="relative min-h-0 flex-1">
-        {messages.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">
             No messages yet. Say hello to {peer.nickname ?? peer.username}.
           </p>
@@ -209,10 +270,10 @@ export function ConversationView({
             <MessageScroller>
               <MessageScrollerViewport>
                 <MessageScrollerContent className="p-4">
-                  {toRuns(messages).flatMap((run) => [
+                  {toRuns(rows).flatMap((run) => [
                     ...(run.day
                       ? [
-                          <MessageScrollerItem key={`day-${run.messages[0]!.id}`}>
+                          <MessageScrollerItem key={`day-${run.messages[0]!.key}`}>
                             <Marker variant="separator">
                               <MarkerContent>{dayLabel(run.day)}</MarkerContent>
                             </Marker>
@@ -220,15 +281,23 @@ export function ConversationView({
                         ]
                       : []),
                     <MessageScrollerItem
-                      key={run.messages[0]!.id}
-                      messageId={run.messages[0]!.id}
+                      key={run.messages[0]!.key}
+                      messageId={run.messages[0]!.key}
                       scrollAnchor
                     >
                       <MessageGroup>
                         {run.messages.map((m) => (
-                          <Message key={m.id} align={m.senderId === user.id ? 'end' : 'start'}>
+                          <Message key={m.key} align={m.senderId === user.id ? 'end' : 'start'}>
                             <MessageContent>
-                              <Bubble variant={m.senderId === user.id ? 'default' : 'muted'}>
+                              <Bubble
+                                variant={
+                                  m.outgoing?.status === 'failed'
+                                    ? 'destructive'
+                                    : m.outgoing || m.senderId !== user.id
+                                      ? 'muted'
+                                      : 'default'
+                                }
+                              >
                                 <BubbleContent
                                   className="whitespace-pre-wrap"
                                   title={timeLabel(m.createdAt)}
@@ -237,6 +306,21 @@ export function ConversationView({
                                 </BubbleContent>
                               </Bubble>
                             </MessageContent>
+                            {m.outgoing?.status === 'failed' && (
+                              <MessageFooter className="items-center gap-2">
+                                <span role="alert" className="text-sm text-destructive">
+                                  {m.outgoing.error}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => retry(m.outgoing!)}
+                                >
+                                  Retry
+                                </Button>
+                              </MessageFooter>
+                            )}
                           </Message>
                         ))}
                       </MessageGroup>
