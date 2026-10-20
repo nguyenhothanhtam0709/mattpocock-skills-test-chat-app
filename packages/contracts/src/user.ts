@@ -116,3 +116,31 @@ export type RefreshResponse = z.infer<typeof RefreshResponseSchema>;
 export const MeResponseSchema = z.object({ user: UserSchema });
 
 export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+/** `GET /users/search?q=`: 2-32 characters, matched as a Username prefix (never rewritten). */
+export const SearchUsersQuerySchema = z.object({
+  q: plainText.refine(
+    (value) => {
+      const length = codePointLength(value);
+      return length >= 2 && length <= 32;
+    },
+    { message: 'must be 2-32 characters' },
+  ),
+});
+
+export type SearchUsersQuery = z.input<typeof SearchUsersQuerySchema>;
+
+/** A search hit: ID, Username and Nickname only. Strict, so an email can never slip in. */
+export const UserSearchResultSchema = z.strictObject({
+  id: z.uuid(),
+  username: z.string(),
+  nickname: z.string().nullable(),
+});
+
+export type UserSearchResult = z.infer<typeof UserSearchResultSchema>;
+
+export const SearchUsersResponseSchema = z.object({
+  users: z.array(UserSearchResultSchema).max(20),
+});
+
+export type SearchUsersResponse = z.infer<typeof SearchUsersResponseSchema>;

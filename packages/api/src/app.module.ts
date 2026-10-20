@@ -20,6 +20,14 @@ import { DatabaseModule, PG_POOL } from './db/database.module.js';
 import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
 
+const SEARCH_URL = '/api/v1/users/search';
+
+/** `AuthGuard` sets `request.auth`; the global throttler guard runs before it. */
+const authenticatedUserId = (req: Record<string, unknown>): unknown =>
+  (req['auth'] as { userId?: unknown } | undefined)?.userId;
+const isAuthenticated = (req: object): boolean =>
+  authenticatedUserId(req as Record<string, unknown>) !== undefined;
+
 @Module({})
 export class AppModule {
   static register(rawConfig: Record<string, unknown>, clock: Clock, logger: Logger): DynamicModule {
@@ -41,6 +49,21 @@ export class AppModule {
               {
                 limit: config.get('THROTTLE_LIMIT', { infer: true }),
                 ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
+                // Route-level guards run after authentication; the global guard has already
+                // counted the request by then.
+                skipIf: (context) => isAuthenticated(context.switchToHttp().getRequest()),
+              },
+              // User search only: 30 per minute per User, counted by the route-level guard
+              // once the caller is authenticated.
+              {
+                name: 'search',
+                limit: 30,
+                ttl: 60 * 1000,
+                skipIf: (context) => {
+                  const req = context.switchToHttp().getRequest<FastifyRequest>();
+                  return !isAuthenticated(req) || req.routeOptions?.url !== SEARCH_URL;
+                },
+                getTracker: (req) => `user:${String(authenticatedUserId(req))}`,
               },
               // Login only: 5 attempts per 15 minutes per identifier (the per-IP limit is on
               // the route itself).

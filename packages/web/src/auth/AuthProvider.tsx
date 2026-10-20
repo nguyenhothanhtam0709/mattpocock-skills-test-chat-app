@@ -18,6 +18,7 @@ import {
   type LoginResult,
 } from '@/api/auth';
 import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
+import { searchUsers, type SearchUsersResult } from '@/api/users';
 
 export type AuthState =
   { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; user: User };
@@ -27,6 +28,8 @@ interface AuthContextValue {
   signIn(identifier: string, password: string): Promise<LoginResult>;
   /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
   setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
+  /** Server-side Username-prefix search with the current access token. */
+  searchUsers(q: string, signal?: AbortSignal): Promise<SearchUsersResult>;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -107,6 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
+  const searchUsersByPrefix = useCallback(async (q: string, signal?: AbortSignal) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return searchUsers(accessToken, q, signal);
+  }, []);
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
@@ -114,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOut]);
 
   const value = useMemo(
-    () => ({ state, signIn, setNickname, logOut }),
-    [state, signIn, setNickname, logOut],
+    () => ({ state, signIn, setNickname, searchUsers: searchUsersByPrefix, logOut }),
+    [state, signIn, setNickname, searchUsersByPrefix, logOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
