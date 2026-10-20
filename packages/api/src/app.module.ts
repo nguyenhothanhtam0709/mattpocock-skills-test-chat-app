@@ -3,6 +3,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type { Logger } from 'pino';
+import { AuthController } from './auth/auth.controller.js';
+import { AuthService } from './auth/auth.service.js';
 import { CLOCK, type Clock } from './clock/clock.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig, type Config } from './config/config.js';
@@ -39,8 +41,9 @@ export class AppModule {
         DatabaseModule,
         ErrorsModule,
       ],
-      controllers: [HealthController],
+      controllers: [HealthController, AuthController],
       providers: [
+        AuthService,
         { provide: CLOCK, useValue: clock },
         // Rate limit every route by default.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
