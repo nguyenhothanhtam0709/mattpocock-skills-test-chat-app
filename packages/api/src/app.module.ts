@@ -19,8 +19,13 @@ import { loadConfig, type Config } from './config/config.js';
 import { DatabaseModule, PG_POOL } from './db/database.module.js';
 import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { MessagesController } from './messages/messages.controller.js';
+import { MessagesService } from './messages/messages.service.js';
 
 const SEARCH_URL = '/api/v1/users/search';
+const SEND_URLS = ['/api/v1/direct-messages', '/api/v1/conversations/:id/messages'];
+const isSendRoute = (req: FastifyRequest): boolean =>
+  req.method === 'POST' && SEND_URLS.includes(req.routeOptions?.url ?? '');
 
 /** `AuthGuard` sets `request.auth`; the global throttler guard runs before it. */
 const authenticatedUserId = (req: Record<string, unknown>): unknown =>
@@ -65,6 +70,17 @@ export class AppModule {
                 },
                 getTracker: (req) => `user:${String(authenticatedUserId(req))}`,
               },
+              // Message sends only (direct and to a Conversation): 30 per 10 s per User.
+              {
+                name: 'send',
+                limit: 30,
+                ttl: 10 * 1000,
+                skipIf: (context) => {
+                  const req = context.switchToHttp().getRequest<FastifyRequest>();
+                  return !isAuthenticated(req) || !isSendRoute(req);
+                },
+                getTracker: (req) => `user:${String(authenticatedUserId(req))}`,
+              },
               // Login only: 5 attempts per 15 minutes per identifier (the per-IP limit is on
               // the route itself).
               {
@@ -89,9 +105,10 @@ export class AppModule {
         DatabaseModule,
         ErrorsModule,
       ],
-      controllers: [HealthController, AuthController, UsersController],
+      controllers: [HealthController, AuthController, UsersController, MessagesController],
       providers: [
         AuthService,
+        MessagesService,
         AuthGuard,
         TokenService,
         { provide: CLOCK, useValue: clock },

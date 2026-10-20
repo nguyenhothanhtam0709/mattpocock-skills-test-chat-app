@@ -13,6 +13,7 @@
     "@base-ui/react": "^1.9.0",
     "@chat/contracts": "workspace:*",
     "@fontsource-variable/geist": "^5.3.0",
+    "@shadcn/react": "^0.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.59.0",

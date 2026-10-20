@@ -1,4 +1,4 @@
-import type { User } from '@chat/contracts';
+import type { SendDirectMessageRequest, SendMessageRequest, User } from '@chat/contracts';
 import {
   createContext,
   useCallback,
@@ -17,6 +17,7 @@ import {
   refreshAccessToken,
   type LoginResult,
 } from '@/api/auth';
+import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
 import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
 
@@ -30,6 +31,10 @@ interface AuthContextValue {
   setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
   /** Server-side Username-prefix search with the current access token. */
   searchUsers(q: string, signal?: AbortSignal): Promise<SearchUsersResult>;
+  /** Sends to a User, creating the Direct Conversation if it does not exist yet. */
+  sendDirectMessage(request: SendDirectMessageRequest): Promise<SendResult>;
+  /** Sends to an existing Conversation. */
+  sendMessage(conversationId: string, request: SendMessageRequest): Promise<SendResult>;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -116,6 +121,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return searchUsers(accessToken, q, signal);
   }, []);
 
+  const sendDirect = useCallback(async (request: SendDirectMessageRequest) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return sendDirectMessage(accessToken, request);
+  }, []);
+
+  const sendToConversation = useCallback(
+    async (conversationId: string, request: SendMessageRequest) => {
+      const accessToken = accessTokenRef.current;
+      if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+      return sendMessage(accessToken, conversationId, request);
+    },
+    [],
+  );
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
@@ -123,8 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOut]);
 
   const value = useMemo(
-    () => ({ state, signIn, setNickname, searchUsers: searchUsersByPrefix, logOut }),
-    [state, signIn, setNickname, searchUsersByPrefix, logOut],
+    () => ({
+      state,
+      signIn,
+      setNickname,
+      searchUsers: searchUsersByPrefix,
+      sendDirectMessage: sendDirect,
+      sendMessage: sendToConversation,
+      logOut,
+    }),
+    [state, signIn, setNickname, searchUsersByPrefix, sendDirect, sendToConversation, logOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

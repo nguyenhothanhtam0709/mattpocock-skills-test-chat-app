@@ -1,5 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  check,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 /**
  * A registered person. Username and email are stored exactly as typed; the unique indexes
@@ -57,3 +67,82 @@ export const tokenDenyList = pgTable('token_deny_list', {
   jti: text('jti').primaryKey(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
+
+/** A container of Messages. Only Direct Conversations exist so far. */
+export const conversations = pgTable(
+  'conversations',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`uuidv7()`),
+    kind: text('kind').notNull(),
+    /** Sequence of the newest Message; bumped under the row lock when a Message is inserted. */
+    lastSequence: integer('last_sequence').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('conversations_kind_check', sql`${t.kind} in ('direct')`)],
+);
+
+export const conversationMembers = pgTable(
+  'conversation_members',
+  {
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.conversationId, t.userId] }),
+    index('conversation_members_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * The normalized pair (lower ID first) of a Direct Conversation. The unique index is what
+ * guarantees at most one Direct Conversation per pair, even under concurrent first sends.
+ */
+export const directConversations = pgTable(
+  'direct_conversations',
+  {
+    conversationId: uuid('conversation_id')
+      .primaryKey()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    lowUserId: uuid('low_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    highUserId: uuid('high_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    uniqueIndex('direct_conversations_pair_unique').on(t.lowUserId, t.highUserId),
+    check('direct_conversations_ordered_check', sql`${t.lowUserId} < ${t.highUserId}`),
+  ],
+);
+
+/** Immutable once inserted. */
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`uuidv7()`),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    senderId: uuid('sender_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    clientMessageId: uuid('client_message_id').notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('messages_conversation_sequence_unique').on(t.conversationId, t.sequence),
+    uniqueIndex('messages_sender_client_message_id_unique').on(t.senderId, t.clientMessageId),
+  ],
+);
