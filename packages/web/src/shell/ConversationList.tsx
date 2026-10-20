@@ -152,15 +152,17 @@ export function ConversationList({
             <div className="grid min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium">{conversation.name}</span>
-                <time
-                  dateTime={conversation.lastMessage.createdAt}
-                  className="shrink-0 text-xs text-muted-foreground"
-                >
-                  {activityLabel(conversation.lastMessage.createdAt)}
-                </time>
+                {conversation.lastMessage && (
+                  <time
+                    dateTime={conversation.lastMessage.createdAt}
+                    className="shrink-0 text-xs text-muted-foreground"
+                  >
+                    {activityLabel(conversation.lastMessage.createdAt)}
+                  </time>
+                )}
               </div>
               <span className="truncate text-xs text-muted-foreground">
-                {conversation.lastMessage.preview}
+                {conversation.lastMessage?.preview ?? 'No messages yet'}
               </span>
             </div>
           </SidebarMenuButton>

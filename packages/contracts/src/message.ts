@@ -102,13 +102,27 @@ export const ConversationMemberSchema = UserSearchResultSchema;
 
 export type ConversationMember = z.infer<typeof ConversationMemberSchema>;
 
+/** A Group with its Members and its single Owner. */
+export const GroupSchema = z.object({
+  id: z.uuid(),
+  kind: z.literal('group'),
+  name: z.string(),
+  ownerId: z.uuid(),
+  members: z.array(ConversationMemberSchema),
+});
+
+export type Group = z.infer<typeof GroupSchema>;
+
 /** `GET /conversations/:id` */
 export const GetConversationResponseSchema = z.object({
-  conversation: z.object({
-    id: z.uuid(),
-    kind: z.literal('direct'),
-    members: z.array(ConversationMemberSchema),
-  }),
+  conversation: z.discriminatedUnion('kind', [
+    z.object({
+      id: z.uuid(),
+      kind: z.literal('direct'),
+      members: z.array(ConversationMemberSchema),
+    }),
+    GroupSchema,
+  ]),
 });
 
 export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;
@@ -117,16 +131,19 @@ export const LAST_MESSAGE_PREVIEW_MAX = 100;
 
 export const ConversationSummarySchema = z.object({
   id: z.uuid(),
-  kind: z.literal('direct'),
+  kind: z.enum(['direct', 'group']),
   /** For a Direct Conversation: the other User's Nickname, else their Username. */
   name: z.string(),
   members: z.array(ConversationMemberSchema),
-  lastMessage: z.object({
-    senderId: z.uuid(),
-    /** Whitespace collapsed, at most 100 characters. */
-    preview: z.string().max(LAST_MESSAGE_PREVIEW_MAX),
-    createdAt: z.iso.datetime(),
-  }),
+  /** Null until the first Message (a new Group has none). */
+  lastMessage: z
+    .object({
+      senderId: z.uuid(),
+      /** Whitespace collapsed, at most 100 characters. */
+      preview: z.string().max(LAST_MESSAGE_PREVIEW_MAX),
+      createdAt: z.iso.datetime(),
+    })
+    .nullable(),
 });
 
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;

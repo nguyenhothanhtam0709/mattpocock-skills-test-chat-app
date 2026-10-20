@@ -6,6 +6,9 @@ import {
   type ConversationSummary,
   RealtimeEvent,
   type ConversationMember,
+  type CreateGroupRequest,
+  type CreateGroupResponse,
+  GROUP_MEMBERS_MAX,
   type GetConversationResponse,
   type GetMessagesQuery,
   type GetMessagesResponse,
@@ -26,6 +29,7 @@ import {
   conversationMembers,
   conversations,
   directConversations,
+  groups,
   messages,
   users,
 } from '../db/schema.js';
@@ -208,13 +212,17 @@ export class MessagesService {
       .select({
         id: conversations.id,
         kind: conversations.kind,
+        groupName: groups.name,
         senderId: messages.senderId,
-        preview: sql<string>`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
+        preview: sql<
+          string | null
+        >`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
         createdAt: messages.createdAt,
       })
       .from(conversationMembers)
       .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
-      .innerJoin(
+      .leftJoin(groups, eq(groups.conversationId, conversations.id))
+      .leftJoin(
         messages,
         and(
           eq(messages.conversationId, conversations.id),
@@ -227,31 +235,100 @@ export class MessagesService {
           onlyConversationId === undefined ? undefined : eq(conversations.id, onlyConversationId),
         ),
       )
-      .orderBy(desc(messages.createdAt), desc(conversations.id));
+      .orderBy(
+        desc(sql`coalesce(${messages.createdAt}, ${conversations.createdAt})`),
+        desc(conversations.id),
+      );
     const members = await this.membersOf(rows.map((r) => r.id));
     return rows.map((row) => {
       const all = members.get(row.id) ?? [];
       const other = all.find((m) => m.id !== userId) ?? all[0]!;
       return {
         id: row.id,
-        kind: 'direct' as const,
-        name: other.nickname ?? other.username,
+        kind: row.groupName === null ? ('direct' as const) : ('group' as const),
+        name: row.groupName ?? other.nickname ?? other.username,
         members: all,
-        lastMessage: {
-          senderId: row.senderId,
-          preview: row.preview,
-          createdAt: row.createdAt.toISOString(),
-        },
+        lastMessage:
+          row.senderId === null
+            ? null
+            : {
+                senderId: row.senderId,
+                preview: row.preview!,
+                createdAt: row.createdAt!.toISOString(),
+              },
       };
     });
   }
 
   async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
     await this.requireMember(conversationId, userId);
-    const members = await this.membersOf([conversationId]);
+    const members = (await this.membersOf([conversationId])).get(conversationId)!;
+    const [group] = await this.db
+      .select({ name: groups.name, ownerId: groups.ownerId })
+      .from(groups)
+      .where(eq(groups.conversationId, conversationId));
     return {
-      conversation: { id: conversationId, kind: 'direct', members: members.get(conversationId)! },
+      conversation: group
+        ? { id: conversationId, kind: 'group', ...group, members }
+        : { id: conversationId, kind: 'direct', members },
     };
+  }
+
+  /**
+   * Creates a Group owned by `ownerId`, with the Owner and the distinct initial Members as
+   * Members, and pushes the new Conversation to each of them. Push is best-effort (ADR-0001).
+   */
+  async createGroup(ownerId: string, request: CreateGroupRequest): Promise<CreateGroupResponse> {
+    const name = request.name.trim();
+    const memberIds = [...new Set([ownerId, ...request.memberIds])];
+    if (memberIds.length > GROUP_MEMBERS_MAX) {
+      throw new DomainException(
+        ErrorCode.GROUP_FULL,
+        HttpStatus.CONFLICT,
+        `A Group has at most ${GROUP_MEMBERS_MAX} Members`,
+      );
+    }
+    const found = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.id, memberIds));
+    const known = new Set(found.map((u) => u.id));
+    const unknown = memberIds.filter((id) => !known.has(id));
+    if (unknown.length > 0) {
+      throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found', {
+        userIds: unknown,
+      });
+    }
+
+    const id = await this.db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(conversations)
+        .values({ kind: 'group' })
+        .returning({ id: conversations.id });
+      await tx.insert(groups).values({ conversationId: created!.id, name, ownerId });
+      await tx
+        .insert(conversationMembers)
+        .values(memberIds.map((userId) => ({ conversationId: created!.id, userId })));
+      return created!.id;
+    });
+
+    const members = (await this.membersOf([id])).get(id)!;
+    await this.pushGroupCreated(id, memberIds);
+    return { conversation: { id, kind: 'group', name, ownerId, members } };
+  }
+
+  private async pushGroupCreated(conversationId: string, memberIds: string[]) {
+    try {
+      const [conversation] = await this.summaries(memberIds[0]!, conversationId);
+      this.realtime.push(
+        RealtimeEvent.CONVERSATION_CREATED,
+        memberIds,
+        { conversation },
+        conversationId,
+      );
+    } catch (error) {
+      this.logger.error({ err: error, conversationId }, 'socket push failed');
+    }
   }
 
   private async membersOf(conversationIds: string[]): Promise<Map<string, ConversationMember[]>> {

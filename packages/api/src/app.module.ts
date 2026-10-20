@@ -18,6 +18,7 @@ import { CLOCK, type Clock } from './clock/clock.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig, type Config } from './config/config.js';
 import { DatabaseModule, PG_POOL } from './db/database.module.js';
+import { GroupsController } from './groups/groups.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { MessagesController } from './messages/messages.controller.js';
@@ -107,7 +108,13 @@ export class AppModule {
         DatabaseModule,
         ErrorsModule,
       ],
-      controllers: [HealthController, AuthController, UsersController, MessagesController],
+      controllers: [
+        HealthController,
+        AuthController,
+        UsersController,
+        MessagesController,
+        GroupsController,
+      ],
       providers: [
         AuthService,
         MessagesService,

@@ -21,7 +21,7 @@ const plainText = z
   .refine((value) => !hasChar(value, isControl), 'must not contain control characters');
 
 /** Same, and additionally free of bidi-override characters (names). */
-const nameText = (trim: boolean) =>
+export const nameText = (trim: boolean) =>
   z
     .string()
     .transform((value) => (trim ? value.normalize('NFC').trim() : value.normalize('NFC')))

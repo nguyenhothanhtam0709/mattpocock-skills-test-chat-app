@@ -538,7 +538,7 @@ describe('GET /conversations', () => {
         kind: 'direct',
         lastMessage: { senderId: bob.id, preview: 'line one line two' },
       });
-      expect(conversations[1]!.lastMessage.preview).toBe('carol here');
+      expect(conversations[1]!.lastMessage?.preview).toBe('carol here');
       expect(conversations[0]!.members.map((m) => m.id).sort()).toEqual([alice.id, bob.id].sort());
       expect(JSON.stringify(res.json())).not.toContain('@example.com');
     });
@@ -554,7 +554,7 @@ describe('GET /conversations', () => {
         (await listConversations(app, bob)).json(),
       );
 
-      expect(conversations[0]!.lastMessage.preview).toBe('x'.repeat(100));
+      expect(conversations[0]!.lastMessage?.preview).toBe('x'.repeat(100));
     });
   });
 
