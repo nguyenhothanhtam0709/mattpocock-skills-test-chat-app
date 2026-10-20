@@ -10,3 +10,7 @@ Columns are `NOT NULL` unless absence is a real state in the domain. When a colu
 
 - **Nullable by default, validate in the app**: rejected. Every reader has to handle `null`, and rows written outside the app can silently break invariants.
 - **Compute defaults in the app**: rejected. Different code paths drift, and the DB cannot guarantee the value.
+
+## Exceptions
+
+- **`membership_periods.end_sequence`** uses an `OPEN_PERIOD_END` sentinel (`2147483647`) for an open period instead of a nullable column or a separate table. Accepted by the user on 2026-10-21 as an exception to the sentinel-free preference: it keeps window queries to a plain range comparison.
