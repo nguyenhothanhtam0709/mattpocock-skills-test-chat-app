@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   LoginRequestSchema,
@@ -11,6 +11,7 @@ import {
 } from '@chat/contracts';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { Auth, AuthGuard, type AuthContext } from './auth.guard.js';
 import { AuthService, type IssuedSession } from './auth.service.js';
 
 export const REFRESH_COOKIE = 'refresh_token';
@@ -68,5 +69,16 @@ export class AuthController {
       void reply.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
       throw error;
     }
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  @UseGuards(AuthGuard)
+  async logout(
+    @Auth() auth: AuthContext,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<void> {
+    await this.auth.logout(auth);
+    void reply.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
   }
 }

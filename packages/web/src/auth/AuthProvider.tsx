@@ -12,6 +12,7 @@ import {
 import {
   fetchCurrentUser,
   login,
+  logout,
   msUntilExpiry,
   refreshAccessToken,
   type LoginResult,
@@ -26,6 +27,8 @@ interface AuthContextValue {
   signIn(identifier: string, password: string): Promise<LoginResult>;
   /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
   setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
+  /** Ends the session on the server and signs out here. */
+  logOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     clearTimeout(timer.current);
+    accessTokenRef.current = undefined;
     setState({ status: 'signedOut' });
   }, []);
 
@@ -103,7 +107,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  const value = useMemo(() => ({ state, signIn, setNickname }), [state, signIn, setNickname]);
+  const logOut = useCallback(async () => {
+    const accessToken = accessTokenRef.current;
+    signOut();
+    if (accessToken) await logout(accessToken);
+  }, [signOut]);
+
+  const value = useMemo(
+    () => ({ state, signIn, setNickname, logOut }),
+    [state, signIn, setNickname, logOut],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

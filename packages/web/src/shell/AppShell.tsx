@@ -1,5 +1,5 @@
 import type { User } from '@chat/contracts';
-import { ChevronsUpDown, MessageSquare, Moon, Sun, UserRound } from 'lucide-react';
+import { ChevronsUpDown, LogOut, MessageSquare, Moon, Sun, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -29,12 +29,14 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ProfileDialog } from './ProfileDialog';
 
 function UserMenu({ user }: { user: User }) {
   const { theme, setTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
+  const { logOut } = useAuth();
   const name = user.nickname ?? user.username;
   return (
     <SidebarMenu>
@@ -56,6 +58,10 @@ function UserMenu({ user }: { user: User }) {
             <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? <Sun /> : <Moon />}
               {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void logOut()}>
+              <LogOut />
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

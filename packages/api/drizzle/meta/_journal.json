@@ -29,6 +29,13 @@
       "when": 1792510342066,
       "tag": "0003_pale_gwen_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792510918019,
+      "tag": "0004_little_nemesis",
+      "breakpoints": true
     }
   ]
 }

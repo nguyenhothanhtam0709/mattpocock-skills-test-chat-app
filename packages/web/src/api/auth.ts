@@ -57,6 +57,19 @@ export async function refreshAccessToken(signal?: AbortSignal): Promise<string |
   }
 }
 
+/** Ends the session on the server. Best effort: the caller signs out locally either way. */
+export async function logout(accessToken: string): Promise<void> {
+  try {
+    await fetch(url('/auth/logout'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    // Nothing to do: the access token is short-lived and the User is signed out here.
+  }
+}
+
 /** The signed-in User's profile; `undefined` when the access token is not accepted. */
 export async function fetchCurrentUser(
   accessToken: string,
