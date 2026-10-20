@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Update Nickname endpoint: set (1–50 chars after trim, contracts rules) or clear
-- [ ] Username cannot be changed through any endpoint
-- [ ] Invalid Nickname returns `VALIDATION_FAILED`
-- [ ] SPA: Profile `Dialog` with a `Field` for Nickname and inline errors; save updates the User menu; tested
+- [x] Update Nickname endpoint: set (1–50 chars after trim, contracts rules) or clear
+- [x] Username cannot be changed through any endpoint
+- [x] Invalid Nickname returns `VALIDATION_FAILED`
+- [x] SPA: Profile `Dialog` with a `Field` for Nickname and inline errors; save updates the User menu; tested

@@ -1,5 +1,6 @@
 import type { User } from '@chat/contracts';
-import { ChevronsUpDown, MessageSquare, Moon, Sun } from 'lucide-react';
+import { ChevronsUpDown, MessageSquare, Moon, Sun, UserRound } from 'lucide-react';
+import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -29,12 +30,15 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useTheme } from '@/theme/ThemeProvider';
+import { ProfileDialog } from './ProfileDialog';
 
 function UserMenu({ user }: { user: User }) {
   const { theme, setTheme } = useTheme();
+  const [profileOpen, setProfileOpen] = useState(false);
   const name = user.nickname ?? user.username;
   return (
     <SidebarMenu>
+      <ProfileDialog user={user} open={profileOpen} onOpenChange={setProfileOpen} />
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
@@ -45,6 +49,10 @@ function UserMenu({ user }: { user: User }) {
             <ChevronsUpDown className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="min-w-56">
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+              <UserRound />
+              Profile
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? <Sun /> : <Moon />}
               {theme === 'dark' ? 'Light theme' : 'Dark theme'}

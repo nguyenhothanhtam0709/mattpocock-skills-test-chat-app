@@ -16,6 +16,7 @@ import {
   refreshAccessToken,
   type LoginResult,
 } from '@/api/auth';
+import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 
 export type AuthState =
   { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; user: User };
@@ -23,6 +24,8 @@ export type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn(identifier: string, password: string): Promise<LoginResult>;
+  /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
+  setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -41,6 +44,7 @@ function refreshDelay(accessToken: string): number {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const accessTokenRef = useRef<string | undefined>(undefined);
 
   const signOut = useCallback(() => {
     clearTimeout(timer.current);
@@ -49,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const scheduleRefresh = useCallback(
     (accessToken: string) => {
+      accessTokenRef.current = accessToken;
       clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         const next = await refreshAccessToken();
@@ -90,7 +95,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
-  const value = useMemo(() => ({ state, signIn }), [state, signIn]);
+  const setNickname = useCallback(async (nickname: string | null) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    const result = await updateNickname(accessToken, nickname);
+    if (result.ok) setState({ status: 'signedIn', user: result.user });
+    return result;
+  }, []);
+
+  const value = useMemo(() => ({ state, signIn, setNickname }), [state, signIn, setNickname]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -142,6 +142,23 @@ export class AuthService {
     return user;
   }
 
+  /** Sets or (with `null`) clears the Nickname; the only profile field a User can change. */
+  async updateNickname(userId: string, nickname: string | null): Promise<RegisterResponse['user']> {
+    const [user] = await this.db
+      .update(users)
+      .set({ nickname })
+      .where(eq(users.id, userId))
+      .returning(publicUser);
+    if (!user) {
+      throw new DomainException(
+        ErrorCode.UNAUTHENTICATED,
+        HttpStatus.UNAUTHORIZED,
+        'Not signed in',
+      );
+    }
+    return user;
+  }
+
   async register(input: NewUser): Promise<RegisterResponse> {
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     try {
