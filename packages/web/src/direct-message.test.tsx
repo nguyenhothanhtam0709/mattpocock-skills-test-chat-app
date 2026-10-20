@@ -152,19 +152,156 @@ describe('first Direct Message', () => {
 
     expect(await screen.findByText('3900 / 4000')).toBeInTheDocument();
   });
+});
 
-  it('keeps the text and shows an error when sending fails', async () => {
+const errorResponse = (code: string, status: number) =>
+  HttpResponse.json({ error: { code, message: 'x' } }, { status });
+
+describe('optimistic send and retry', () => {
+  it('shows the Message at once as pending, then replaces it with the confirmed one', async () => {
     const { user } = await openChatWithBob();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
     server.use(
-      http.post('*/api/v1/direct-messages', () =>
-        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'x' } }, { status: 500 }),
-      ),
+      http.post('*/api/v1/direct-messages', async ({ request }) => {
+        await gate;
+        const body = (await request.json()) as SentRequest['body'];
+        return HttpResponse.json(
+          {
+            message: {
+              id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c01',
+              conversationId,
+              senderId: alice.id,
+              sequence: 1,
+              clientMessageId: body.clientMessageId,
+              body: body.body,
+              createdAt: '2026-10-20T09:30:00.000Z',
+            },
+            conversation: { id: conversationId, kind: 'direct', memberIds: [alice.id, bob.id] },
+          },
+          { status: 201 },
+        );
+      }),
     );
     const box = screen.getByRole('textbox', { name: /message/i });
 
-    await user.type(box, 'will fail{Enter}');
+    await user.type(box, 'hi there{Enter}');
+
+    const pending = await screen.findByText('hi there');
+    expect(box).toHaveValue('');
+    expect(pending.closest('[data-variant]')).toHaveAttribute('data-variant', 'muted');
+    release();
+    await waitFor(() =>
+      expect(screen.getByText('hi there').closest('[data-variant]')).toHaveAttribute(
+        'data-variant',
+        'default',
+      ),
+    );
+    expect(screen.getAllByText('hi there')).toHaveLength(1);
+  });
+
+  it('marks a failed Message and retries it with the same client message ID', async () => {
+    const { user, sent } = await openChatWithBob();
+    server.use(
+      http.post('*/api/v1/direct-messages', async ({ request }) => {
+        sent.push({
+          url: '',
+          body: (await request.json()) as SentRequest['body'],
+          authorization: null,
+        });
+        return errorResponse('INTERNAL_ERROR', 500);
+      }),
+    );
+
+    await user.type(screen.getByRole('textbox', { name: /message/i }), 'flaky{Enter}');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
-    await waitFor(() => expect(box).toHaveValue('will fail'));
+    expect(screen.getByText('flaky').closest('[data-variant]')).toHaveAttribute(
+      'data-variant',
+      'destructive',
+    );
+    server.resetHandlers();
+    // Back to the happy handlers from openChatWithBob are gone after reset; install them again.
+    server.use(
+      http.post('*/api/v1/direct-messages', async ({ request }) => {
+        const body = (await request.json()) as SentRequest['body'];
+        sent.push({ url: '', body, authorization: null });
+        return HttpResponse.json(
+          {
+            message: {
+              id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c01',
+              conversationId,
+              senderId: alice.id,
+              sequence: 1,
+              clientMessageId: body.clientMessageId,
+              body: body.body,
+              createdAt: '2026-10-20T09:30:00.000Z',
+            },
+            conversation: { id: conversationId, kind: 'direct', memberIds: [alice.id, bob.id] },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /retry/i })).toBeNull());
+    expect(screen.getAllByText('flaky')).toHaveLength(1);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.body.clientMessageId).toBe(sent[0]?.body.clientMessageId);
+  });
+
+  it('reconciles a 200 for a Message the server had already stored without duplicating it', async () => {
+    const { user } = await openChatWithBob();
+    let attempts = 0;
+    server.use(
+      http.post('*/api/v1/direct-messages', async ({ request }) => {
+        attempts += 1;
+        if (attempts === 1) return HttpResponse.error();
+        const body = (await request.json()) as SentRequest['body'];
+        return HttpResponse.json(
+          {
+            message: {
+              id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c01',
+              conversationId,
+              senderId: alice.id,
+              sequence: 1,
+              clientMessageId: body.clientMessageId,
+              body: body.body,
+              createdAt: '2026-10-20T09:30:00.000Z',
+            },
+            conversation: { id: conversationId, kind: 'direct', memberIds: [alice.id, bob.id] },
+          },
+          { status: 200 },
+        );
+      }),
+    );
+
+    await user.type(screen.getByRole('textbox', { name: /message/i }), 'once{Enter}');
+    await user.click(await screen.findByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /retry/i })).toBeNull());
+    expect(screen.getAllByText('once')).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('tells the User when they are rate limited', async () => {
+    const { user } = await openChatWithBob();
+    server.use(http.post('*/api/v1/direct-messages', () => errorResponse('RATE_LIMITED', 429)));
+
+    await user.type(screen.getByRole('textbox', { name: /message/i }), 'fast{Enter}');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/too fast/i);
+  });
+
+  it('tells the User when the server rejects the Message as invalid', async () => {
+    const { user } = await openChatWithBob();
+    server.use(
+      http.post('*/api/v1/direct-messages', () => errorResponse('VALIDATION_FAILED', 400)),
+    );
+
+    await user.type(screen.getByRole('textbox', { name: /message/i }), 'odd{Enter}');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be sent/i);
   });
 });
