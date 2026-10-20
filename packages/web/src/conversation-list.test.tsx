@@ -29,6 +29,7 @@ const summaries = [
     kind: 'direct',
     name: 'Bob',
     members: [aliceMember, bob],
+    isMember: true,
     lastMessage: {
       senderId: bob.id,
       preview: 'see you at noon',
@@ -40,6 +41,7 @@ const summaries = [
     kind: 'direct',
     name: 'carol',
     members: [aliceMember, carol],
+    isMember: true,
     lastMessage: { senderId: alice.id, preview: 'thanks!', createdAt: '2020-03-03T10:00:00Z' },
   },
 ];

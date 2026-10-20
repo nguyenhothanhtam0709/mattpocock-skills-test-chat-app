@@ -61,6 +61,7 @@ describe('realtime event contracts', () => {
       kind: 'direct',
       name: 'Alice',
       members: [{ id, username: 'Alice', nickname: null }],
+      isMember: true,
       lastMessage: { senderId: id, preview: 'hi', createdAt: message.createdAt },
     };
     expect(ConversationCreatedEventSchema.safeParse({ conversation }).success).toBe(true);

@@ -134,23 +134,40 @@ export const groups = pgTable('groups', {
     .references(() => users.id, { onDelete: 'cascade' }),
 });
 
+/** The `endSequence` of a period that has not ended: the largest `integer` value. */
+export const OPEN_PERIOD_END = 2147483647;
+
 /**
- * Users the Owner removed from a Group, so that posting can answer `NOT_A_MEMBER` rather than
- * `CONVERSATION_NOT_FOUND`. A row goes when the User is added back. Ticket 17 replaces this
- * with membership periods.
+ * A stretch of a User's membership in a Conversation: they can read the Messages whose
+ * sequence is greater than `startSequence` and at most `endSequence`. A User gets one period
+ * per time they were a Member, so a Former Member who was added back has several. An open
+ * period has `endSequence = OPEN_PERIOD_END` (a sentinel rather than a nullable column,
+ * ADR-0005); a User has at most one open period per Conversation.
  */
-export const removedGroupMembers = pgTable(
-  'removed_group_members',
+export const membershipPeriods = pgTable(
+  'membership_periods',
   {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`uuidv7()`),
     conversationId: uuid('conversation_id')
       .notNull()
-      .references(() => groups.conversationId, { onDelete: 'cascade' }),
+      .references(() => conversations.id, { onDelete: 'cascade' }),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    startSequence: integer('start_sequence').notNull(),
+    endSequence: integer('end_sequence').notNull().default(OPEN_PERIOD_END),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.conversationId, t.userId] })],
+  (t) => [
+    index('membership_periods_conversation_user_idx').on(t.conversationId, t.userId),
+    index('membership_periods_user_idx').on(t.userId),
+    uniqueIndex('membership_periods_open_unique')
+      .on(t.conversationId, t.userId)
+      .where(sql`${t.endSequence} = 2147483647`),
+    check('membership_periods_range_check', sql`${t.endSequence} >= ${t.startSequence}`),
+  ],
 );
 
 /** Immutable once inserted. */

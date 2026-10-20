@@ -34,6 +34,7 @@ const summary = (
   kind: 'direct' as const,
   name: peer.nickname ?? peer.username,
   members: [aliceMember, { id: peer.id, username: peer.username, nickname: peer.nickname }],
+  isMember: true,
   lastMessage: { senderId: peer.id, preview, createdAt },
 });
 

@@ -135,6 +135,8 @@ export const ConversationSummarySchema = z.object({
   /** For a Direct Conversation: the other User's Nickname, else their Username. */
   name: z.string(),
   members: z.array(ConversationMemberSchema),
+  /** False for a Former Member: they can read their windows but not post. */
+  isMember: z.boolean(),
   /** Null until the first Message (a new Group has none). */
   lastMessage: z
     .object({

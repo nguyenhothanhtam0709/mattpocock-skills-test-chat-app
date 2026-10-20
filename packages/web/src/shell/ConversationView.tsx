@@ -164,7 +164,9 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
 
 /** What a view is showing: a Direct Conversation with a peer, or an existing Group. */
 export type ConversationTarget =
-  { kind: 'direct'; peer: UserSearchResult } | { kind: 'group'; name: string; memberCount: number };
+  | { kind: 'direct'; peer: UserSearchResult }
+  /** `isMember` is false for a Former Member, who can read their windows but not post. */
+  | { kind: 'group'; name: string; memberCount: number; isMember: boolean };
 
 /**
  * A Direct Conversation with a peer, or a Group. A Direct Conversation starts without a
@@ -493,7 +495,14 @@ export function ConversationView({
           </MessageScrollerProvider>
         )}
       </div>
-      <Composer onSend={send} />
+      {target.kind === 'group' && !target.isMember ? (
+        <p className="border-t p-4 text-center text-sm text-muted-foreground">
+          You are no longer a member of this group. You can read the messages from when you were a
+          member, but you cannot send new ones.
+        </p>
+      ) : (
+        <Composer onSend={send} />
+      )}
     </div>
   );
 }
