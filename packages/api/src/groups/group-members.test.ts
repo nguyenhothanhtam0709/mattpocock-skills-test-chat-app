@@ -329,7 +329,7 @@ describe('DELETE /groups/:id/members/:userId', () => {
       const notInGroup = await removeMember(app, alice, group.id, dave.id);
       const outsider = await removeMember(app, dave, group.id, alice.id);
 
-      expect(notInGroup.statusCode).toBe(404);
+      expect(notInGroup.statusCode).toBe(403);
       expect(errorCode(notInGroup)).toBe(ErrorCode.NOT_A_MEMBER);
       expect(outsider.statusCode).toBe(404);
       expect(errorCode(outsider)).toBe(ErrorCode.CONVERSATION_NOT_FOUND);
