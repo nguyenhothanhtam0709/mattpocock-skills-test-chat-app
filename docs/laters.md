@@ -1,4 +1,4 @@
-# Planned later
+# Laters
 
 Decisions to revisit after MVP1. These are intentions, not commitments; turn each into a spec/ADR before starting.
 
