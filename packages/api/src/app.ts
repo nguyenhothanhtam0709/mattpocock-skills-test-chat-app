@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -67,6 +68,7 @@ export async function createApp(
       callback(null, origin === config.SPA_ORIGIN),
     credentials: true,
   });
+  await app.register(cookie);
   adapter.getInstance().addHook('onClose', (_instance, done) => {
     closeLogger();
     done();

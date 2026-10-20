@@ -1,7 +1,41 @@
+import { useEffect } from 'react';
+import { AuthProvider, useAuth } from '@/auth/AuthProvider';
+import { LoginPage } from '@/auth/LoginPage';
 import { SignupPage } from '@/auth/SignupPage';
 import { HealthPage } from '@/health/HealthPage';
+import { navigate, usePath } from '@/router';
+import { AppShell } from '@/shell/AppShell';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
-/** No router yet: the signup page lives at /signup, everything else shows service status. */
+/**
+ * No router library yet. `/signup` and `/health` are public; `/login` is for signed-out
+ * Users; everything else is the app shell, which signed-out Users are sent away from.
+ */
+function Routes() {
+  const path = usePath();
+  const { state } = useAuth();
+  const signedIn = state.status === 'signedIn';
+  const signedOut = state.status === 'signedOut';
+  const isPublic = path === '/signup' || path === '/health';
+
+  useEffect(() => {
+    if (signedOut && !isPublic && path !== '/login') navigate('/login');
+    if (signedIn && path === '/login') navigate('/');
+  }, [signedIn, signedOut, isPublic, path]);
+
+  if (path === '/signup') return <SignupPage />;
+  if (path === '/health') return <HealthPage />;
+  if (state.status === 'loading') return null;
+  if (state.status === 'signedIn') return path === '/login' ? null : <AppShell user={state.user} />;
+  return path === '/login' ? <LoginPage /> : null;
+}
+
 export function App() {
-  return window.location.pathname === '/signup' ? <SignupPage /> : <HealthPage />;
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <Routes />
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }

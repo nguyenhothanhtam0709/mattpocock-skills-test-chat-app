@@ -76,3 +76,33 @@ export const RegisterResponseSchema = z.object({
 });
 
 export type RegisterResponse = z.infer<typeof RegisterResponseSchema>;
+
+export const UserSchema = RegisterResponseSchema.shape.user;
+
+export type User = z.infer<typeof UserSchema>;
+
+/** Sign-in: a Username or an email, plus the password. Deliberately lenient: no policy checks. */
+export const LoginRequestSchema = z.object({
+  identifier: z.string().min(1).max(254),
+  password: z.string().min(1).max(128),
+});
+
+export type LoginRequest = z.input<typeof LoginRequestSchema>;
+
+/** The access token is short-lived and lives only in SPA memory; the refresh token is a cookie. */
+export const LoginResponseSchema = z.object({
+  accessToken: z.string(),
+  user: UserSchema,
+});
+
+export type LoginResponse = z.infer<typeof LoginResponseSchema>;
+
+export const RefreshResponseSchema = z.object({
+  accessToken: z.string(),
+});
+
+export type RefreshResponse = z.infer<typeof RefreshResponseSchema>;
+
+export const MeResponseSchema = z.object({ user: UserSchema });
+
+export type MeResponse = z.infer<typeof MeResponseSchema>;

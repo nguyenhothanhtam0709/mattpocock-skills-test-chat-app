@@ -1,8 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { server } from './test/server';
+
+beforeEach(() => {
+  window.history.pushState({}, '', '/health');
+});
 
 describe('health page', () => {
   it('shows the API as healthy when the health endpoint reports ok', async () => {

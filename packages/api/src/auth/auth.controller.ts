@@ -1,12 +1,32 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  LoginRequestSchema,
   RegisterRequestSchema,
+  type LoginRequest,
+  type LoginResponse,
+  type RefreshResponse,
   type RegisterRequest,
   type RegisterResponse,
 } from '@chat/contracts';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
-import { AuthService } from './auth.service.js';
+import { AuthService, type IssuedSession } from './auth.service.js';
+
+export const REFRESH_COOKIE = 'refresh_token';
+
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+
+/** Always sent with these attributes; the cookie is only ever readable by the refresh route. */
+function setRefreshCookie(reply: FastifyReply, session: IssuedSession): void {
+  void reply.setCookie(REFRESH_COOKIE, session.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/api/v1/auth',
+    expires: session.refreshExpiresAt,
+  });
+}
 
 @Controller('auth')
 export class AuthController {
@@ -19,5 +39,34 @@ export class AuthController {
     @Body(new ZodValidationPipe(RegisterRequestSchema)) body: RegisterRequest,
   ): Promise<RegisterResponse> {
     return this.auth.register(body);
+  }
+
+  /** 10 attempts per 15 minutes per IP here, plus 5 per identifier (see AppModule). */
+  @Post('login')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: FIFTEEN_MINUTES_MS } })
+  async login(
+    @Body(new ZodValidationPipe(LoginRequestSchema)) body: LoginRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<LoginResponse> {
+    const { accessToken, user, ...session } = await this.auth.login(body.identifier, body.password);
+    setRefreshCookie(reply, { accessToken, ...session });
+    return { accessToken, user };
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<RefreshResponse> {
+    try {
+      const session = await this.auth.refresh(request.cookies[REFRESH_COOKIE]);
+      setRefreshCookie(reply, session);
+      return { accessToken: session.accessToken };
+    } catch (error) {
+      void reply.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+      throw error;
+    }
   }
 }

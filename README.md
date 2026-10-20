@@ -4,7 +4,7 @@ pnpm workspace: `packages/api` (NestJS 12 on Fastify, Drizzle + `pg`), `packages
 
 ```sh
 pnpm install
-cp packages/api/.env.example packages/api/.env
+cp packages/api/.env.example packages/api/.env   # then fill JWT_PRIVATE_KEY / JWT_PUBLIC_KEY (Ed25519 PEM, see the file)
 pnpm db:up          # local Postgres (docker compose)
 pnpm db:migrate     # apply Drizzle migrations
 pnpm dev:api        # API on http://localhost:3000/api/v1

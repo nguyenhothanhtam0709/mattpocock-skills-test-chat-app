@@ -1,0 +1,97 @@
+import type { User } from '@chat/contracts';
+import { ChevronsUpDown, MessageSquare, Moon, Sun } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { useTheme } from '@/theme/ThemeProvider';
+
+function UserMenu({ user }: { user: User }) {
+  const { theme, setTheme } = useTheme();
+  const name = user.nickname ?? user.username;
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
+            <Avatar className="size-8">
+              <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <span className="truncate font-medium">{name}</span>
+            <ChevronsUpDown className="ml-auto size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="min-w-56">
+            <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              {theme === 'dark' ? <Sun /> : <Moon />}
+              {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+/** The signed-in frame: the Conversation list in a sidebar (a sheet on mobile) beside the content. */
+export function AppShell({ user }: { user: User }) {
+  return (
+    <SidebarProvider>
+      <Sidebar>
+        <SidebarHeader>
+          <span className="px-2 py-1 text-lg font-semibold">Chat</span>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <MessageSquare />
+                </EmptyMedia>
+                <EmptyTitle>No conversations yet</EmptyTitle>
+                <EmptyDescription>
+                  Messages you send and receive will show up here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          <UserMenu user={user} />
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex h-12 items-center gap-2 border-b px-3">
+          <SidebarTrigger />
+        </header>
+        <main className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
+          Select a conversation to start chatting.
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
