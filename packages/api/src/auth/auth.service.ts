@@ -6,7 +6,6 @@ import * as argon2 from 'argon2';
 import { and, eq, gt, or, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
-import { v7 as uuidv7 } from 'uuid';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import type { Config } from '../config/config.js';
@@ -81,19 +80,19 @@ export class AuthService {
 
     const user = { id: row.id, username: row.username, email: row.email, nickname: row.nickname };
     const now = this.clock.now();
-    const sessionId = uuidv7();
     const refreshToken = this.tokens.newRefreshToken();
     const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlMs);
-    await this.db.insert(sessions).values({
-      id: sessionId,
-      userId: user.id,
-      refreshTokenHash: this.tokens.hashRefreshToken(refreshToken),
-      createdAt: now,
-      rotatedAt: now,
-      expiresAt: refreshExpiresAt,
-    });
+    const [created] = await this.db
+      .insert(sessions)
+      .values({
+        userId: user.id,
+        refreshTokenHash: this.tokens.hashRefreshToken(refreshToken),
+        rotatedAt: now,
+        expiresAt: refreshExpiresAt,
+      })
+      .returning({ id: sessions.id });
     return {
-      accessToken: await this.tokens.signAccessToken(user.id, sessionId),
+      accessToken: await this.tokens.signAccessToken(user.id, created!.id),
       refreshToken,
       refreshExpiresAt,
       user,
@@ -192,7 +191,6 @@ export class AuthService {
       const [row] = await this.db
         .insert(users)
         .values({
-          id: uuidv7(),
           username: input.username,
           email: input.email,
           passwordHash,

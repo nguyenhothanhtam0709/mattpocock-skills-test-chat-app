@@ -9,7 +9,7 @@ describe('test harness', () => {
     const pool = new Pool({ connectionString: inject('databaseUrl') });
     try {
       await pool.query(
-        `insert into users (id, username, email, password_hash) values (gen_random_uuid(), 'k', 'k@example.com', 'x')`,
+        `insert into users (username, email, password_hash) values ('k', 'k@example.com', 'x')`,
       );
       await truncateAllTables(inject('databaseUrl'));
       const { rows } = await pool.query(`select count(*)::int as n from users`);

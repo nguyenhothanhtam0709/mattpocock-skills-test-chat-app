@@ -13,7 +13,7 @@ export default async function setup(project: {
   let stop = async () => {};
 
   if (!url) {
-    const container = await new PostgreSqlContainer('postgres:17-alpine').start();
+    const container = await new PostgreSqlContainer('postgres:18-alpine').start();
     url = container.getConnectionUri();
     stop = async () => {
       await container.stop();
