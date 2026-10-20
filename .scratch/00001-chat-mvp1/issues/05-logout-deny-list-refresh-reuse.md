@@ -13,3 +13,12 @@
 - [x] Presenting a rotated (already-used) refresh token revokes the session; subsequent refreshes fail
 - [x] Expired deny-list entries are swept (tested with the injectable clock)
 - [x] SPA: Log out in the User menu clears auth state and returns to login; tested
+
+## Comments
+
+**Implementation notes (spec drift, PR #11):**
+- Added `token_deny_list` table and `sessions.previous_refresh_token_hash` (migration 0004).
+- `AuthGuard` also rejects tokens whose session row is gone (`SESSION_REVOKED`), at the cost of two extra DB lookups per authenticated request. Ticket 14 (socket revocation) must reuse this check.
+- Reuse detection remembers one rotation back only; older tokens get a plain 401 without revoking the session.
+- Sweeping runs on logout; there is no timer.
+- Reuse-detection tests were written after the code, not seen failing first.
