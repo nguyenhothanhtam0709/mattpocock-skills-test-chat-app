@@ -57,6 +57,16 @@ export const NicknameSchema = nameText(true).refine(
   { message: 'must be 1-50 characters' },
 );
 
+/**
+ * Update the caller's profile. Only the Nickname is editable (`null` clears it); the schema is
+ * strict so a Username, email or anything else is rejected rather than silently ignored.
+ */
+export const UpdateProfileRequestSchema = z.strictObject({
+  nickname: NicknameSchema.nullable(),
+});
+
+export type UpdateProfileRequest = z.input<typeof UpdateProfileRequestSchema>;
+
 export const RegisterRequestSchema = z.object({
   username: UsernameSchema,
   email: EmailSchema,

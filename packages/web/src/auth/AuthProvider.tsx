@@ -17,6 +17,7 @@ import {
   refreshAccessToken,
   type LoginResult,
 } from '@/api/auth';
+import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 
 export type AuthState =
   { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; user: User };
@@ -24,6 +25,8 @@ export type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn(identifier: string, password: string): Promise<LoginResult>;
+  /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
+  setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -96,13 +99,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
+  const setNickname = useCallback(async (nickname: string | null) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    const result = await updateNickname(accessToken, nickname);
+    if (result.ok) setState({ status: 'signedIn', user: result.user });
+    return result;
+  }, []);
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
     if (accessToken) await logout(accessToken);
   }, [signOut]);
 
-  const value = useMemo(() => ({ state, signIn, logOut }), [state, signIn, logOut]);
+  const value = useMemo(
+    () => ({ state, signIn, setNickname, logOut }),
+    [state, signIn, setNickname, logOut],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
