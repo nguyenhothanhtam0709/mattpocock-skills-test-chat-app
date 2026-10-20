@@ -34,10 +34,10 @@ describe('UsernameSchema', () => {
     ['C0 control', 'ali\u001fce'],
     ['DEL', 'ali\u007fce'],
     ['C1 control', 'ali\u0085ce'],
-    ['right-to-left override', 'ali‮ce'],
-    ['left-to-right embedding', 'ali‪ce'],
-    ['isolate', 'ali⁦ce'],
-    ['pop isolate', 'ali⁩ce'],
+    ['right-to-left override', 'ali\u202Ece'],
+    ['left-to-right embedding', 'ali\u202Ace'],
+    ['isolate', 'ali\u2066ce'],
+    ['pop isolate', 'ali\u2069ce'],
     ['decomposed accent (NFC turns it into a non-ASCII letter)', 'Amélie'],
   ])('rejects %s', (_label, value) => {
     expect(UsernameSchema.safeParse(value).success).toBe(false);
@@ -150,7 +150,8 @@ describe('RegisterRequestSchema', () => {
   });
 
   it.each(['username', 'email', 'password'] as const)('requires %s', (field) => {
-    const { [field]: _omitted, ...rest } = valid;
+    const rest: Partial<typeof valid> = { ...valid };
+    delete rest[field];
     expect(RegisterRequestSchema.safeParse(rest).success).toBe(false);
   });
 

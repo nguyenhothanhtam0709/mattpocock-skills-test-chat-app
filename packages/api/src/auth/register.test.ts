@@ -38,7 +38,8 @@ describe('POST /auth/register', () => {
 
   it('gives a User without a Nickname a null Nickname', async () => {
     await withApp({}, async (app) => {
-      const { nickname: _omit, ...withoutNickname } = valid;
+      const withoutNickname: Partial<typeof valid> = { ...valid };
+      delete withoutNickname.nickname;
       const res = await register(app, withoutNickname);
 
       expect(res.statusCode).toBe(201);

@@ -8,9 +8,11 @@ describe('test harness', () => {
   it('truncates all application tables between tests', async () => {
     const pool = new Pool({ connectionString: inject('databaseUrl') });
     try {
-      await pool.query(`insert into app_meta (key, value) values ('k', 'v')`);
+      await pool.query(
+        `insert into users (id, username, email, password_hash) values (gen_random_uuid(), 'k', 'k@example.com', 'x')`,
+      );
       await truncateAllTables(inject('databaseUrl'));
-      const { rows } = await pool.query(`select count(*)::int as n from app_meta`);
+      const { rows } = await pool.query(`select count(*)::int as n from users`);
       expect(rows[0].n).toBe(0);
     } finally {
       await pool.end();

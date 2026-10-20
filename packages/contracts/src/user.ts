@@ -1,9 +1,13 @@
 import { z } from 'zod';
 
 /** NUL, C0 and C1 control characters (includes tab and newline). */
-const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/u;
+const isControl = (cp: number): boolean => cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f);
 /** Bidi overrides, embeddings and isolates (ADR-0002). */
-const BIDI_OVERRIDES = /[‪-‮⁦-⁩]/u;
+const isBidiOverride = (cp: number): boolean =>
+  (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069);
+
+const hasChar = (value: string, test: (cp: number) => boolean): boolean =>
+  [...value].some((char) => test(char.codePointAt(0)!));
 
 const codePointLength = (value: string): number => [...value].length;
 
@@ -14,15 +18,15 @@ const codePointLength = (value: string): number => [...value].length;
 const plainText = z
   .string()
   .transform((value) => value.normalize('NFC'))
-  .refine((value) => !CONTROL_CHARS.test(value), 'must not contain control characters');
+  .refine((value) => !hasChar(value, isControl), 'must not contain control characters');
 
 /** Same, and additionally free of bidi-override characters (names). */
 const nameText = (trim: boolean) =>
   z
     .string()
     .transform((value) => (trim ? value.normalize('NFC').trim() : value.normalize('NFC')))
-    .refine((value) => !CONTROL_CHARS.test(value), 'must not contain control characters')
-    .refine((value) => !BIDI_OVERRIDES.test(value), 'must not contain bidirectional overrides');
+    .refine((value) => !hasChar(value, isControl), 'must not contain control characters')
+    .refine((value) => !hasChar(value, isBidiOverride), 'must not contain bidirectional overrides');
 
 /** 3-32 letters, digits or underscores; case is preserved, uniqueness is case-insensitive. */
 export const UsernameSchema = nameText(false).refine(
