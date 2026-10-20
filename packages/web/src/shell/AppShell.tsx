@@ -182,6 +182,7 @@ export function AppShell({ user }: { user: User }) {
               user={user}
               target={open.target}
               conversationId={open.conversationId}
+              onLeft={() => setRefreshKey((k) => k + 1)}
               onSent={(conversationId) => {
                 setOpen((current) => current && { ...current, conversationId });
                 setRefreshKey((k) => k + 1);

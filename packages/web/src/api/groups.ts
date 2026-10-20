@@ -104,6 +104,25 @@ async function changeMembers(
   return { ok: false, error: GENERIC_ERROR };
 }
 
+/** `POST /api/v1/groups/:id/leave`: any Member; the Group as it is after they left. */
+export async function leaveGroup(accessToken: string, groupId: string): Promise<GroupResult> {
+  let res: Response;
+  try {
+    res = await fetch(new URL(`/api/v1/groups/${groupId}/leave`, window.location.origin), {
+      method: 'POST',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+  const payload: unknown = await res.json().catch(() => undefined);
+  if (res.ok) return { ok: true, group: GroupMembershipResponseSchema.parse(payload).conversation };
+  const code = ErrorResponseSchema.safeParse(payload).data?.error.code;
+  if (code === ErrorCode.GROUP_CLOSED) return { ok: false, error: 'This Group is closed.' };
+  if (code === ErrorCode.NOT_A_MEMBER) return { ok: false, error: 'You already left this Group.' };
+  return { ok: false, error: GENERIC_ERROR };
+}
+
 /** `POST /api/v1/groups/:id/members`: Owner only. */
 export const addGroupMember = (accessToken: string, groupId: string, userId: string) =>
   changeMembers(accessToken, groupId, 'POST', '', { userId });

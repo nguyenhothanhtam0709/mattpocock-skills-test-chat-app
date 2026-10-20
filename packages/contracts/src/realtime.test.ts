@@ -27,12 +27,18 @@ describe('realtime event contracts', () => {
       CONVERSATION_CREATED: 'conversation.created',
       GROUP_MEMBER_ADDED: 'group.member_added',
       GROUP_MEMBER_REMOVED: 'group.member_removed',
+      GROUP_MEMBER_LEFT: 'group.member_left',
+      GROUP_OWNER_CHANGED: 'group.owner_changed',
+      GROUP_CLOSED: 'group.closed',
       SESSION_REVOKED: 'session.revoked',
     });
     expect(Object.keys(RealtimeEventSchemas).sort()).toEqual([
       'conversation.created',
+      'group.closed',
       'group.member_added',
+      'group.member_left',
       'group.member_removed',
+      'group.owner_changed',
       'message.created',
       'session.revoked',
     ]);

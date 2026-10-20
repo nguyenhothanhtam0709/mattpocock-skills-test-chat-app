@@ -7,6 +7,9 @@ export const RealtimeEvent = {
   CONVERSATION_CREATED: 'conversation.created',
   GROUP_MEMBER_ADDED: 'group.member_added',
   GROUP_MEMBER_REMOVED: 'group.member_removed',
+  GROUP_MEMBER_LEFT: 'group.member_left',
+  GROUP_OWNER_CHANGED: 'group.owner_changed',
+  GROUP_CLOSED: 'group.closed',
   SESSION_REVOKED: 'session.revoked',
 } as const;
 
@@ -38,6 +41,27 @@ export const GroupMemberRemovedEventSchema = z.object({
 
 export type GroupMemberRemovedEvent = z.infer<typeof GroupMemberRemovedEventSchema>;
 
+/** Pushed to the remaining Members of a Group when a Member leaves. */
+export const GroupMemberLeftEventSchema = z.object({
+  conversationId: z.uuid(),
+  member: ConversationMemberSchema,
+});
+
+export type GroupMemberLeftEvent = z.infer<typeof GroupMemberLeftEventSchema>;
+
+/** Pushed to the remaining Members of a Group when the Owner left and ownership passed on. */
+export const GroupOwnerChangedEventSchema = z.object({
+  conversationId: z.uuid(),
+  ownerId: z.uuid(),
+});
+
+export type GroupOwnerChangedEvent = z.infer<typeof GroupOwnerChangedEventSchema>;
+
+/** Pushed to the last Member (the one who left) when the Group becomes a Closed Group. */
+export const GroupClosedEventSchema = z.object({ conversationId: z.uuid() });
+
+export type GroupClosedEvent = z.infer<typeof GroupClosedEventSchema>;
+
 /** Pushed to every socket of a session that was ended (logout); the server then disconnects them. */
 export const SessionRevokedEventSchema = z.object({});
 
@@ -46,5 +70,8 @@ export const RealtimeEventSchemas = {
   [RealtimeEvent.CONVERSATION_CREATED]: ConversationCreatedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_ADDED]: GroupMemberAddedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_REMOVED]: GroupMemberRemovedEventSchema,
+  [RealtimeEvent.GROUP_MEMBER_LEFT]: GroupMemberLeftEventSchema,
+  [RealtimeEvent.GROUP_OWNER_CHANGED]: GroupOwnerChangedEventSchema,
+  [RealtimeEvent.GROUP_CLOSED]: GroupClosedEventSchema,
   [RealtimeEvent.SESSION_REVOKED]: SessionRevokedEventSchema,
 } as const;
