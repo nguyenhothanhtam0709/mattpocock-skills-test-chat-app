@@ -1,0 +1,30 @@
+{
+  "name": "chat",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build:contracts": "pnpm --filter @chat/contracts build",
+    "dev:api": "pnpm build:contracts && pnpm --filter @chat/api dev",
+    "dev:web": "pnpm build:contracts && pnpm --filter @chat/web dev",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @chat/api db:generate",
+    "db:migrate": "pnpm --filter @chat/api db:migrate",
+    "test": "pnpm build:contracts && pnpm -r --workspace-concurrency=1 test",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "pnpm build:contracts && pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}
