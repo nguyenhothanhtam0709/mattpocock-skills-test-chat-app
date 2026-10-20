@@ -19,3 +19,11 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 ### Database
 
 The Drizzle schema is the source of truth; generate migrations with `pnpm db:generate`, never hand-edit them. See `docs/adr/0003-drizzle-schema-is-source-of-truth.md`.
+
+Generated IDs and "created at" timestamps are DB column defaults, not passed from app code. See `docs/adr/0004-db-generates-ids-and-created-timestamps.md`.
+
+Avoid nullable columns and prefer DB-generated values (defaults, built-ins like `now()`) for data consistency. See `docs/adr/0005-avoid-nullable-columns-prefer-db-generated-values.md`.
+
+### No assumptions
+
+Don't assume; ask. Never add, remove or change a package without the ticket saying so. See `docs/workflow/no-assumptions.md`.
