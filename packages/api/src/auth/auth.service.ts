@@ -6,7 +6,6 @@ import * as argon2 from 'argon2';
 import { and, eq, gt, ne, or, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
-import { CLOCK, type Clock } from '../clock/clock.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import type { Config } from '../config/config.js';
 import { PG_POOL } from '../db/database.module.js';
@@ -41,20 +40,24 @@ const publicUser = {
 @Injectable()
 export class AuthService {
   private readonly db: NodePgDatabase;
-  private readonly refreshTtlMs: number;
+  private readonly refreshTtlSeconds: number;
   /** Verified against when the User does not exist, so both paths do the same hashing work. */
   private readonly dummyHash: Promise<string>;
 
   constructor(
     @Inject(PG_POOL) pool: Pool,
-    @Inject(CLOCK) private readonly clock: Clock,
     private readonly tokens: TokenService,
     @Inject(TOKEN_DENY_LIST) private readonly denyList: TokenDenyList,
     config: ConfigService<Config, true>,
   ) {
     this.db = drizzle(pool);
-    this.refreshTtlMs = config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }) * 24 * 60 * 60 * 1000;
+    this.refreshTtlSeconds = config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }) * 24 * 60 * 60;
     this.dummyHash = argon2.hash(randomBytes(16).toString('hex'), { type: argon2.argon2id });
+  }
+
+  /** The database computes "now plus the refresh TTL"; only the duration is passed in. */
+  private refreshExpiry() {
+    return sql`now() + make_interval(secs => ${this.refreshTtlSeconds})`;
   }
 
   /** Any failure is the same generic INVALID_CREDENTIALS. */
@@ -79,22 +82,20 @@ export class AuthService {
     }
 
     const user = { id: row.id, username: row.username, email: row.email, nickname: row.nickname };
-    const now = this.clock.now();
     const refreshToken = this.tokens.newRefreshToken();
-    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlMs);
     const [created] = await this.db
       .insert(sessions)
       .values({
         userId: user.id,
         refreshTokenHash: this.tokens.hashRefreshToken(refreshToken),
-        rotatedAt: now,
-        expiresAt: refreshExpiresAt,
+        rotatedAt: sql`now()`,
+        expiresAt: this.refreshExpiry(),
       })
-      .returning({ id: sessions.id });
+      .returning({ id: sessions.id, expiresAt: sessions.expiresAt });
     return {
       accessToken: await this.tokens.signAccessToken(user.id, created!.id),
       refreshToken,
-      refreshExpiresAt,
+      refreshExpiresAt: created!.expiresAt,
       user,
     };
   }
@@ -105,25 +106,23 @@ export class AuthService {
       new DomainException(ErrorCode.UNAUTHENTICATED, HttpStatus.UNAUTHORIZED, 'Not signed in');
     if (!refreshToken) throw unauthenticated();
 
-    const now = this.clock.now();
     const next = this.tokens.newRefreshToken();
-    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlMs);
     // One conditional UPDATE, so two concurrent refreshes with the same token cannot both win.
     const [session] = await this.db
       .update(sessions)
       .set({
         previousRefreshTokenHash: sessions.refreshTokenHash,
         refreshTokenHash: this.tokens.hashRefreshToken(next),
-        rotatedAt: now,
-        expiresAt: refreshExpiresAt,
+        rotatedAt: sql`now()`,
+        expiresAt: this.refreshExpiry(),
       })
       .where(
         and(
           eq(sessions.refreshTokenHash, this.tokens.hashRefreshToken(refreshToken)),
-          gt(sessions.expiresAt, now),
+          gt(sessions.expiresAt, sql`now()`),
         ),
       )
-      .returning({ id: sessions.id, userId: sessions.userId });
+      .returning({ id: sessions.id, userId: sessions.userId, expiresAt: sessions.expiresAt });
     if (!session) {
       // A token that was already rotated away is being replayed: assume it was stolen and
       // end the whole session, so neither the thief nor the owner can keep refreshing.
@@ -136,7 +135,7 @@ export class AuthService {
     return {
       accessToken: await this.tokens.signAccessToken(session.userId, session.id),
       refreshToken: next,
-      refreshExpiresAt,
+      refreshExpiresAt: session.expiresAt,
     };
   }
 

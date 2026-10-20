@@ -3,7 +3,6 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Pool } from 'pg';
 import { describe, expect, inject, it } from 'vitest';
 import { withApp } from '../../test/app-harness.js';
-import { testClock } from '../../test/test-clock.js';
 
 const alice = { username: 'Alice', email: 'alice@example.com', password: 'correct horse battery' };
 
@@ -98,13 +97,12 @@ describe('POST /auth/logout', () => {
   });
 
   it('sweeps expired deny-list entries on later logouts', async () => {
-    const time = testClock();
-    await withApp({ clock: time.clock }, async (app) => {
+    await withApp({}, async (app) => {
       const first = await signIn(app);
       await logout(app, first.accessToken);
       expect(await query('select jti from token_deny_list')).toHaveLength(1);
 
-      time.advanceSeconds(15 * 60 + 1);
+      await query(`update token_deny_list set expires_at = now() - interval '1 second'`);
       const second = await signIn(app);
       await logout(app, second.accessToken);
 

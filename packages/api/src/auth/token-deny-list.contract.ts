@@ -1,22 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { testClock } from '../../test/test-clock.js';
-import type { Clock } from '../clock/clock.js';
 import type { TokenDenyList } from './token-deny-list.js';
 
 /**
  * The behaviour every `TokenDenyList` adapter must have. Call it from a test file with a
- * factory that builds the adapter on the given clock.
+ * factory that builds the adapter and a way to make an entry expire (adapters cannot fake
+ * their store's clock, so the test moves the entry, not time).
  */
+export interface TokenDenyListUnderTest {
+  denyList: TokenDenyList;
+  /** Makes the entry for `jti` already expired. */
+  expire(jti: string): Promise<void>;
+}
+
 export function describeTokenDenyListContract(
   adapterName: string,
-  create: (clock: Clock) => Promise<TokenDenyList>,
+  create: () => Promise<TokenDenyListUnderTest>,
 ): void {
   describe(`TokenDenyList contract: ${adapterName}`, () => {
     async function setup() {
-      const time = testClock();
-      const denyList = await create(time.clock);
-      const inSeconds = (seconds: number) => new Date(time.clock.now().getTime() + seconds * 1000);
-      return { denyList, time, inSeconds };
+      const { denyList, expire } = await create();
+      const inSeconds = (seconds: number) => new Date(Date.now() + seconds * 1000);
+      return { denyList, expire, inSeconds };
     }
 
     it('does not deny a jti that was never added', async () => {
@@ -26,13 +30,11 @@ export function describeTokenDenyListContract(
     });
 
     it('denies an added jti until its expiry, and not after', async () => {
-      const { denyList, time, inSeconds } = await setup();
+      const { denyList, expire, inSeconds } = await setup();
       await denyList.add('jti-1', inSeconds(60));
 
       expect(await denyList.isDenied('jti-1')).toBe(true);
-      time.advanceSeconds(59);
-      expect(await denyList.isDenied('jti-1')).toBe(true);
-      time.advanceSeconds(1);
+      await expire('jti-1');
       expect(await denyList.isDenied('jti-1')).toBe(false);
     });
 
@@ -53,11 +55,12 @@ export function describeTokenDenyListContract(
     });
 
     it('sweeps expired entries and keeps live ones, reporting how many it removed', async () => {
-      const { denyList, time, inSeconds } = await setup();
+      const { denyList, expire, inSeconds } = await setup();
       await denyList.add('short', inSeconds(10));
       await denyList.add('short-too', inSeconds(20));
       await denyList.add('long', inSeconds(600));
-      time.advanceSeconds(30);
+      await expire('short');
+      await expire('short-too');
 
       expect(await denyList.sweepExpired()).toBe(2);
 
