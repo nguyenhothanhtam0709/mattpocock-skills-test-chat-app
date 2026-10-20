@@ -36,6 +36,13 @@
       "when": 1792510918019,
       "tag": "0004_little_nemesis",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792512192995,
+      "tag": "0005_milky_carnage",
+      "breakpoints": true
     }
   ]
 }
