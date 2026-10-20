@@ -4,15 +4,15 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `auth.service.ts`: `refreshExpiresAt` / `rotatedAt` and any other `Date` bound into inserts and updates become SQL (`` sql`now() + make_interval(secs => ${ttlSeconds})` `` or `` sql`now()` ``); no `new Date(now.getTime() + ttl)` left
-- [ ] `postgres-token-deny-list.ts`: `expiresAt > now()` and `expiresAt <= now()` use SQL `now()`, not `clock.now()`. The adapter no longer takes a `Clock`. The `expiresAt` of an entry still comes from the JWT `exp` claim (external value, allowed)
-- [ ] Refresh-token rotation and reuse-detection queries compare against SQL `now()` in the same statement or transaction as the write
-- [ ] `Clock` stays only for JWT `iat` / `exp` in `token.service.ts`; remove it from everything else (`app.module.ts` wiring, constructors)
-- [ ] Tests no longer advance a fake clock for DB-side expiry: they backdate rows (e.g. `UPDATE ... SET expires_at = now() - interval '1 second'`) or use short TTLs. Update `token-deny-list.contract.ts`, `logout.test.ts`, `session.test.ts`, `harness.test.ts` and `test/test-clock.ts` accordingly
-- [ ] No schema change expected; if one is needed, generate the migration with `pnpm db:generate`
-- [ ] No new packages. Lint, typecheck and all tests pass
+- [x] `auth.service.ts`: `refreshExpiresAt` / `rotatedAt` and any other `Date` bound into inserts and updates become SQL (`` sql`now() + make_interval(secs => ${ttlSeconds})` `` or `` sql`now()` ``); no `new Date(now.getTime() + ttl)` left
+- [x] `postgres-token-deny-list.ts`: `expiresAt > now()` and `expiresAt <= now()` use SQL `now()`, not `clock.now()`. The adapter no longer takes a `Clock`. The `expiresAt` of an entry still comes from the JWT `exp` claim (external value, allowed)
+- [x] Refresh-token rotation and reuse-detection queries compare against SQL `now()` in the same statement or transaction as the write
+- [x] `Clock` stays only for JWT `iat` / `exp` in `token.service.ts`; remove it from everything else (`app.module.ts` wiring, constructors)
+- [x] Tests no longer advance a fake clock for DB-side expiry: they backdate rows (e.g. `UPDATE ... SET expires_at = now() - interval '1 second'`) or use short TTLs. Update `token-deny-list.contract.ts`, `logout.test.ts`, `session.test.ts`, `harness.test.ts` and `test/test-clock.ts` accordingly
+- [x] No schema change expected; if one is needed, generate the migration with `pnpm db:generate`
+- [x] No new packages. Lint, typecheck and all tests pass
 
 ## Notes
 

@@ -7,13 +7,14 @@ import {
   RealtimeEvent,
   type ConversationMember,
   type GetConversationResponse,
+  type GetMessagesQuery,
   type GetMessagesResponse,
   type ListConversationsResponse,
   type Message,
   type SendDirectMessageRequest,
   type SendMessageRequest,
 } from '@chat/contracts';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { Logger } from 'pino';
@@ -131,14 +132,17 @@ export class MessagesService {
     }
   }
 
-  /** The newest Messages first, optionally only those before a sequence number. */
-  async latest(
+  /**
+   * Newest first by default, or only those `before` a sequence number; with `after`, the
+   * Messages following it, oldest first.
+   */
+  async history(
     userId: string,
     conversationId: string,
-    limit: number,
-    before: number | undefined,
+    { limit, before, after }: GetMessagesQuery,
   ): Promise<GetMessagesResponse> {
     await this.requireMember(conversationId, userId);
+    const forward = after !== undefined;
     const rows = await this.db
       .select()
       .from(messages)
@@ -146,9 +150,10 @@ export class MessagesService {
         and(
           eq(messages.conversationId, conversationId),
           before === undefined ? undefined : lt(messages.sequence, before),
+          forward ? gt(messages.sequence, after) : undefined,
         ),
       )
-      .orderBy(desc(messages.sequence))
+      .orderBy(forward ? asc(messages.sequence) : desc(messages.sequence))
       .limit(limit + 1);
     return { messages: rows.slice(0, limit).map(toMessage), hasMore: rows.length > limit };
   }

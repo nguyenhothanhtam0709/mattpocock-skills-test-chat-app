@@ -11,20 +11,9 @@ import { Pool } from 'pg';
 import { inject, describe, expect, it } from 'vitest';
 import { withApp } from '../../test/app-harness.js';
 import { testJwtKeys } from '../../test/keys.js';
-import type { Clock } from '../clock/clock.js';
+import { testClock } from '../../test/test-clock.js';
 
 const alice = { username: 'Alice', email: 'alice@example.com', password: 'correct horse battery' };
-
-function testClock(start = new Date('2030-01-01T00:00:00Z')) {
-  let current = start;
-  const clock: Clock = { now: () => current };
-  return {
-    clock,
-    advanceSeconds(seconds: number) {
-      current = new Date(current.getTime() + seconds * 1000);
-    },
-  };
-}
 
 async function signIn(app: NestFastifyApplication) {
   await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload: alice });
@@ -162,10 +151,14 @@ describe('POST /auth/refresh', () => {
   });
 
   it('refuses an expired session', async () => {
-    const time = testClock();
-    await withApp({ clock: time.clock }, async (app) => {
+    await withApp({}, async (app) => {
       const { cookie } = await signIn(app);
-      time.advanceSeconds(31 * 24 * 60 * 60);
+      const pool = new Pool({ connectionString: inject('databaseUrl') });
+      try {
+        await pool.query(`update sessions set expires_at = now() - interval '1 second'`);
+      } finally {
+        await pool.end();
+      }
 
       const res = await refresh(app, cookie.value);
 

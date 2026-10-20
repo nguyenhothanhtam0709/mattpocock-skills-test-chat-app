@@ -119,7 +119,7 @@ export class AppModule {
         {
           provide: TOKEN_DENY_LIST,
           inject: [PG_POOL, CLOCK],
-          useFactory: (pool: Pool, appClock: Clock) => new PostgresTokenDenyList(pool, appClock),
+          useFactory: (pool: Pool) => new PostgresTokenDenyList(pool),
         },
         // Rate limit every route by default.
         { provide: APP_GUARD, useClass: AppThrottlerGuard },
