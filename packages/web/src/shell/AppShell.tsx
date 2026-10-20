@@ -1,7 +1,16 @@
 import type { User } from '@chat/contracts';
-import { ChevronsUpDown, LogOut, MessageSquare, Moon, Sun, UserRound } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  LogOut,
+  MessageSquare,
+  Moon,
+  SquarePen,
+  Sun,
+  UserRound,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +40,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
+import { NewConversationDialog } from './NewConversationDialog';
 import { ProfileDialog } from './ProfileDialog';
 
 function UserMenu({ user }: { user: User }) {
@@ -72,11 +82,28 @@ function UserMenu({ user }: { user: User }) {
 
 /** The signed-in frame: the Conversation list in a sidebar (a sheet on mobile) beside the content. */
 export function AppShell({ user }: { user: User }) {
+  const [newConversationOpen, setNewConversationOpen] = useState(false);
   return (
     <SidebarProvider>
+      <NewConversationDialog
+        open={newConversationOpen}
+        onOpenChange={setNewConversationOpen}
+        // Starting the Direct Conversation with the picked User is a later ticket.
+        onPick={() => setNewConversationOpen(false)}
+      />
       <Sidebar>
         <SidebarHeader>
-          <span className="px-2 py-1 text-lg font-semibold">Chat</span>
+          <div className="flex items-center justify-between">
+            <span className="px-2 py-1 text-lg font-semibold">Chat</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New conversation"
+              onClick={() => setNewConversationOpen(true)}
+            >
+              <SquarePen />
+            </Button>
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>

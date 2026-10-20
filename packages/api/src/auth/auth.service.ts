@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ErrorCode, type RegisterResponse } from '@chat/contracts';
+import { ErrorCode, type RegisterResponse, type SearchUsersResponse } from '@chat/contracts';
 import * as argon2 from 'argon2';
-import { and, eq, gt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, ne, or, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import { v7 as uuidv7 } from 'uuid';
@@ -167,6 +167,23 @@ export class AuthService {
       );
     }
     return user;
+  }
+
+  /**
+   * Users whose Username starts with `q` (case-insensitive; `%`, `_` and `\` are literal),
+   * the exact match first, at most 20, never the searcher. Public fields only.
+   */
+  async searchUsers(searcherId: string, q: string): Promise<SearchUsersResponse['users']> {
+    const needle = q.toLowerCase();
+    const prefix = `${needle.replace(/[\\%_]/g, '\\$&')}%`;
+    return this.db
+      .select({ id: users.id, username: users.username, nickname: users.nickname })
+      .from(users)
+      .where(
+        and(sql`lower(${users.username}) like ${prefix} escape '\\'`, ne(users.id, searcherId)),
+      )
+      .orderBy(sql`(lower(${users.username}) = ${needle}) desc`, sql`lower(${users.username})`)
+      .limit(20);
   }
 
   /** Sets or (with `null`) clears the Nickname; the only profile field a User can change. */
