@@ -51,4 +51,15 @@ export class GroupsController {
   ): Promise<GroupMembershipResponse> {
     return this.messages.removeGroupMember(auth.userId, groupId, userId);
   }
+
+  /** Any Member may leave; ownership passes on and the last Member to leave closes the Group. */
+  @Post(':id/leave')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  leave(
+    @Auth() auth: AuthContext,
+    @Param('id', IdPipe) groupId: string,
+  ): Promise<GroupMembershipResponse> {
+    return this.messages.leaveGroup(auth.userId, groupId);
+  }
 }

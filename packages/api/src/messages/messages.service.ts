@@ -300,7 +300,7 @@ export class MessagesService {
 
   async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
     await this.requireReader(conversationId, userId);
-    const members = (await this.membersOf([conversationId])).get(conversationId)!;
+    const members = (await this.membersOf([conversationId])).get(conversationId) ?? [];
     const [group] = await this.db
       .select({ name: groups.name, ownerId: groups.ownerId })
       .from(groups)
@@ -432,6 +432,7 @@ export class MessagesService {
     if (member) return;
     if (forPosting) {
       await this.requireReader(conversationId, userId);
+      await this.rejectIfClosed(conversationId);
       throw new DomainException(
         ErrorCode.NOT_A_MEMBER,
         HttpStatus.FORBIDDEN,
@@ -448,12 +449,30 @@ export class MessagesService {
       .from(groups)
       .where(eq(groups.conversationId, groupId));
     if (!group) throw conversationNotFound();
+    await this.requireReader(groupId, callerId);
+    await this.rejectIfClosed(groupId);
     await this.requireMember(groupId, callerId);
     if (group.ownerId !== callerId) {
       throw new DomainException(
         ErrorCode.NOT_GROUP_OWNER,
         HttpStatus.FORBIDDEN,
         'Only the Owner can change the Members',
+      );
+    }
+  }
+
+  /** A Group with no Members left is a Closed Group: read-only, for ever. */
+  private async rejectIfClosed(conversationId: string): Promise<void> {
+    const [member] = await this.db
+      .select({ userId: conversationMembers.userId })
+      .from(conversationMembers)
+      .where(eq(conversationMembers.conversationId, conversationId))
+      .limit(1);
+    if (!member) {
+      throw new DomainException(
+        ErrorCode.GROUP_CLOSED,
+        HttpStatus.CONFLICT,
+        'This Group is closed',
       );
     }
   }
@@ -592,6 +611,109 @@ export class MessagesService {
         { conversationId: groupId, member },
         groupId,
       );
+    } catch (error) {
+      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
+    }
+    return { conversation: conversation as GroupMembershipResponse['conversation'] };
+  }
+
+  /**
+   * A Member leaves; their period ends at the newest Message. If they were the Owner,
+   * ownership passes to the Member whose current period began first (ties: lowest User ID).
+   * If they were the last Member, the Group is closed. Pushes are best-effort (ADR-0001).
+   */
+  async leaveGroup(callerId: string, groupId: string): Promise<GroupMembershipResponse> {
+    const [group] = await this.db
+      .select({ ownerId: groups.ownerId })
+      .from(groups)
+      .where(eq(groups.conversationId, groupId));
+    if (!group) throw conversationNotFound();
+    await this.requireReader(groupId, callerId);
+    await this.rejectIfClosed(groupId);
+    await this.requireMember(groupId, callerId, true);
+
+    const outcome = await this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from ${conversations} where ${conversations.id} = ${groupId} for update`,
+      );
+      const deleted = await tx
+        .delete(conversationMembers)
+        .where(
+          and(
+            eq(conversationMembers.conversationId, groupId),
+            eq(conversationMembers.userId, callerId),
+          ),
+        )
+        .returning({ userId: conversationMembers.userId });
+      if (deleted.length === 0) return undefined;
+      await tx
+        .update(membershipPeriods)
+        .set({ endSequence: sql`(select last_sequence from conversations where id = ${groupId})` })
+        .where(
+          and(
+            eq(membershipPeriods.conversationId, groupId),
+            eq(membershipPeriods.userId, callerId),
+            eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
+          ),
+        );
+      const [current] = await tx
+        .select({ ownerId: groups.ownerId })
+        .from(groups)
+        .where(eq(groups.conversationId, groupId));
+      const [successor] = await tx
+        .select({ userId: membershipPeriods.userId })
+        .from(membershipPeriods)
+        .where(
+          and(
+            eq(membershipPeriods.conversationId, groupId),
+            eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
+          ),
+        )
+        .orderBy(asc(membershipPeriods.createdAt), asc(membershipPeriods.userId))
+        .limit(1);
+      if (!successor) return { closed: true as const, newOwnerId: undefined };
+      if (current!.ownerId !== callerId) return { closed: false as const, newOwnerId: undefined };
+      await tx
+        .update(groups)
+        .set({ ownerId: successor.userId })
+        .where(eq(groups.conversationId, groupId));
+      return { closed: false as const, newOwnerId: successor.userId };
+    });
+    if (!outcome) {
+      throw new DomainException(
+        ErrorCode.NOT_A_MEMBER,
+        HttpStatus.FORBIDDEN,
+        'You are no longer a Member of this Group',
+      );
+    }
+
+    const { conversation } = await this.get(callerId, groupId);
+    try {
+      const remaining = conversation.members.map((m) => m.id);
+      if (outcome.closed) {
+        this.realtime.push(
+          RealtimeEvent.GROUP_CLOSED,
+          [callerId],
+          { conversationId: groupId },
+          groupId,
+        );
+      } else {
+        const member = (await this.memberRow(callerId))!;
+        this.realtime.push(
+          RealtimeEvent.GROUP_MEMBER_LEFT,
+          remaining,
+          { conversationId: groupId, member },
+          groupId,
+        );
+        if (outcome.newOwnerId) {
+          this.realtime.push(
+            RealtimeEvent.GROUP_OWNER_CHANGED,
+            remaining,
+            { conversationId: groupId, ownerId: outcome.newOwnerId },
+            groupId,
+          );
+        }
+      }
     } catch (error) {
       this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
     }

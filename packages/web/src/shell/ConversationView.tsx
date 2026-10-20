@@ -178,6 +178,7 @@ export function ConversationView({
   target,
   conversationId: initialConversationId,
   onSent,
+  onLeft,
 }: {
   user: User;
   target: ConversationTarget;
@@ -185,6 +186,8 @@ export function ConversationView({
   conversationId?: string | undefined;
   /** Called after each send with the Conversation's ID. */
   onSent?: (conversationId: string) => void;
+  /** Called after the User left the Group, so the Conversation list can follow. */
+  onLeft?: () => void;
 }) {
   const { sendDirectMessage, sendMessage, messagesPage } = useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
@@ -261,19 +264,37 @@ export function ConversationView({
   const [memberDelta, setMemberDelta] = useState(0);
   // Membership notes live only in this view (they are not stored): they appear as they happen.
   const [notes, setNotes] = useState<MembershipNote[]>([]);
+  // Set once this User left the Group, or the Group was closed (from another tab or by them).
+  const [selfLeft, setSelfLeft] = useState(false);
+  const [closedFlag, setClosedFlag] = useState(false);
 
   useRealtimeEvents(
     useCallback(
       (event) => {
-        if (event.type !== 'group.member_added' && event.type !== 'group.member_removed') return;
+        if (event.type === 'group.closed') {
+          if (event.conversationId === conversationId) setClosedFlag(true);
+          return;
+        }
+        if (
+          event.type !== 'group.member_added' &&
+          event.type !== 'group.member_removed' &&
+          event.type !== 'group.member_left'
+        ) {
+          return;
+        }
         if (event.conversationId !== conversationId) return;
         const added = event.type === 'group.member_added';
+        const verb = {
+          'group.member_added': 'was added',
+          'group.member_removed': 'was removed',
+          'group.member_left': 'left',
+        }[event.type];
         setMemberDelta((n) => n + (added ? 1 : -1));
         setNotes((current) => [
           ...current,
           {
             key: crypto.randomUUID(),
-            text: `${event.member.nickname ?? event.member.username} was ${added ? 'added' : 'removed'}`,
+            text: `${event.member.nickname ?? event.member.username} ${verb}`,
           },
         ]);
       },
@@ -356,6 +377,9 @@ export function ConversationView({
     void transmit(pending);
   }
 
+  const closed = target.kind === 'group' && (closedFlag || target.memberCount + memberDelta <= 0);
+  const canPost = target.kind !== 'group' || (target.isMember && !selfLeft && !closed);
+
   const rows: Row[] = [
     ...messages.map((m) => ({
       key: m.clientMessageId,
@@ -399,6 +423,11 @@ export function ConversationView({
                   user={user}
                   open={detailsOpen}
                   onOpenChange={setDetailsOpen}
+                  onLeft={() => {
+                    setSelfLeft(true);
+                    setMemberDelta((n) => n - 1);
+                    onLeft?.();
+                  }}
                 />
               </>
             )}
@@ -495,13 +524,14 @@ export function ConversationView({
           </MessageScrollerProvider>
         )}
       </div>
-      {target.kind === 'group' && !target.isMember ? (
-        <p className="border-t p-4 text-center text-sm text-muted-foreground">
-          You are no longer a member of this group. You can read the messages from when you were a
-          member, but you cannot send new ones.
-        </p>
-      ) : (
+      {canPost ? (
         <Composer onSend={send} />
+      ) : (
+        <p className="border-t p-4 text-center text-sm text-muted-foreground">
+          {closed
+            ? 'This group is closed. It has no members left and can no longer receive messages or new members. You can read the messages from when you were a member.'
+            : 'You are no longer a member of this group. You can read the messages from when you were a member, but you cannot send new ones.'}
+        </p>
       )}
     </div>
   );

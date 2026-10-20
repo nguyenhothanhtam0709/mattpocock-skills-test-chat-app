@@ -94,6 +94,11 @@ export function ConversationList({
           setState({ status: 'ready', list: [conversation, ...listed] });
           return;
         }
+        if (event.type === 'group.closed') {
+          // Closing also flips the entry to read-only; the server knows the rest.
+          setPushedReloads((n) => n + 1);
+          return;
+        }
         if (event.type !== 'message.created') return;
         const { message } = event;
         const known = listed.find((c) => c.id === message.conversationId);

@@ -33,6 +33,7 @@ import {
   addGroupMember,
   createGroup,
   getGroup,
+  leaveGroup,
   removeGroupMember,
   type CreateGroupResult,
   type GroupResult,
@@ -63,6 +64,8 @@ interface AuthContextValue {
   addGroupMember(groupId: string, userId: string): Promise<GroupResult>;
   /** Owner only: removes a Member from the Group. */
   removeGroupMember(groupId: string, userId: string): Promise<GroupResult>;
+  /** Any Member leaves the Group; resolves with the Group as it is afterwards. */
+  leaveGroup(groupId: string): Promise<GroupResult>;
   /** The User's Conversations, most recently active first. */
   listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
   /**
@@ -203,6 +206,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return removeGroupMember(accessToken, groupId, userId);
   }, []);
 
+  const leave = useCallback(async (groupId: string) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return leaveGroup(accessToken, groupId);
+  }, []);
+
   const conversationList = useCallback(async (signal?: AbortSignal) => {
     const accessToken = accessTokenRef.current;
     if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
@@ -238,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       getGroup: group,
       addGroupMember: addMember,
       removeGroupMember: removeMember,
+      leaveGroup: leave,
       listConversations: conversationList,
       messagesPage: page,
       getAccessToken,
@@ -255,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       group,
       addMember,
       removeMember,
+      leave,
       conversationList,
       page,
       getAccessToken,

@@ -1,5 +1,5 @@
 import type { Group, User, UserSearchResult } from '@chat/contracts';
-import { EllipsisVertical, UserMinus } from 'lucide-react';
+import { EllipsisVertical, LogOut, UserMinus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import {
@@ -42,17 +42,21 @@ export function GroupDetailsSheet({
   user,
   open,
   onOpenChange,
+  onLeft,
 }: {
   groupId: string;
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called with the Group as it is after the User left it. */
+  onLeft?: (group: Group) => void;
 }) {
-  const { getGroup, addGroupMember, removeGroupMember } = useAuth();
+  const { getGroup, addGroupMember, removeGroupMember, leaveGroup } = useAuth();
   const [group, setGroup] = useState<Group>();
   const [error, setError] = useState<string>();
   const [removing, setRemoving] = useState<UserSearchResult>();
   const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -69,7 +73,18 @@ export function GroupDetailsSheet({
   useRealtimeEvents(
     useCallback(
       (event) => {
-        if (event.type !== 'group.member_added' && event.type !== 'group.member_removed') return;
+        if (event.type === 'group.owner_changed') {
+          if (event.conversationId !== groupId) return;
+          setGroup((current) => current && { ...current, ownerId: event.ownerId });
+          return;
+        }
+        if (
+          event.type !== 'group.member_added' &&
+          event.type !== 'group.member_removed' &&
+          event.type !== 'group.member_left'
+        ) {
+          return;
+        }
         if (event.conversationId !== groupId) return;
         const { member } = event;
         setGroup((current) => {
@@ -95,7 +110,8 @@ export function GroupDetailsSheet({
     return result.ok;
   }
 
-  const isOwner = group?.ownerId === user.id;
+  const isMember = group?.members.some((m) => m.id === user.id) ?? false;
+  const isOwner = isMember && group?.ownerId === user.id;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -124,6 +140,12 @@ export function GroupDetailsSheet({
                 onPick={(picked) => void change(() => addGroupMember(groupId, picked.id))}
               />
             </div>
+          )}
+          {group && isMember && (
+            <Button variant="outline" disabled={busy} onClick={() => setLeaving(true)}>
+              <LogOut />
+              Leave group
+            </Button>
           )}
           {group && (
             <ul aria-label="Members" className="grid gap-1">
@@ -160,6 +182,39 @@ export function GroupDetailsSheet({
             </ul>
           )}
         </div>
+        <AlertDialog open={leaving} onOpenChange={setLeaving}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave this group?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You will no longer be able to send Messages to it, but you can still read what was
+                said while you were a Member.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(undefined);
+                  const result = await leaveGroup(groupId);
+                  setBusy(false);
+                  setLeaving(false);
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  setGroup(result.group);
+                  onLeft?.(result.group);
+                }}
+              >
+                Leave
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog
           open={removing !== undefined}
           onOpenChange={(o) => !o && setRemoving(undefined)}
