@@ -1,3 +1,8 @@
 # Agent skills installed from skills-lock.json
 .agents/skills/shadcn/
 .claude/skills/shadcn
+node_modules
+dist
+coverage
+*.tsbuildinfo
+.env

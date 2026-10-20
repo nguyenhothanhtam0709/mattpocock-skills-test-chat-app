@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.scratch
+.agents
+.claude
+pnpm-lock.yaml
+packages/api/drizzle/meta
