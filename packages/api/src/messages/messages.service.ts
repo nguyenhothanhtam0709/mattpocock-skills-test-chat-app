@@ -1,13 +1,17 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   ErrorCode,
+  LAST_MESSAGE_PREVIEW_MAX,
   type Conversation,
+  type ConversationMember,
+  type GetConversationResponse,
   type GetMessagesResponse,
+  type ListConversationsResponse,
   type Message,
   type SendDirectMessageRequest,
   type SendMessageRequest,
 } from '@chat/contracts';
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import { DomainException } from '../common/all-exceptions.filter.js';
@@ -132,6 +136,75 @@ export class MessagesService {
       .orderBy(desc(messages.sequence))
       .limit(limit + 1);
     return { messages: rows.slice(0, limit).map(toMessage), hasMore: rows.length > limit };
+  }
+
+  /** The caller's Conversations, newest last Message first. */
+  async list(userId: string): Promise<ListConversationsResponse> {
+    const rows = await this.db
+      .select({
+        id: conversations.id,
+        kind: conversations.kind,
+        senderId: messages.senderId,
+        preview: sql<string>`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
+        createdAt: messages.createdAt,
+      })
+      .from(conversationMembers)
+      .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+      .innerJoin(
+        messages,
+        and(
+          eq(messages.conversationId, conversations.id),
+          eq(messages.sequence, conversations.lastSequence),
+        ),
+      )
+      .where(eq(conversationMembers.userId, userId))
+      .orderBy(desc(messages.createdAt), desc(conversations.id));
+    const members = await this.membersOf(rows.map((r) => r.id));
+    return {
+      conversations: rows.map((row) => {
+        const all = members.get(row.id) ?? [];
+        const other = all.find((m) => m.id !== userId) ?? all[0]!;
+        return {
+          id: row.id,
+          kind: 'direct' as const,
+          name: other.nickname ?? other.username,
+          members: all,
+          lastMessage: {
+            senderId: row.senderId,
+            preview: row.preview,
+            createdAt: row.createdAt.toISOString(),
+          },
+        };
+      }),
+    };
+  }
+
+  async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
+    await this.requireMember(conversationId, userId);
+    const members = await this.membersOf([conversationId]);
+    return {
+      conversation: { id: conversationId, kind: 'direct', members: members.get(conversationId)! },
+    };
+  }
+
+  private async membersOf(conversationIds: string[]): Promise<Map<string, ConversationMember[]>> {
+    const byConversation = new Map<string, ConversationMember[]>();
+    if (conversationIds.length === 0) return byConversation;
+    const rows = await this.db
+      .select({
+        conversationId: conversationMembers.conversationId,
+        id: users.id,
+        username: users.username,
+        nickname: users.nickname,
+      })
+      .from(conversationMembers)
+      .innerJoin(users, eq(users.id, conversationMembers.userId))
+      .where(inArray(conversationMembers.conversationId, conversationIds))
+      .orderBy(users.id);
+    for (const { conversationId, ...member } of rows) {
+      byConversation.set(conversationId, [...(byConversation.get(conversationId) ?? []), member]);
+    }
+    return byConversation;
   }
 
   private async requireMember(conversationId: string, userId: string): Promise<void> {

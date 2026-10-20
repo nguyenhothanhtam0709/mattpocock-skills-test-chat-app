@@ -199,7 +199,7 @@ describe('app shell', () => {
       ),
     );
     render(<App />);
-    await screen.findByText(/no conversations yet/i);
+    await screen.findByText(/select a conversation/i);
   }
 
   it("shows the User's Nickname in the User menu", async () => {

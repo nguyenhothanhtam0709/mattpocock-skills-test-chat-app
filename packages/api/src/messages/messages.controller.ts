@@ -3,7 +3,9 @@ import {
   GetMessagesQuerySchema,
   SendDirectMessageRequestSchema,
   SendMessageRequestSchema,
+  type GetConversationResponse,
   type GetMessagesQuery,
+  type ListConversationsResponse,
   type GetMessagesResponse,
   type SendDirectMessageRequest,
   type SendDirectMessageResponse,
@@ -50,6 +52,21 @@ export class MessagesController {
     const { message, created } = await this.messages.send(auth.userId, conversationId, body);
     void reply.status(statusFor(created));
     return { message };
+  }
+
+  @Get('conversations')
+  @UseGuards(AuthGuard)
+  list(@Auth() auth: AuthContext): Promise<ListConversationsResponse> {
+    return this.messages.list(auth.userId);
+  }
+
+  @Get('conversations/:id')
+  @UseGuards(AuthGuard)
+  get(
+    @Auth() auth: AuthContext,
+    @Param('id', ConversationIdPipe) conversationId: string,
+  ): Promise<GetConversationResponse> {
+    return this.messages.get(auth.userId, conversationId);
   }
 
   @Get('conversations/:id/messages')

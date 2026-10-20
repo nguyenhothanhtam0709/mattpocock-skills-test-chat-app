@@ -1,13 +1,5 @@
 import type { User, UserSearchResult } from '@chat/contracts';
-import {
-  ChevronsUpDown,
-  LogOut,
-  MessageSquare,
-  Moon,
-  SquarePen,
-  Sun,
-  UserRound,
-} from 'lucide-react';
+import { ChevronsUpDown, LogOut, Moon, SquarePen, Sun, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -17,13 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty';
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +25,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
+import { ConversationList } from './ConversationList';
 import { ConversationView } from './ConversationView';
 import { NewConversationDialog } from './NewConversationDialog';
 import { ProfileDialog } from './ProfileDialog';
@@ -84,14 +70,15 @@ function UserMenu({ user }: { user: User }) {
 /** The signed-in frame: the Conversation list in a sidebar (a sheet on mobile) beside the content. */
 export function AppShell({ user }: { user: User }) {
   const [newConversationOpen, setNewConversationOpen] = useState(false);
-  const [peer, setPeer] = useState<UserSearchResult>();
+  const [open, setOpen] = useState<{ peer: UserSearchResult; conversationId?: string }>();
+  const [refreshKey, setRefreshKey] = useState(0);
   return (
     <SidebarProvider>
       <NewConversationDialog
         open={newConversationOpen}
         onOpenChange={setNewConversationOpen}
         onPick={(picked) => {
-          setPeer(picked);
+          setOpen({ peer: picked });
           setNewConversationOpen(false);
         }}
       />
@@ -112,17 +99,14 @@ export function AppShell({ user }: { user: User }) {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel>Conversations</SidebarGroupLabel>
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <MessageSquare />
-                </EmptyMedia>
-                <EmptyTitle>No conversations yet</EmptyTitle>
-                <EmptyDescription>
-                  Messages you send and receive will show up here.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <ConversationList
+              selectedId={open?.conversationId}
+              refreshKey={refreshKey}
+              onSelect={(conversation) => {
+                const other = conversation.members.find((m) => m.id !== user.id);
+                if (other) setOpen({ peer: other, conversationId: conversation.id });
+              }}
+            />
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
@@ -130,12 +114,21 @@ export function AppShell({ user }: { user: User }) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        {peer ? (
+        {open ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex h-12 items-center border-b px-3 md:hidden">
               <SidebarTrigger />
             </div>
-            <ConversationView key={peer.id} user={user} peer={peer} />
+            <ConversationView
+              key={open.peer.id}
+              user={user}
+              peer={open.peer}
+              conversationId={open.conversationId}
+              onSent={(conversationId) => {
+                setOpen((current) => current && { ...current, conversationId });
+                setRefreshKey((k) => k + 1);
+              }}
+            />
           </div>
         ) : (
           <>

@@ -4,9 +4,9 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] List Conversations endpoint for the current User: kind, display name (other User's Nickname or Username for a Direct Conversation), last Message preview and time, sorted by latest Message
-- [ ] Only Conversations the User belongs to are listed
-- [ ] Get one Conversation endpoint (kind, Members); never-Members get `404`
-- [ ] SPA: `SidebarMenu` items with `Avatar` (+ fallback), truncated preview and time; selecting one opens the Conversation view; `Empty` state when none; `Skeleton` while loading; tested
+- [x] List Conversations endpoint for the current User: kind, display name (other User's Nickname or Username for a Direct Conversation), last Message preview and time, sorted by latest Message
+- [x] Only Conversations the User belongs to are listed
+- [x] Get one Conversation endpoint (kind, Members); never-Members get `404`
+- [x] SPA: `SidebarMenu` items with `Avatar` (+ fallback), truncated preview and time; selecting one opens the Conversation view; `Empty` state when none; `Skeleton` while loading; tested

@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import {
   ErrorCode,
   ErrorResponseSchema,
+  GetConversationResponseSchema,
   GetMessagesResponseSchema,
+  ListConversationsResponseSchema,
   LoginResponseSchema,
   SendDirectMessageResponseSchema,
   SendMessageResponseSchema,
@@ -443,6 +445,116 @@ describe('Message body handling', () => {
       await sendDirect(app, alice, { recipientId: randomUUID(), body: secret });
 
       expect(logs.raw).not.toContain(secret);
+    });
+  });
+});
+
+const listConversations = (app: NestFastifyApplication, as: Person) =>
+  app.inject({ method: 'GET', url: '/api/v1/conversations', headers: bearer(as) });
+
+describe('GET /conversations', () => {
+  it('requires authentication', async () => {
+    await withApp({}, async (app) => {
+      const res = await app.inject({ method: 'GET', url: '/api/v1/conversations' });
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  it('lists only my Conversations, most recently active first, named after the other User', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const carol = await signUp(app, 'Carol');
+      const dave = await signUp(app, 'Dave');
+      await app.inject({
+        method: 'PATCH',
+        url: '/api/v1/users/me',
+        headers: bearer(bob),
+        payload: { nickname: 'Bobby B' },
+      });
+      await sendDirect(app, alice, { recipientId: bob.id, body: 'first to bob' });
+      await sendDirect(app, carol, { recipientId: alice.id, body: 'carol here' });
+      await sendDirect(app, carol, { recipientId: dave.id, body: 'not alice' });
+      await sendDirect(app, bob, { recipientId: alice.id, body: 'line one\n\n  line two' });
+
+      const res = await listConversations(app, alice);
+
+      expect(res.statusCode).toBe(200);
+      const { conversations } = ListConversationsResponseSchema.parse(res.json());
+      expect(conversations.map((c) => c.name)).toEqual(['Bobby B', 'Carol']);
+      expect(conversations[0]).toMatchObject({
+        kind: 'direct',
+        lastMessage: { senderId: bob.id, preview: 'line one line two' },
+      });
+      expect(conversations[1]!.lastMessage.preview).toBe('carol here');
+      expect(conversations[0]!.members.map((m) => m.id).sort()).toEqual([alice.id, bob.id].sort());
+      expect(JSON.stringify(res.json())).not.toContain('@example.com');
+    });
+  });
+
+  it('truncates the preview to 100 characters', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      await sendDirect(app, alice, { recipientId: bob.id, body: 'x'.repeat(500) });
+
+      const { conversations } = ListConversationsResponseSchema.parse(
+        (await listConversations(app, bob)).json(),
+      );
+
+      expect(conversations[0]!.lastMessage.preview).toBe('x'.repeat(100));
+    });
+  });
+
+  it('is empty for a User with no Conversations', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const res = await listConversations(app, alice);
+      expect(ListConversationsResponseSchema.parse(res.json()).conversations).toEqual([]);
+    });
+  });
+});
+
+describe('GET /conversations/:id', () => {
+  it('returns kind and Members to a Member', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const { conversation } = SendDirectMessageResponseSchema.parse(
+        (await sendDirect(app, alice, { recipientId: bob.id })).json(),
+      );
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/conversations/${conversation.id}`,
+        headers: bearer(bob),
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = GetConversationResponseSchema.parse(res.json());
+      expect(body.conversation.kind).toBe('direct');
+      expect(body.conversation.members.map((m) => m.username).sort()).toEqual(['Alice', 'Bob']);
+    });
+  });
+
+  it('answers 404 CONVERSATION_NOT_FOUND to a non-Member and for an unknown ID', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const carol = await signUp(app, 'Carol');
+      const { conversation } = SendDirectMessageResponseSchema.parse(
+        (await sendDirect(app, alice, { recipientId: bob.id })).json(),
+      );
+
+      for (const id of [conversation.id, randomUUID()]) {
+        const res = await app.inject({
+          method: 'GET',
+          url: `/api/v1/conversations/${id}`,
+          headers: bearer(carol),
+        });
+        expect(res.statusCode).toBe(404);
+        expect(errorCode(res)).toBe(ErrorCode.CONVERSATION_NOT_FOUND);
+      }
     });
   });
 });

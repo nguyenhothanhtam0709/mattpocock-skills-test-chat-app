@@ -17,6 +17,12 @@ import {
   refreshAccessToken,
   type LoginResult,
 } from '@/api/auth';
+import {
+  latestMessages,
+  listConversations,
+  type LatestMessagesResult,
+  type ListConversationsResult,
+} from '@/api/conversations';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
 import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
@@ -35,6 +41,10 @@ interface AuthContextValue {
   sendDirectMessage(request: SendDirectMessageRequest): Promise<SendResult>;
   /** Sends to an existing Conversation. */
   sendMessage(conversationId: string, request: SendMessageRequest): Promise<SendResult>;
+  /** The User's Conversations, most recently active first. */
+  listConversations(signal?: AbortSignal): Promise<ListConversationsResult>;
+  /** The newest page of a Conversation's Messages, oldest first. */
+  latestMessages(conversationId: string, signal?: AbortSignal): Promise<LatestMessagesResult>;
   /** Ends the session on the server and signs out here. */
   logOut(): Promise<void>;
 }
@@ -136,6 +146,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const conversationList = useCallback(async (signal?: AbortSignal) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return listConversations(accessToken, signal);
+  }, []);
+
+  const latest = useCallback(async (conversationId: string, signal?: AbortSignal) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return latestMessages(accessToken, conversationId, signal);
+  }, []);
+
   const logOut = useCallback(async () => {
     const accessToken = accessTokenRef.current;
     signOut();
@@ -150,9 +172,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       searchUsers: searchUsersByPrefix,
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
+      listConversations: conversationList,
+      latestMessages: latest,
       logOut,
     }),
-    [state, signIn, setNickname, searchUsersByPrefix, sendDirect, sendToConversation, logOut],
+    [
+      state,
+      signIn,
+      setNickname,
+      searchUsersByPrefix,
+      sendDirect,
+      sendToConversation,
+      conversationList,
+      latest,
+      logOut,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

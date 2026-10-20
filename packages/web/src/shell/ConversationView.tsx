@@ -6,7 +6,7 @@ import {
   type UserSearchResult,
 } from '@chat/contracts';
 import { ArrowUp } from 'lucide-react';
-import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import {
@@ -138,10 +138,41 @@ function Composer({ onSend }: { onSend: (body: string) => Promise<string | undef
  * is sent to the User and creates the Conversation, later ones go to it. Messages are shown
  * as text only (ADR-0002).
  */
-export function ConversationView({ user, peer }: { user: User; peer: UserSearchResult }) {
-  const { sendDirectMessage, sendMessage } = useAuth();
-  const [conversationId, setConversationId] = useState<string>();
+export function ConversationView({
+  user,
+  peer,
+  conversationId: initialConversationId,
+  onSent,
+}: {
+  user: User;
+  peer: UserSearchResult;
+  /** Set when opening an existing Conversation: its newest Messages are loaded. */
+  conversationId?: string | undefined;
+  /** Called after each send with the Conversation's ID. */
+  onSent?: (conversationId: string) => void;
+}) {
+  const { sendDirectMessage, sendMessage, latestMessages } = useAuth();
+  // Only the Conversation this view was opened with is loaded; a later change of the prop is
+  // just the first send reporting the Conversation it created.
+  const [openedWith] = useState(initialConversationId);
+  const [conversationId, setConversationId] = useState(openedWith);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  useEffect(() => {
+    if (!openedWith) return;
+    const controller = new AbortController();
+    void (async () => {
+      const result = await latestMessages(openedWith, controller.signal);
+      if (controller.signal.aborted || !result.ok) return;
+      setMessages((current) => {
+        const loaded = new Set(result.messages.map((m) => m.id));
+        return [...result.messages, ...current.filter((m) => !loaded.has(m.id))].sort(
+          (a, b) => a.sequence - b.sequence,
+        );
+      });
+    })();
+    return () => controller.abort();
+  }, [openedWith, latestMessages]);
 
   async function send(body: string): Promise<string | undefined> {
     const clientMessageId = crypto.randomUUID();
@@ -149,7 +180,9 @@ export function ConversationView({ user, peer }: { user: User; peer: UserSearchR
       ? await sendMessage(conversationId, { clientMessageId, body })
       : await sendDirectMessage({ recipientId: peer.id, clientMessageId, body });
     if (!result.ok) return result.error;
-    if (result.conversation) setConversationId(result.conversation.id);
+    const id = result.conversation?.id ?? result.message.conversationId;
+    setConversationId(id);
+    onSent?.(id);
     setMessages((current) =>
       [...current.filter((m) => m.id !== result.message.id), result.message].sort(
         (a, b) => a.sequence - b.sequence,

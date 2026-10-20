@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UserSearchResultSchema } from './user.js';
 
 export const MESSAGE_BODY_MAX = 4000;
 
@@ -83,3 +84,44 @@ export const GetMessagesResponseSchema = z.object({
 });
 
 export type GetMessagesResponse = z.infer<typeof GetMessagesResponseSchema>;
+
+/** A Member as other Members see them: never an email. */
+export const ConversationMemberSchema = UserSearchResultSchema;
+
+export type ConversationMember = z.infer<typeof ConversationMemberSchema>;
+
+/** `GET /conversations/:id` */
+export const GetConversationResponseSchema = z.object({
+  conversation: z.object({
+    id: z.uuid(),
+    kind: z.literal('direct'),
+    members: z.array(ConversationMemberSchema),
+  }),
+});
+
+export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;
+
+export const LAST_MESSAGE_PREVIEW_MAX = 100;
+
+export const ConversationSummarySchema = z.object({
+  id: z.uuid(),
+  kind: z.literal('direct'),
+  /** For a Direct Conversation: the other User's Nickname, else their Username. */
+  name: z.string(),
+  members: z.array(ConversationMemberSchema),
+  lastMessage: z.object({
+    senderId: z.uuid(),
+    /** Whitespace collapsed, at most 100 characters. */
+    preview: z.string().max(LAST_MESSAGE_PREVIEW_MAX),
+    createdAt: z.iso.datetime(),
+  }),
+});
+
+export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
+
+/** `GET /conversations`: the caller's Conversations, most recently active first. */
+export const ListConversationsResponseSchema = z.object({
+  conversations: z.array(ConversationSummarySchema),
+});
+
+export type ListConversationsResponse = z.infer<typeof ListConversationsResponseSchema>;
