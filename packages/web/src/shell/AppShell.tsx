@@ -1,4 +1,4 @@
-import type { User } from '@chat/contracts';
+import type { User, UserSearchResult } from '@chat/contracts';
 import {
   ChevronsUpDown,
   LogOut,
@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
+import { ConversationView } from './ConversationView';
 import { NewConversationDialog } from './NewConversationDialog';
 import { ProfileDialog } from './ProfileDialog';
 
@@ -83,13 +84,16 @@ function UserMenu({ user }: { user: User }) {
 /** The signed-in frame: the Conversation list in a sidebar (a sheet on mobile) beside the content. */
 export function AppShell({ user }: { user: User }) {
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [peer, setPeer] = useState<UserSearchResult>();
   return (
     <SidebarProvider>
       <NewConversationDialog
         open={newConversationOpen}
         onOpenChange={setNewConversationOpen}
-        // Starting the Direct Conversation with the picked User is a later ticket.
-        onPick={() => setNewConversationOpen(false)}
+        onPick={(picked) => {
+          setPeer(picked);
+          setNewConversationOpen(false);
+        }}
       />
       <Sidebar>
         <SidebarHeader>
@@ -126,12 +130,23 @@ export function AppShell({ user }: { user: User }) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-12 items-center gap-2 border-b px-3">
-          <SidebarTrigger />
-        </header>
-        <main className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
-          Select a conversation to start chatting.
-        </main>
+        {peer ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex h-12 items-center border-b px-3 md:hidden">
+              <SidebarTrigger />
+            </div>
+            <ConversationView key={peer.id} user={user} peer={peer} />
+          </div>
+        ) : (
+          <>
+            <header className="flex h-12 items-center gap-2 border-b px-3">
+              <SidebarTrigger />
+            </header>
+            <main className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
+              Select a conversation to start chatting.
+            </main>
+          </>
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

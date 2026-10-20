@@ -22,3 +22,17 @@ export class AppThrottlerGuard extends ThrottlerGuard {
  * User (the global guard runs before authentication and only sees the IP).
  */
 export class SearchThrottlerGuard extends AppThrottlerGuard {}
+
+/**
+ * Same, for Message sends (`send` throttler). The counter is per User, shared by every send
+ * route (the default key would also include the handler, giving each route its own budget).
+ */
+export class SendThrottlerGuard extends AppThrottlerGuard {
+  protected override generateKey(
+    _context: ExecutionContext,
+    tracker: string,
+    throttlerName: string,
+  ): string {
+    return `${throttlerName}-${tracker}`;
+  }
+}
