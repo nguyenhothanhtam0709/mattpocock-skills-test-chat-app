@@ -12,6 +12,7 @@ import {
 import {
   fetchCurrentUser,
   login,
+  logout,
   msUntilExpiry,
   refreshAccessToken,
   type LoginResult,
@@ -23,6 +24,8 @@ export type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn(identifier: string, password: string): Promise<LoginResult>;
+  /** Ends the session on the server and signs out here. */
+  logOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -41,14 +44,17 @@ function refreshDelay(accessToken: string): number {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const accessTokenRef = useRef<string | undefined>(undefined);
 
   const signOut = useCallback(() => {
     clearTimeout(timer.current);
+    accessTokenRef.current = undefined;
     setState({ status: 'signedOut' });
   }, []);
 
   const scheduleRefresh = useCallback(
     (accessToken: string) => {
+      accessTokenRef.current = accessToken;
       clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         const next = await refreshAccessToken();
@@ -90,7 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
-  const value = useMemo(() => ({ state, signIn }), [state, signIn]);
+  const logOut = useCallback(async () => {
+    const accessToken = accessTokenRef.current;
+    signOut();
+    if (accessToken) await logout(accessToken);
+  }, [signOut]);
+
+  const value = useMemo(() => ({ state, signIn, logOut }), [state, signIn, logOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

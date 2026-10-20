@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -226,6 +226,63 @@ describe('app shell', () => {
     await user.click(screen.getByRole('button', { name: /ali\b/i }));
     await user.click(await screen.findByRole('menuitem', { name: /light theme/i }));
     expect(document.documentElement).not.toHaveClass('dark');
+  });
+
+  describe('Log out', () => {
+    const logOut = async () => {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /ali\b/i }));
+      await user.click(await screen.findByRole('menuitem', { name: /log out/i }));
+    };
+
+    it('ends the session on the server and returns to the login page', async () => {
+      const authorizations: (string | null)[] = [];
+      server.use(
+        http.post('*/api/v1/auth/logout', ({ request }) => {
+          authorizations.push(request.headers.get('authorization'));
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      await openShell();
+
+      await logOut();
+
+      expect(await screen.findByLabelText(/username or email/i)).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/login');
+      expect(screen.queryByText(/no conversations/i)).not.toBeInTheDocument();
+      expect(authorizations).toHaveLength(1);
+      expect(authorizations[0]).toMatch(/^Bearer .+\..+\..+$/);
+    });
+
+    it('returns to the login page even when the server cannot be reached', async () => {
+      server.use(http.post('*/api/v1/auth/logout', () => HttpResponse.error()));
+      await openShell();
+
+      await logOut();
+
+      expect(await screen.findByLabelText(/username or email/i)).toBeInTheDocument();
+    });
+
+    it('does not bring the User back on the next load', async () => {
+      server.use(http.post('*/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })));
+      await openShell();
+      await logOut();
+      await screen.findByLabelText(/username or email/i);
+      server.use(
+        http.post('*/api/v1/auth/refresh', () =>
+          HttpResponse.json(
+            { error: { code: 'UNAUTHENTICATED', message: 'Not signed in' } },
+            { status: 401 },
+          ),
+        ),
+      );
+      window.history.pushState({}, '', '/');
+
+      cleanup();
+      render(<App />);
+
+      expect(await screen.findByLabelText(/username or email/i)).toBeInTheDocument();
+    });
   });
 
   it('remembers the chosen theme across reloads', async () => {
