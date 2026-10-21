@@ -256,7 +256,7 @@ describe('POST /groups/:id/members', () => {
       await settle();
       expect(sockets.dave.received).toEqual([]);
       for (const s of [sockets.alice, sockets.bob]) {
-        expect(s.received.map(([name]) => name)).toEqual(['group.member_added']);
+        expect(s.received.map(([name]) => name)).toEqual(['group.member_added', 'message.created']);
       }
     });
   });

@@ -57,18 +57,27 @@ interface Outgoing {
   error?: string;
 }
 
-interface MembershipNote {
-  key: string;
-  text: string;
-}
-
 interface Row {
   key: string;
   senderId: string;
   createdAt: string;
   body: string;
   outgoing?: Outgoing;
+  /** Set for a stored membership note ("Bob was added"): rendered as a `Marker`, not a bubble. */
+  note?: string;
 }
+
+const NOTE_VERBS = {
+  member_added: 'was added',
+  member_removed: 'was removed',
+  member_left: 'left',
+} as const;
+
+/** The note's text, or undefined for a Message a Member wrote. */
+const noteText = (m: ChatMessage): string | undefined =>
+  m.kind === 'text' || !m.subject
+    ? undefined
+    : `${m.subject.nickname ?? m.subject.username} ${NOTE_VERBS[m.kind]}`;
 
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
@@ -92,7 +101,7 @@ function toEntries(rows: Row[]): Entry[] {
     return {
       row,
       ...(newDay ? { day: row.createdAt } : {}),
-      continuesRun: !newDay && prev!.senderId === row.senderId,
+      continuesRun: !newDay && !row.note && !prev!.note && prev!.senderId === row.senderId,
     };
   });
 }
@@ -262,8 +271,6 @@ export function ConversationView({
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [memberDelta, setMemberDelta] = useState(0);
-  // Membership notes live only in this view (they are not stored): they appear as they happen.
-  const [notes, setNotes] = useState<MembershipNote[]>([]);
   // Set once this User left the Group, or the Group was closed (from another tab or by them).
   const [selfLeft, setSelfLeft] = useState(false);
   const [closedFlag, setClosedFlag] = useState(false);
@@ -288,20 +295,8 @@ export function ConversationView({
           return;
         }
         if (event.conversationId !== conversationId) return;
-        const added = event.type === 'group.member_added';
-        const verb = {
-          'group.member_added': 'was added',
-          'group.member_removed': 'was removed',
-          'group.member_left': 'left',
-        }[event.type];
-        setMemberDelta((n) => n + (added ? 1 : -1));
-        setNotes((current) => [
-          ...current,
-          {
-            key: crypto.randomUUID(),
-            text: `${event.member.nickname ?? event.member.username} ${verb}`,
-          },
-        ]);
+        // The note itself arrives as a stored `message.created`; this only keeps the count.
+        setMemberDelta((n) => n + (event.type === 'group.member_added' ? 1 : -1));
       },
       [conversationId],
     ),
@@ -386,12 +381,16 @@ export function ConversationView({
   const canPost = target.kind !== 'group' || (target.isMember && !selfLeft && !closed);
 
   const rows: Row[] = [
-    ...messages.map((m) => ({
-      key: m.clientMessageId,
-      senderId: m.senderId,
-      createdAt: m.createdAt,
-      body: m.body,
-    })),
+    ...messages.map((m) => {
+      const note = noteText(m);
+      return {
+        key: m.clientMessageId,
+        senderId: m.senderId,
+        createdAt: m.createdAt,
+        body: m.body,
+        ...(note === undefined ? {} : { note }),
+      };
+    }),
     ...outgoing.map((o) => ({
       key: o.clientMessageId,
       senderId: user.id,
@@ -451,7 +450,7 @@ export function ConversationView({
         )}
       </header>
       <div className="relative min-h-0 flex-1">
-        {rows.length === 0 && notes.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">
             No messages yet.{' '}
             {target.kind === 'group'
@@ -475,48 +474,47 @@ export function ConversationView({
                           <MarkerContent>{dayLabel(day)}</MarkerContent>
                         </Marker>
                       )}
-                      <Message align={m.senderId === user.id ? 'end' : 'start'}>
-                        <MessageContent>
-                          <Bubble
-                            variant={
-                              m.outgoing?.status === 'failed'
-                                ? 'destructive'
-                                : m.outgoing || m.senderId !== user.id
-                                  ? 'muted'
-                                  : 'default'
-                            }
-                          >
-                            <BubbleContent
-                              className="whitespace-pre-wrap"
-                              title={timeLabel(m.createdAt)}
+                      {m.note !== undefined ? (
+                        <Marker>
+                          <MarkerContent>{m.note}</MarkerContent>
+                        </Marker>
+                      ) : (
+                        <Message align={m.senderId === user.id ? 'end' : 'start'}>
+                          <MessageContent>
+                            <Bubble
+                              variant={
+                                m.outgoing?.status === 'failed'
+                                  ? 'destructive'
+                                  : m.outgoing || m.senderId !== user.id
+                                    ? 'muted'
+                                    : 'default'
+                              }
                             >
-                              {m.body}
-                            </BubbleContent>
-                          </Bubble>
-                        </MessageContent>
-                        {m.outgoing?.status === 'failed' && (
-                          <MessageFooter className="items-center gap-2">
-                            <span role="alert" className="text-sm text-destructive">
-                              {m.outgoing.error}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => retry(m.outgoing!)}
-                            >
-                              Retry
-                            </Button>
-                          </MessageFooter>
-                        )}
-                      </Message>
-                    </MessageScrollerItem>
-                  ))}
-                  {notes.map((note) => (
-                    <MessageScrollerItem key={note.key} messageId={note.key}>
-                      <Marker>
-                        <MarkerContent>{note.text}</MarkerContent>
-                      </Marker>
+                              <BubbleContent
+                                className="whitespace-pre-wrap"
+                                title={timeLabel(m.createdAt)}
+                              >
+                                {m.body}
+                              </BubbleContent>
+                            </Bubble>
+                          </MessageContent>
+                          {m.outgoing?.status === 'failed' && (
+                            <MessageFooter className="items-center gap-2">
+                              <span role="alert" className="text-sm text-destructive">
+                                {m.outgoing.error}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => retry(m.outgoing!)}
+                              >
+                                Retry
+                              </Button>
+                            </MessageFooter>
+                          )}
+                        </Message>
+                      )}
                     </MessageScrollerItem>
                   ))}
                 </MessageScrollerContent>

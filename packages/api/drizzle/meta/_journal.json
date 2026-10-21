@@ -71,6 +71,13 @@
       "when": 1792524289774,
       "tag": "0009_jittery_black_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792541300088,
+      "tag": "0010_broken_wild_child",
+      "breakpoints": true
     }
   ]
 }

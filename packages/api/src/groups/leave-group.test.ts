@@ -97,7 +97,8 @@ const readBodies = async (app: NestFastifyApplication, as: Person, groupId: stri
       })
     ).json(),
   )
-    .messages.map((m) => m.body)
+    .messages.filter((m) => m.kind === 'text')
+    .map((m) => m.body)
     .sort();
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
@@ -218,7 +219,10 @@ describe('POST /groups/:id/leave', () => {
       await left;
       await settle();
 
-      expect(aliceSocket.received.map(([name]) => name)).toEqual(['group.member_left']);
+      expect(aliceSocket.received.map(([name]) => name)).toEqual([
+        'group.member_left',
+        'message.created',
+      ]);
     });
   });
 

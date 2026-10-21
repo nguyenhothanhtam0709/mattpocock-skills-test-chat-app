@@ -31,6 +31,7 @@ import {
   conversations,
   directConversations,
   groups,
+  membershipNotes,
   membershipPeriods,
   messages,
   OPEN_PERIOD_END,
@@ -49,13 +50,17 @@ export interface SentMessage {
 /** Thrown inside a transaction to undo it (including its sequence bump) on a resend. */
 class DuplicateClientMessage extends Error {}
 
-const toMessage = (row: MessageRow): Message => ({
+type NoteKind = Exclude<Message['kind'], 'text'>;
+
+const toMessage = (row: MessageRow, subject?: ConversationMember | null): Message => ({
   id: row.id,
   conversationId: row.conversationId,
   senderId: row.senderId,
   sequence: row.sequence,
   clientMessageId: row.clientMessageId,
+  kind: row.kind as Message['kind'],
   body: row.body,
+  ...(subject ? { subject } : {}),
   createdAt: row.createdAt.toISOString(),
 });
 
@@ -155,8 +160,15 @@ export class MessagesService {
     await this.requireReader(conversationId, userId);
     const forward = after !== undefined;
     const rows = await this.db
-      .select()
+      .select({
+        message: messages,
+        subjectId: users.id,
+        subjectUsername: users.username,
+        subjectNickname: users.nickname,
+      })
       .from(messages)
+      .leftJoin(membershipNotes, eq(membershipNotes.messageId, messages.id))
+      .leftJoin(users, eq(users.id, membershipNotes.subjectId))
       .where(
         and(
           eq(messages.conversationId, conversationId),
@@ -179,7 +191,19 @@ export class MessagesService {
       )
       .orderBy(forward ? asc(messages.sequence) : desc(messages.sequence))
       .limit(limit + 1);
-    return { messages: rows.slice(0, limit).map(toMessage), hasMore: rows.length > limit };
+    return {
+      messages: rows
+        .slice(0, limit)
+        .map((r) =>
+          toMessage(
+            r.message,
+            r.subjectId === null
+              ? null
+              : { id: r.subjectId, username: r.subjectUsername!, nickname: r.subjectNickname },
+          ),
+        ),
+      hasMore: rows.length > limit,
+    };
   }
 
   /** The caller's Conversations, newest last Message first. */
@@ -241,6 +265,7 @@ export class MessagesService {
       select max(vm.sequence) from messages vm
       join membership_periods vp on vp.conversation_id = vm.conversation_id
       where vm.conversation_id = ${conversations.id} and vp.user_id = ${userId}
+        and vm.kind = 'text'
         and vm.sequence > vp.start_sequence and vm.sequence <= vp.end_sequence
     )`;
     const rows = await this.db
@@ -526,7 +551,7 @@ export class MessagesService {
     if (!member) {
       throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found');
     }
-    await this.db.transaction(async (tx) => {
+    const note = await this.db.transaction(async (tx) => {
       await this.lockConversation(tx, groupId);
       const current = await tx
         .select({ userId: conversationMembers.userId })
@@ -547,14 +572,14 @@ export class MessagesService {
         );
       }
       await tx.insert(conversationMembers).values({ conversationId: groupId, userId });
-      // Messages up to now stay out of reach; the new period starts after the newest one.
-      const [counter] = await tx
-        .select({ lastSequence: conversations.lastSequence })
-        .from(conversations)
-        .where(eq(conversations.id, groupId));
-      await tx
-        .insert(membershipPeriods)
-        .values({ conversationId: groupId, userId, startSequence: counter!.lastSequence });
+      const note = await this.insertNote(tx, groupId, callerId, member, 'member_added');
+      // Messages up to now stay out of reach; the new period starts just before its own note.
+      await tx.insert(membershipPeriods).values({
+        conversationId: groupId,
+        userId,
+        startSequence: note.sequence - 1,
+      });
+      return note;
     });
 
     const { conversation } = await this.get(callerId, groupId);
@@ -571,6 +596,7 @@ export class MessagesService {
         conversationId: groupId,
         member,
       });
+      this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, { message: note });
     } catch (error) {
       this.logPushFailure(error, groupId);
     }
@@ -604,10 +630,11 @@ export class MessagesService {
           ),
         )
         .returning({ userId: conversationMembers.userId });
-      if (deleted.length === 0) return false;
+      if (deleted.length === 0 || !member) return undefined;
+      const note = await this.insertNote(tx, groupId, callerId, member, 'member_removed');
       await tx
         .update(membershipPeriods)
-        .set({ endSequence: sql`(select last_sequence from conversations where id = ${groupId})` })
+        .set({ endSequence: note.sequence })
         .where(
           and(
             eq(membershipPeriods.conversationId, groupId),
@@ -615,7 +642,7 @@ export class MessagesService {
             eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
           ),
         );
-      return true;
+      return note;
     });
     if (!removed || !member) {
       throw new DomainException(
@@ -637,6 +664,7 @@ export class MessagesService {
         conversationId: groupId,
         member,
       });
+      this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, { message: removed });
       this.realtime.push(
         RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
         [userId],
@@ -664,6 +692,7 @@ export class MessagesService {
     await this.rejectIfClosed(groupId);
     await this.requireMember(groupId, callerId, true);
 
+    const leaver = (await this.memberRow(callerId))!;
     const outcome = await this.db.transaction(async (tx) => {
       await this.lockConversation(tx, groupId);
       const deleted = await tx
@@ -676,9 +705,10 @@ export class MessagesService {
         )
         .returning({ userId: conversationMembers.userId });
       if (deleted.length === 0) return undefined;
+      const note = await this.insertNote(tx, groupId, callerId, leaver, 'member_left');
       await tx
         .update(membershipPeriods)
-        .set({ endSequence: sql`(select last_sequence from conversations where id = ${groupId})` })
+        .set({ endSequence: note.sequence })
         .where(
           and(
             eq(membershipPeriods.conversationId, groupId),
@@ -701,13 +731,15 @@ export class MessagesService {
         )
         .orderBy(asc(membershipPeriods.createdAt), asc(membershipPeriods.userId))
         .limit(1);
-      if (!successor) return { closed: true as const, newOwnerId: undefined };
-      if (current!.ownerId !== callerId) return { closed: false as const, newOwnerId: undefined };
+      if (!successor) return { note, closed: true as const, newOwnerId: undefined };
+      if (current!.ownerId !== callerId) {
+        return { note, closed: false as const, newOwnerId: undefined };
+      }
       await tx
         .update(groups)
         .set({ ownerId: successor.userId })
         .where(eq(groups.conversationId, groupId));
-      return { closed: false as const, newOwnerId: successor.userId };
+      return { note, closed: false as const, newOwnerId: successor.userId };
     });
     if (!outcome) {
       throw new DomainException(
@@ -732,10 +764,12 @@ export class MessagesService {
           groupId,
         );
       } else {
-        const member = (await this.memberRow(callerId))!;
         this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_LEFT, groupId, {
           conversationId: groupId,
-          member,
+          member: leaver,
+        });
+        this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
+          message: outcome.note,
         });
         if (outcome.newOwnerId) {
           this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
@@ -830,6 +864,31 @@ export class MessagesService {
       .from(directConversations)
       .where(pair);
     return { id: winner!.id, created: false };
+  }
+
+  /**
+   * Inserts a membership note at the next position of the Conversation's sequence, inside the
+   * caller's transaction (the Conversation row must be locked). `actorId` made the change,
+   * `subject` is who it is about.
+   */
+  private async insertNote(
+    tx: Tx,
+    conversationId: string,
+    actorId: string,
+    subject: ConversationMember,
+    kind: NoteKind,
+  ): Promise<Message> {
+    const [counter] = await tx
+      .update(conversations)
+      .set({ lastSequence: sql`${conversations.lastSequence} + 1` })
+      .where(eq(conversations.id, conversationId))
+      .returning({ sequence: conversations.lastSequence });
+    const [row] = await tx
+      .insert(messages)
+      .values({ conversationId, senderId: actorId, sequence: counter!.sequence, kind })
+      .returning();
+    await tx.insert(membershipNotes).values({ messageId: row!.id, subjectId: subject.id });
+    return toMessage(row!, subject);
   }
 
   /**
