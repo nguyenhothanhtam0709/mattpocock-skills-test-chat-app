@@ -314,8 +314,8 @@ describe('DELETE /groups/:id/members/:userId', () => {
 
       const res = await removeMember(app, alice, group.id, alice.id);
 
-      expect(res.statusCode).toBe(400);
-      expect(errorCode(res)).toBe(ErrorCode.VALIDATION_FAILED);
+      expect(res.statusCode).toBe(409);
+      expect(errorCode(res)).toBe(ErrorCode.OWNER_CANNOT_BE_REMOVED);
       expect((await post(app, alice, group.id)).statusCode).toBe(201);
     });
   });
