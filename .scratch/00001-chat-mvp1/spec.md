@@ -137,7 +137,7 @@ A person registers as a User (Username, email, password, optional Nickname) and 
 
 - pnpm workspace monorepo with three packages: the **API** (NestJS), the **web** SPA (React), and **contracts** (shared Zod schemas, inferred types, the `ErrorCode` enum, and push-event definitions). Contracts is the single source of truth for every payload shape crossing a boundary.
 - Node 24, native ESM throughout, TypeScript strict mode. Confirm NestJS 12 ESM support while scaffolding.
-- Single server process, single PostgreSQL database for MVP1; no horizontal scaling. Design choices (UUIDv7 IDs, per-Conversation sequence, per-User and per-Group push rooms, ports for stores) are made so that scaling/sharding by Conversation later is not blocked.
+- Single server process, single PostgreSQL database for MVP1; no horizontal scaling (see `docs/adr/0006-api-runs-as-a-single-instance.md`). Design choices (UUIDv7 IDs, per-Conversation sequence, per-User and per-Group push rooms, ports for stores) are made so that scaling/sharding by Conversation later is not blocked.
 - ESLint + Prettier. Lint rules ban `dangerouslySetInnerHTML` in application code and any import of `class-validator` / `class-transformer`.
 - Local Postgres via a docker-compose file.
 
