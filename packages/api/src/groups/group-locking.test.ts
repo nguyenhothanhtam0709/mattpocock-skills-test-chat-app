@@ -1,55 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import {
-  CreateGroupResponseSchema,
   ErrorCode,
   ErrorResponseSchema,
   GetConversationResponseSchema,
   GetMessagesResponseSchema,
-  LoginResponseSchema,
-  type Group,
 } from '@chat/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Pool } from 'pg';
 import { inject, describe, expect, it } from 'vitest';
 import { withApp } from '../../test/app-harness.js';
-
-const password = 'correct horse battery';
-
-interface Person {
-  id: string;
-  token: string;
-}
-
-async function signUp(app: NestFastifyApplication, username: string): Promise<Person> {
-  await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/register',
-    payload: { username, email: `${username.toLowerCase()}@example.com`, password },
-  });
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/login',
-    payload: { identifier: username, password },
-  });
-  const login = LoginResponseSchema.parse(res.json());
-  return { id: login.user.id, token: login.accessToken };
-}
-
-const bearer = (p: Person) => ({ authorization: `Bearer ${p.token}` });
-
-async function createGroup(
-  app: NestFastifyApplication,
-  owner: Person,
-  memberIds: string[] = [],
-): Promise<Group> {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/groups',
-    headers: bearer(owner),
-    payload: { name: 'Club', memberIds },
-  });
-  return CreateGroupResponseSchema.parse(res.json()).conversation;
-}
+import { bearer, createGroup, signUp, type Person } from '../../test/people.js';
 
 const leave = (app: NestFastifyApplication, as: Person, groupId: string) =>
   app.inject({ method: 'POST', url: `/api/v1/groups/${groupId}/leave`, headers: bearer(as) });

@@ -112,13 +112,12 @@ export class MessagesService {
       return await this.commitOrder.run(
         conversationId,
         async (queue) => {
-          const message = await this.db.transaction(async (tx) => {
+          return this.db.transaction(async (tx) => {
             await lockConversation(tx, conversationId);
             queue();
             await requireMember(tx, conversationId, senderId, true);
             return this.insertMessage(tx, conversationId, senderId, request);
           });
-          return message;
         },
         async (message) => {
           await this.pushCreated(message, undefined);
@@ -212,9 +211,9 @@ export class MessagesService {
         .from(groups)
         .where(eq(groups.conversationId, message.conversationId));
       if (newConversationRecipient) {
-        const [conversation] = await this.queries.summaries(
-          newConversationRecipient,
-          message.conversationId,
+        const conversation = exactlyOne(
+          await this.queries.summaries(newConversationRecipient, message.conversationId),
+          'the new Conversation summary',
         );
         this.realtime.push(
           RealtimeEvent.CONVERSATION_CREATED,
