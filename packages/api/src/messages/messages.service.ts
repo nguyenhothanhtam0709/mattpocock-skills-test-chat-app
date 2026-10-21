@@ -24,7 +24,7 @@ import {
   conversations,
   directConversations,
   groups,
-  membershipNotes,
+  systemMessages,
   membershipPeriods,
   messages,
   users,
@@ -151,8 +151,8 @@ export class MessagesService {
         subjectNickname: users.nickname,
       })
       .from(messages)
-      .leftJoin(membershipNotes, eq(membershipNotes.messageId, messages.id))
-      .leftJoin(users, eq(users.id, membershipNotes.subjectId))
+      .leftJoin(systemMessages, eq(systemMessages.messageId, messages.id))
+      .leftJoin(users, eq(users.id, systemMessages.subjectId))
       .where(
         and(
           eq(messages.conversationId, conversationId),

@@ -104,7 +104,7 @@ async function timeline(app: NestFastifyApplication, as: Person, groupId: string
 
 afterEach(closeAllSockets);
 
-describe('stored membership notes', () => {
+describe('stored system messages', () => {
   it('stores "added" in history at its place in the sequence, for Members and the added User', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
@@ -124,15 +124,15 @@ describe('stored membership notes', () => {
         ['text', 'after'],
       ]);
       const res = await history(app, alice, group.id, '?limit=100');
-      const note = GetMessagesResponseSchema.parse(res.json()).messages.find(
+      const systemMessage = GetMessagesResponseSchema.parse(res.json()).messages.find(
         (m) => m.kind === 'member_added',
       )!;
-      expect(note.sequence).toBe(2);
-      expect(note.senderId).toBe(alice.id);
+      expect(systemMessage.sequence).toBe(2);
+      expect(systemMessage.senderId).toBe(alice.id);
     });
   });
 
-  it('stores "removed" and "left", visible to the Former Member only up to their own note', async () => {
+  it('stores "removed" and "left", visible to the Former Member only up to their own System Message', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
       const bob = await signUp(app, 'Bob');
@@ -158,7 +158,7 @@ describe('stored membership notes', () => {
     });
   });
 
-  it('keeps a Former Member who is added back from seeing the gap, notes included', async () => {
+  it('keeps a Former Member who is added back from seeing the gap, system messages included', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
       const bob = await signUp(app, 'Bob');
@@ -176,7 +176,7 @@ describe('stored membership notes', () => {
     });
   });
 
-  it('does not let notes change the preview or the sequence of lastMessage', async () => {
+  it('does not let system messages change the preview or the sequence of lastMessage', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
       const bob = await signUp(app, 'Bob');
@@ -190,7 +190,7 @@ describe('stored membership notes', () => {
     });
   });
 
-  it('pushes the note as message.created to the current Members and the added User, once each', async () => {
+  it('pushes the System Message as message.created to the current Members and the added User, once each', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
       const bob = await signUp(app, 'Bob');

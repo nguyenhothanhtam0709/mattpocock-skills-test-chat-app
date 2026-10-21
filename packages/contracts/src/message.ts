@@ -39,7 +39,7 @@ export const SendDirectMessageRequestSchema = SendMessageRequestSchema.extend({
 
 export type SendDirectMessageRequest = z.input<typeof SendDirectMessageRequestSchema>;
 
-/** `text` is a Message a Member wrote; the rest are system notes about a membership change. */
+/** `text` is a Message a Member wrote; the rest are System Messages about a membership change. */
 export const MessageKindSchema = z.enum(['text', 'member_added', 'member_removed', 'member_left']);
 
 export type MessageKind = z.infer<typeof MessageKindSchema>;
@@ -47,15 +47,15 @@ export type MessageKind = z.infer<typeof MessageKindSchema>;
 export const MessageSchema = z.object({
   id: z.uuid(),
   conversationId: z.uuid(),
-  /** For a note: whoever made the change (the Owner, or the Member who left). */
+  /** For a System Message: whoever made the change (the Owner, or the Member who left). */
   senderId: z.uuid(),
   sequence: z.number().int().positive(),
   clientMessageId: z.uuid(),
   /** Defaults to `text` when absent, so older payloads still parse. */
   kind: MessageKindSchema.default('text'),
-  /** Empty for a note. */
+  /** Empty for a System Message. */
   body: z.string(),
-  /** For a note: the User it is about ("Bob was added"); absent for `text`. */
+  /** For a System Message: the User it is about ("Bob was added"); absent for `text`. */
   subject: UserSearchResultSchema.optional(),
   createdAt: z.iso.datetime(),
 });

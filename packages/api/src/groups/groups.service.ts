@@ -19,7 +19,7 @@ import {
   conversationMembers,
   conversations,
   groups,
-  membershipNotes,
+  systemMessages,
   membershipPeriods,
   messages,
   OPEN_PERIOD_END,
@@ -41,11 +41,11 @@ import {
 import { MessagesService } from '../messages/messages.service.js';
 import { nextSequence, only, toMessage, type Tx } from '../messages/message-rows.js';
 
-type NoteKind = Exclude<Message['kind'], 'text'>;
+type SystemMessageKind = Exclude<Message['kind'], 'text'>;
 
 /** What leaving did, for the pushes that follow the commit. */
 interface LeaveOutcome {
-  note: Message;
+  systemMessage: Message;
   closed: boolean;
   newOwnerId: string | undefined;
 }
@@ -53,7 +53,7 @@ interface LeaveOutcome {
 /**
  * Group lifecycle: create, add, remove, leave. Add, remove and leave share one shape: lock the
  * Conversation, take a commit-order slot, check every rule under the lock, change membership,
- * write the note and the period, commit; then, in commit order, change rooms and push.
+ * write the System Message and the period, commit; then, in commit order, change rooms and push.
  */
 @Injectable()
 export class GroupsService {
@@ -113,7 +113,7 @@ export class GroupsService {
     });
 
     const members = (await this.queries.membersOf([id])).get(id) ?? [];
-    await this.pushCreated(id, memberIds);
+    await this.pushCreated(id, ownerId, memberIds);
     return { conversation: { id, kind: 'group', name, ownerId, members, closed: false } };
   }
 
@@ -147,16 +147,22 @@ export class GroupsService {
         }
         if (current.length >= GROUP_MEMBERS_MAX) throw groupFull();
         await tx.insert(conversationMembers).values({ conversationId: groupId, userId });
-        const note = await insertNote(tx, groupId, callerId, member, 'member_added');
-        // Messages up to now stay out of reach; the new period starts just before its own note.
+        const systemMessage = await insertSystemMessage(
+          tx,
+          groupId,
+          callerId,
+          member,
+          'member_added',
+        );
+        // Messages up to now stay out of reach; the new period starts just before its own System Message.
         await tx.insert(membershipPeriods).values({
           conversationId: groupId,
           userId,
-          startSequence: note.sequence - 1,
+          startSequence: systemMessage.sequence - 1,
         });
-        return { note, member };
+        return { systemMessage, member };
       },
-      async ({ note, member }) => {
+      async ({ systemMessage, member }) => {
         // The room join comes before any read that can throw, as in remove and leave.
         this.pushSafely(groupId, () => {
           this.realtime.joinGroupRoom(userId, groupId);
@@ -174,7 +180,9 @@ export class GroupsService {
             conversationId: groupId,
             member,
           });
-          this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, { message: note });
+          this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
+            message: systemMessage,
+          });
         } catch (error) {
           this.logPushFailure(error, groupId);
         }
@@ -203,9 +211,15 @@ export class GroupsService {
         const member = await memberRow(tx, userId);
         const wasMember = await dropMember(tx, groupId, userId);
         if (!wasMember || !member) return undefined;
-        const note = await insertNote(tx, groupId, callerId, member, 'member_removed');
-        await endPeriod(tx, groupId, userId, note.sequence);
-        return { removed: note, member };
+        const systemMessage = await insertSystemMessage(
+          tx,
+          groupId,
+          callerId,
+          member,
+          'member_removed',
+        );
+        await endPeriod(tx, groupId, userId, systemMessage.sequence);
+        return { removed: systemMessage, member };
       },
       async (outcome) => {
         if (!outcome) {
@@ -255,20 +269,26 @@ export class GroupsService {
         const leaver = await memberRow(tx, callerId);
         if (!leaver) throw new Error('Expected the leaving Member to exist');
         if (!(await dropMember(tx, groupId, callerId))) throw conversationNotFound();
-        const note = await insertNote(tx, groupId, callerId, leaver, 'member_left');
-        await endPeriod(tx, groupId, callerId, note.sequence);
+        const systemMessage = await insertSystemMessage(
+          tx,
+          groupId,
+          callerId,
+          leaver,
+          'member_left',
+        );
+        await endPeriod(tx, groupId, callerId, systemMessage.sequence);
         const successor = await successorOwner(tx, groupId);
         let outcome: LeaveOutcome;
         if (!successor) {
-          outcome = { note, closed: true, newOwnerId: undefined };
+          outcome = { systemMessage, closed: true, newOwnerId: undefined };
         } else if (group.ownerId !== callerId) {
-          outcome = { note, closed: false, newOwnerId: undefined };
+          outcome = { systemMessage, closed: false, newOwnerId: undefined };
         } else {
           await tx
             .update(groups)
             .set({ ownerId: successor })
             .where(eq(groups.conversationId, groupId));
-          outcome = { note, closed: false, newOwnerId: successor };
+          outcome = { systemMessage, closed: false, newOwnerId: successor };
         }
         return { leaver, outcome };
       },
@@ -292,7 +312,7 @@ export class GroupsService {
             member: leaver,
           });
           this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
-            message: outcome.note,
+            message: outcome.systemMessage,
           });
           if (outcome.newOwnerId) {
             this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
@@ -354,10 +374,10 @@ export class GroupsService {
     this.logger.error({ err: error, conversationId }, 'socket push failed');
   }
 
-  private async pushCreated(conversationId: string, memberIds: string[]) {
+  private async pushCreated(conversationId: string, ownerId: string, memberIds: string[]) {
     try {
       for (const userId of memberIds) this.realtime.joinGroupRoom(userId, conversationId);
-      const [conversation] = await this.queries.summaries(memberIds[0]!, conversationId);
+      const [conversation] = await this.queries.summaries(ownerId, conversationId);
       this.realtime.push(
         RealtimeEvent.CONVERSATION_CREATED,
         memberIds,
@@ -388,7 +408,7 @@ async function dropMember(tx: Tx, groupId: string, userId: string): Promise<bool
   return deleted.length > 0;
 }
 
-/** Ends the User's open period at the note that ended their membership. */
+/** Ends the User's open period at the System Message that ended their membership. */
 async function endPeriod(tx: Tx, groupId: string, userId: string, endSequence: number) {
   await tx
     .update(membershipPeriods)
@@ -419,16 +439,16 @@ async function successorOwner(tx: Tx, groupId: string): Promise<string | undefin
 }
 
 /**
- * Inserts a membership note at the next position of the Conversation's sequence, inside the
+ * Inserts a System Message at the next position of the Conversation's sequence, inside the
  * caller's transaction (the Conversation row must be locked). `actorId` made the change,
  * `subject` is who it is about.
  */
-async function insertNote(
+async function insertSystemMessage(
   tx: Tx,
   conversationId: string,
   actorId: string,
   subject: ConversationMember,
-  kind: NoteKind,
+  kind: SystemMessageKind,
 ): Promise<Message> {
   const row = only(
     await tx
@@ -440,8 +460,8 @@ async function insertNote(
         kind,
       })
       .returning(),
-    'the new note',
+    'the new System Message',
   );
-  await tx.insert(membershipNotes).values({ messageId: row.id, kind, subjectId: subject.id });
+  await tx.insert(systemMessages).values({ messageId: row.id, kind, subjectId: subject.id });
   return toMessage(row, subject);
 }

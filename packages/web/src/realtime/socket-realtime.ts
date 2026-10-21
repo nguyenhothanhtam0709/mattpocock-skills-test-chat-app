@@ -3,6 +3,9 @@ import { io, type Socket } from 'socket.io-client';
 import parser from 'socket.io-msgpack-parser';
 import type { ConnectionStatus, RealtimeEvent, RealtimeEvents } from './events';
 
+const isRealtimeEventName = (name: string): name is RealtimeEventName =>
+  Object.hasOwn(RealtimeEventSchemas, name);
+
 export interface SocketRealtimeOptions {
   /** Where the Socket.IO server is; the page's origin in the app. */
   url: string;
@@ -40,11 +43,11 @@ export function createSocketRealtime({
     next.on('disconnect', () => setStatus('disconnected'));
     next.on('connect_error', () => setStatus('disconnected'));
     next.onAny((name: string, payload: unknown) => {
-      if (!(name in RealtimeEventSchemas)) {
+      if (!isRealtimeEventName(name)) {
         console.warn(`Dropped unknown realtime event "${name}"`);
         return;
       }
-      const parsed = RealtimeEventSchemas[name as RealtimeEventName].safeParse(payload);
+      const parsed = RealtimeEventSchemas[name].safeParse(payload);
       if (!parsed.success) {
         console.warn(`Dropped invalid realtime event "${name}"`, parsed.error.issues);
         return;
