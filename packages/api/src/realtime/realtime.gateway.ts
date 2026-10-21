@@ -1,7 +1,4 @@
 import { Inject } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Pool } from 'pg';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -12,8 +9,7 @@ import { RealtimeEvent, type RealtimeEventName } from '@chat/contracts';
 import type { Logger } from 'pino';
 import type { IoServer as Server, IoSocket as Socket } from './socket-types.js';
 import { AccessTokenAuthenticator } from '../auth/access-token-authenticator.js';
-import { PG_POOL } from '../db/database.module.js';
-import { conversationMembers, groups } from '../db/schema.js';
+import { GroupMemberships } from '../groups/group-memberships.js';
 import { PINO } from '../logging/logging.module.js';
 
 export const userRoom = (userId: string) => `user:${userId}`;
@@ -29,15 +25,11 @@ export const sessionRoom = (sessionId: string) => `session:${sessionId}`;
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer() server!: Server;
 
-  private readonly db: NodePgDatabase;
-
   constructor(
     private readonly authenticator: AccessTokenAuthenticator,
-    @Inject(PG_POOL) pool: Pool,
+    private readonly memberships: GroupMemberships,
     @Inject(PINO) private readonly logger: Logger,
-  ) {
-    this.db = drizzle(pool);
-  }
+  ) {}
 
   afterInit(server: Server): void {
     server.use((socket, next) => {
@@ -65,12 +57,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
   /** The Group rooms of the Groups the User is a current Member of. */
   private async groupRoomsOf(userId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: conversationMembers.conversationId })
-      .from(conversationMembers)
-      .innerJoin(groups, eq(groups.conversationId, conversationMembers.conversationId))
-      .where(eq(conversationMembers.userId, userId));
-    return rows.map((row) => conversationRoom(row.id));
+    return (await this.memberships.groupIdsOf(userId)).map(conversationRoom);
   }
 
   /**

@@ -18,9 +18,13 @@ import { CLOCK, type Clock } from './clock/clock.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig, type Config } from './config/config.js';
 import { DatabaseModule, PG_POOL } from './db/database.module.js';
+import { GroupMemberships } from './groups/group-memberships.js';
 import { GroupsController } from './groups/groups.controller.js';
+import { GroupsService } from './groups/groups.service.js';
 import { HealthController } from './health/health.controller.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { CommitOrder } from './messages/commit-order.js';
+import { ConversationQueries } from './messages/conversation-queries.js';
 import { MessagesController } from './messages/messages.controller.js';
 import { MessagesService } from './messages/messages.service.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
@@ -118,6 +122,10 @@ export class AppModule {
       providers: [
         AuthService,
         MessagesService,
+        GroupsService,
+        GroupMemberships,
+        CommitOrder,
+        ConversationQueries,
         AuthGuard,
         AccessTokenAuthenticator,
         RealtimeGateway,
