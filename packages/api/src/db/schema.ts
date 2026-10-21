@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -204,15 +205,36 @@ export const messages = pgTable(
       'messages_kind_check',
       sql`${t.kind} in ('text', 'member_added', 'member_removed', 'member_left')`,
     ),
+    check('messages_note_body_check', sql`${t.kind} = 'text' or ${t.body} = ''`),
+    // The target of the composite foreign key from `membership_notes`.
+    uniqueIndex('messages_id_kind_unique').on(t.id, t.kind),
   ],
 );
 
-/** The User a membership note is about; exactly the rows of `messages` whose kind is not `text`. */
-export const membershipNotes = pgTable('membership_notes', {
-  messageId: uuid('message_id')
-    .primaryKey()
-    .references(() => messages.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-});
+/**
+ * The User a membership note is about. Invariant: a `messages` row has a row here iff its
+ * `kind` is not `text`. The database enforces "only if": `kind` is copied from the message,
+ * the composite foreign key keeps it equal to the message's kind, and the check keeps it away
+ * from `text`. It also enforces that a note's `body` is empty (`messages_note_body_check`).
+ * It cannot enforce "if" (every note-kind message has a row here): that needs a deferred
+ * constraint trigger, which this project does not use, so `insertNote` in the messages
+ * service, which writes both rows in one transaction, is the only guard for that direction.
+ */
+export const membershipNotes = pgTable(
+  'membership_notes',
+  {
+    messageId: uuid('message_id').primaryKey(),
+    kind: text('kind').notNull(),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    foreignKey({
+      name: 'membership_notes_message_kind_fk',
+      columns: [t.messageId, t.kind],
+      foreignColumns: [messages.id, messages.kind],
+    }).onDelete('cascade'),
+    check('membership_notes_kind_check', sql`${t.kind} <> 'text'`),
+  ],
+);
