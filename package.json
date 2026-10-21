@@ -10,6 +10,7 @@
     "build:contracts": "pnpm --filter @chat/contracts build",
     "dev:api": "pnpm build:contracts && pnpm --filter @chat/api dev",
     "dev:web": "pnpm build:contracts && pnpm --filter @chat/web dev",
+    "serve:web": "pnpm build:contracts && pnpm --filter @chat/web build && pnpm --filter @chat/web preview",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @chat/api db:generate",

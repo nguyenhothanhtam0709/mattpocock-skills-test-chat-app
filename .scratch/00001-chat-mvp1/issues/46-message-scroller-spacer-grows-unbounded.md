@@ -14,3 +14,7 @@
 ## Comments
 
 - From ticket 45's walkthrough (see its Comments for details).
+- Re-reported by the user ("the send message text box disappear after I send msg by press enter") and re-verified: it is not specific to Enter, and not dev-only.
+  - Dev (`pnpm dev:web`, Chrome): in a Direct Conversation with 7 messages the layout is fine on open (document height 838, composer top 737). Sending with Enter made the whole page 5099 px tall with the composer at y=4998 (viewport 838). Sending with the Send button made it 182,524 px, composer at y=182,423.
+  - Production build (`pnpm serve:web`): same, sending with Enter gave a 205,618 px page and the composer at y=205,517.
+  - The document itself grows (`<main>` and the `sidebar-wrapper` are as tall as the page, `scrollY` 0), so the conversation pane is not height-constrained and the composer is pushed below the fold rather than the pane scrolling. The growth gets worse with each send. Reload restores the layout.
