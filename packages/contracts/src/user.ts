@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { codePointOf } from './code-point.js';
 
 /** NUL, C0 and C1 control characters (includes tab and newline). */
 const isControl = (cp: number): boolean => cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f);
@@ -7,7 +8,7 @@ const isBidiOverride = (cp: number): boolean =>
   (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069);
 
 const hasChar = (value: string, test: (cp: number) => boolean): boolean =>
-  [...value].some((char) => test(char.codePointAt(0) ?? 0));
+  [...value].some((char) => test(codePointOf(char)));
 
 const codePointLength = (value: string): number => [...value].length;
 
