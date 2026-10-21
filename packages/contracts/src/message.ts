@@ -118,7 +118,9 @@ export const GroupSchema = z.object({
   id: z.uuid(),
   kind: z.literal('group'),
   name: z.string(),
-  ownerId: z.uuid(),
+  /** Omitted for a Former Member, who sees no Members and so not who owns the Group. */
+  ownerId: z.uuid().optional(),
+  /** Empty for a Former Member of the Group (see `closed` for a Group nobody is left in). */
   members: z.array(ConversationMemberSchema),
   /** Derived: true once no Member is left. A Closed Group is read-only, for ever. */
   closed: z.boolean(),
