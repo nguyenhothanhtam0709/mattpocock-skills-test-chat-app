@@ -284,6 +284,12 @@ export function ConversationView({
     })();
   }, [conversationId, isGroup, getGroup]);
 
+  // The list's snapshot can predate Member changes pushed while this Group was not open (the
+  // list is not told of them), so opening the Group asks the server for the current count.
+  useEffect(() => {
+    refreshGroup();
+  }, [refreshGroup]);
+
   // Messages pushed while the connection was down are gone for good: fetch what came after the
   // last one seen, page by page. Duplicates with pushes are merged by ID.
   useReconnected(() => {
