@@ -10,6 +10,7 @@ export const RealtimeEvent = {
   GROUP_MEMBER_LEFT: 'group.member_left',
   GROUP_OWNER_CHANGED: 'group.owner_changed',
   GROUP_CLOSED: 'group.closed',
+  GROUP_MEMBERSHIP_ENDED: 'group.membership_ended',
   SESSION_REVOKED: 'session.revoked',
 } as const;
 
@@ -62,6 +63,15 @@ export const GroupClosedEventSchema = z.object({ conversationId: z.uuid() });
 
 export type GroupClosedEvent = z.infer<typeof GroupClosedEventSchema>;
 
+/**
+ * Pushed to every socket of a User who was removed from a Group or left it (not to a last
+ * Member whose leaving closes it: that one gets `group.closed`). The sockets have already
+ * left the Group's room, so this is the last Group push they receive.
+ */
+export const GroupMembershipEndedEventSchema = z.object({ conversationId: z.uuid() });
+
+export type GroupMembershipEndedEvent = z.infer<typeof GroupMembershipEndedEventSchema>;
+
 /** Pushed to every socket of a session that was ended (logout); the server then disconnects them. */
 export const SessionRevokedEventSchema = z.object({});
 
@@ -73,5 +83,6 @@ export const RealtimeEventSchemas = {
   [RealtimeEvent.GROUP_MEMBER_LEFT]: GroupMemberLeftEventSchema,
   [RealtimeEvent.GROUP_OWNER_CHANGED]: GroupOwnerChangedEventSchema,
   [RealtimeEvent.GROUP_CLOSED]: GroupClosedEventSchema,
+  [RealtimeEvent.GROUP_MEMBERSHIP_ENDED]: GroupMembershipEndedEventSchema,
   [RealtimeEvent.SESSION_REVOKED]: SessionRevokedEventSchema,
 } as const;

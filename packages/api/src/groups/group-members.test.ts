@@ -360,7 +360,7 @@ describe('DELETE /groups/:id/members/:userId', () => {
       await post(app, alice, group.id, 'after bob left');
       await delivered;
       await settle();
-      expect(bobSocket.received).toEqual([]);
+      expect(bobSocket.received.map(([name]) => name)).toEqual(['group.membership_ended']);
     });
   });
 

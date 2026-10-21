@@ -30,6 +30,7 @@ describe('realtime event contracts', () => {
       GROUP_MEMBER_LEFT: 'group.member_left',
       GROUP_OWNER_CHANGED: 'group.owner_changed',
       GROUP_CLOSED: 'group.closed',
+      GROUP_MEMBERSHIP_ENDED: 'group.membership_ended',
       SESSION_REVOKED: 'session.revoked',
     });
     expect(Object.keys(RealtimeEventSchemas).sort()).toEqual([
@@ -38,6 +39,7 @@ describe('realtime event contracts', () => {
       'group.member_added',
       'group.member_left',
       'group.member_removed',
+      'group.membership_ended',
       'group.owner_changed',
       'message.created',
       'session.revoked',

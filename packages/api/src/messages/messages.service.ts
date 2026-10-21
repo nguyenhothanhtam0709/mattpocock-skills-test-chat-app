@@ -198,6 +198,10 @@ export class MessagesService {
         .select({ userId: conversationMembers.userId })
         .from(conversationMembers)
         .where(eq(conversationMembers.conversationId, message.conversationId));
+      const [group] = await this.db
+        .select({ id: groups.conversationId })
+        .from(groups)
+        .where(eq(groups.conversationId, message.conversationId));
       if (newConversationRecipient) {
         const [conversation] = await this.summaries(
           newConversationRecipient,
@@ -209,6 +213,12 @@ export class MessagesService {
           { conversation },
           message.conversationId,
         );
+      }
+      if (group) {
+        this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, message.conversationId, {
+          message,
+        });
+        return;
       }
       this.realtime.push(
         RealtimeEvent.MESSAGE_CREATED,
@@ -380,6 +390,7 @@ export class MessagesService {
 
   private async pushGroupCreated(conversationId: string, memberIds: string[]) {
     try {
+      for (const userId of memberIds) this.realtime.joinGroupRoom(userId, conversationId);
       const [conversation] = await this.summaries(memberIds[0]!, conversationId);
       this.realtime.push(
         RealtimeEvent.CONVERSATION_CREATED,
@@ -548,6 +559,7 @@ export class MessagesService {
 
     const { conversation } = await this.get(callerId, groupId);
     try {
+      this.realtime.joinGroupRoom(userId, groupId);
       const [summary] = await this.summaries(userId, groupId);
       this.realtime.push(
         RealtimeEvent.CONVERSATION_CREATED,
@@ -555,12 +567,10 @@ export class MessagesService {
         { conversation: summary },
         groupId,
       );
-      this.realtime.push(
-        RealtimeEvent.GROUP_MEMBER_ADDED,
-        conversation.members.map((m) => m.id),
-        { conversationId: groupId, member },
-        groupId,
-      );
+      this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_ADDED, groupId, {
+        conversationId: groupId,
+        member,
+      });
     } catch (error) {
       this.logPushFailure(error, groupId);
     }
@@ -615,12 +625,22 @@ export class MessagesService {
       );
     }
 
+    // The removed User's sockets leave the room first, so they only get the ended event.
+    try {
+      this.realtime.leaveGroupRoom(userId, groupId);
+    } catch (error) {
+      this.logPushFailure(error, groupId);
+    }
     const { conversation } = await this.get(callerId, groupId);
     try {
+      this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_REMOVED, groupId, {
+        conversationId: groupId,
+        member,
+      });
       this.realtime.push(
-        RealtimeEvent.GROUP_MEMBER_REMOVED,
-        conversation.members.map((m) => m.id),
-        { conversationId: groupId, member },
+        RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
+        [userId],
+        { conversationId: groupId },
         groupId,
       );
     } catch (error) {
@@ -697,9 +717,13 @@ export class MessagesService {
       );
     }
 
+    try {
+      this.realtime.leaveGroupRoom(callerId, groupId);
+    } catch (error) {
+      this.logPushFailure(error, groupId);
+    }
     const { conversation } = await this.get(callerId, groupId);
     try {
-      const remaining = conversation.members.map((m) => m.id);
       if (outcome.closed) {
         this.realtime.push(
           RealtimeEvent.GROUP_CLOSED,
@@ -709,20 +733,22 @@ export class MessagesService {
         );
       } else {
         const member = (await this.memberRow(callerId))!;
+        this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_LEFT, groupId, {
+          conversationId: groupId,
+          member,
+        });
+        if (outcome.newOwnerId) {
+          this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
+            conversationId: groupId,
+            ownerId: outcome.newOwnerId,
+          });
+        }
         this.realtime.push(
-          RealtimeEvent.GROUP_MEMBER_LEFT,
-          remaining,
-          { conversationId: groupId, member },
+          RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
+          [callerId],
+          { conversationId: groupId },
           groupId,
         );
-        if (outcome.newOwnerId) {
-          this.realtime.push(
-            RealtimeEvent.GROUP_OWNER_CHANGED,
-            remaining,
-            { conversationId: groupId, ownerId: outcome.newOwnerId },
-            groupId,
-          );
-        }
       }
     } catch (error) {
       this.logPushFailure(error, groupId);
