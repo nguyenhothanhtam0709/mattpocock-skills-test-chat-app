@@ -15,6 +15,7 @@ const alice = {
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
 const carol = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b62', username: 'carol', nickname: null };
+const dave = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b63', username: 'dave', nickname: null };
 const groupId = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b80';
 
 function fakeAccessToken() {
@@ -195,6 +196,49 @@ describe('the Member count for a Member who did not cause the change', () => {
     expect(
       within(screen.getByRole('list', { name: 'Members' })).getAllByRole('listitem'),
     ).toHaveLength(1);
+  });
+});
+
+describe('the Member count while a slower list reload is in flight', () => {
+  it('is not overwritten by a list answer that predates a newer Group answer', async () => {
+    const state: ServerGroup = { members: [aliceMember, bob], closed: false, isMember: true };
+    serverWith(state);
+    // The reload after reconnecting reads the list now but answers late: its count is old by then.
+    let listCalls = 0;
+    server.use(
+      http.get('*/api/v1/conversations', async () => {
+        listCalls += 1;
+        const snapshot = { ...state, members: [...state.members] };
+        if (listCalls > 1) await delay(150);
+        return HttpResponse.json({
+          conversations: [
+            {
+              id: groupId,
+              kind: 'group',
+              name: 'Book Club',
+              ownerId: bob.id,
+              members: snapshot.members,
+              closed: snapshot.closed,
+              isMember: snapshot.isMember,
+              lastMessage: null,
+            },
+          ],
+        });
+      }),
+    );
+    const { fake } = await openGroup();
+    await screen.findByText('2 members');
+
+    fake.disconnect();
+    state.members = [aliceMember, bob, carol];
+    act(() => fake.reconnect());
+    expect(await screen.findByText('3 members')).toBeInTheDocument();
+    state.members = [aliceMember, bob, carol, dave];
+    act(() => fake.emit({ type: 'group.member_added', conversationId: groupId, member: dave }));
+    expect(await screen.findByText('4 members')).toBeInTheDocument();
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.getByText('4 members')).toBeInTheDocument();
   });
 });
 
