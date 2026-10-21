@@ -254,10 +254,26 @@ export class MessagesService {
     // A Former Member sees no Members and no Owner (who joined later is not theirs to know).
     if (!members.some((m) => m.id === userId)) {
       return {
-        conversation: { id: conversationId, kind: 'group', name: group.name, members: [], closed },
+        conversation: {
+          id: conversationId,
+          kind: 'group',
+          name: group.name,
+          members: [],
+          closed,
+          isMember: false,
+        },
       };
     }
-    return { conversation: { id: conversationId, kind: 'group', ...group, members, closed } };
+    return {
+      conversation: {
+        id: conversationId,
+        kind: 'group',
+        ...group,
+        members,
+        closed,
+        isMember: true,
+      },
+    };
   }
 
   private async findByClientMessageId(

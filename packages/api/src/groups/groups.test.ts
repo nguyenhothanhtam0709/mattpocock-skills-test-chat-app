@@ -279,7 +279,10 @@ describe('Groups in the Conversation endpoints', () => {
         headers: bearer(dave),
       });
 
-      expect(GetConversationResponseSchema.parse(asBob.json()).conversation).toEqual(conversation);
+      expect(GetConversationResponseSchema.parse(asBob.json()).conversation).toEqual({
+        ...conversation,
+        isMember: true,
+      });
       expect(asDave.statusCode).toBe(404);
       expect(errorCode(asDave)).toBe(ErrorCode.CONVERSATION_NOT_FOUND);
     });

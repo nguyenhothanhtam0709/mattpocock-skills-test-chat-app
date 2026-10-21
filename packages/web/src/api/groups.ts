@@ -5,6 +5,7 @@ import {
   ErrorCode,
   ErrorResponseSchema,
   type CreateGroupRequest,
+  type GetConversationResponse,
   type Group,
 } from '@chat/contracts';
 
@@ -40,7 +41,11 @@ export async function createGroup(
   return { ok: false, error: 'Something went wrong. Try again.' };
 }
 
-export type GroupResult = { ok: true; group: Group } | { ok: false; error: string };
+export type GroupResult<G extends Group = Group> =
+  { ok: true; group: G } | { ok: false; error: string };
+
+/** A Group as `GET /conversations/:id` tells it to the caller (adds `isMember`). */
+export type GroupDetail = Extract<GetConversationResponse['conversation'], { kind: 'group' }>;
 
 const GENERIC_ERROR = 'Something went wrong. Try again.';
 const UNREACHABLE = 'Could not reach the server. Try again.';
@@ -50,7 +55,7 @@ export async function getGroup(
   accessToken: string,
   groupId: string,
   signal?: AbortSignal,
-): Promise<GroupResult> {
+): Promise<GroupResult<GroupDetail>> {
   let res: Response;
   try {
     res = await fetch(new URL(`/api/v1/conversations/${groupId}`, window.location.origin), {

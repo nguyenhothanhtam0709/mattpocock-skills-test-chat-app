@@ -48,7 +48,7 @@ function serverWith(state: ServerGroup) {
       }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
-      HttpResponse.json({ conversation: group() }),
+      HttpResponse.json({ conversation: { ...group(), isMember: state.isMember } }),
     ),
     http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
       HttpResponse.json({ messages: [], hasMore: false }),
@@ -168,6 +168,42 @@ describe('being re-added', () => {
     );
 
     expect(await screen.findByRole('textbox', { name: /message/i })).toBeInTheDocument();
+  });
+});
+
+describe('after a disconnect', () => {
+  it('shows read-only with no Member count when removed while offline', async () => {
+    const state: ServerGroup = { members: [aliceMember, bob], closed: false, isMember: true };
+    serverWith(state);
+    const { fake } = await openGroup();
+    await screen.findByRole('textbox', { name: /message/i });
+    await screen.findByText('2 members');
+
+    fake.disconnect();
+    state.members = [];
+    state.isMember = false;
+    fake.reconnect();
+
+    expect(
+      await screen.findByText(/you are no longer a member of this group/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /message/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ members?$/)).not.toBeInTheDocument();
+  });
+
+  it('gives the composer back when re-added while offline', async () => {
+    const state: ServerGroup = { members: [], closed: false, isMember: false };
+    serverWith(state);
+    const { fake } = await openGroup();
+    await screen.findByText(/you are no longer a member of this group/i);
+
+    fake.disconnect();
+    state.members = [aliceMember, bob];
+    state.isMember = true;
+    fake.reconnect();
+
+    expect(await screen.findByRole('textbox', { name: /message/i })).toBeInTheDocument();
+    expect(await screen.findByText('2 members')).toBeInTheDocument();
   });
 });
 

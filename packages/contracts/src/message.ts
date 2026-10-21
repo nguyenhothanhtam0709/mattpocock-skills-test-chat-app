@@ -136,7 +136,10 @@ export const GetConversationResponseSchema = z.object({
       kind: z.literal('direct'),
       members: z.array(ConversationMemberSchema),
     }),
-    GroupSchema,
+    GroupSchema.extend({
+      /** Derived for the caller: false for a Former Member (and for a Closed Group). */
+      isMember: z.boolean(),
+    }),
   ]),
 });
 

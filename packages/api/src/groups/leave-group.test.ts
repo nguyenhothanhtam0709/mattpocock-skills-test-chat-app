@@ -316,6 +316,21 @@ describe('the closed flag', () => {
     );
   };
 
+  it('tells the caller whether they are a current Member on GET /conversations/:id', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      expect(await getGroup(app, alice, group.id)).toMatchObject({ isMember: true });
+      expect(await getGroup(app, bob, group.id)).toMatchObject({ isMember: true });
+
+      await leave(app, bob, group.id);
+
+      expect(await getGroup(app, bob, group.id)).toMatchObject({ isMember: false, members: [] });
+      expect(await getGroup(app, alice, group.id)).toMatchObject({ isMember: true });
+    });
+  });
+
   it('is false while a Group has Members and true once the last one left, everywhere', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');

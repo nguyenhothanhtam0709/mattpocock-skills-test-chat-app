@@ -36,6 +36,7 @@ import {
   leaveGroup,
   removeGroupMember,
   type CreateGroupResult,
+  type GroupDetail,
   type GroupResult,
 } from '@/api/groups';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
@@ -59,7 +60,7 @@ interface AuthContextValue {
   /** Creates a Group owned by the User. */
   createGroup(request: CreateGroupRequest): Promise<CreateGroupResult>;
   /** A Group with its Members and Owner. */
-  getGroup(groupId: string, signal?: AbortSignal): Promise<GroupResult>;
+  getGroup(groupId: string, signal?: AbortSignal): Promise<GroupResult<GroupDetail>>;
   /** Owner only: adds a User to the Group. */
   addGroupMember(groupId: string, userId: string): Promise<GroupResult>;
   /** Owner only: removes a Member from the Group. */

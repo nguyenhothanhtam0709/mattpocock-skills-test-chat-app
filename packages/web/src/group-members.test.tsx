@@ -45,7 +45,12 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>) {
       HttpResponse.json({ conversations: [{ ...current, isMember: true, lastMessage: null }] }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
-      HttpResponse.json({ conversation: current }),
+      HttpResponse.json({
+        conversation: {
+          ...current,
+          isMember: current.members.some((m) => (m as { id: string }).id === alice.id),
+        },
+      }),
     ),
     http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
       HttpResponse.json({ messages: [], hasMore: false }),

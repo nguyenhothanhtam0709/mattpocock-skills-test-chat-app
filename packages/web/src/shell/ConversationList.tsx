@@ -98,8 +98,11 @@ export function ConversationList({
         if (!listed) return;
         if (event.type === 'conversation.created') {
           const { conversation } = event;
-          if (listed.some((c) => c.id === conversation.id)) return;
-          setState({ status: 'ready', list: [conversation, ...listed] });
+          // An ID already listed is replaced (a re-added Former Member's entry is stale).
+          setState({
+            status: 'ready',
+            list: [conversation, ...listed.filter((c) => c.id !== conversation.id)],
+          });
           return;
         }
         if (event.type === 'group.closed' || event.type === 'group.membership_ended') {
