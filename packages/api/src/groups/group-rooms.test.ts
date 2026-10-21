@@ -271,6 +271,60 @@ describe('Group rooms', () => {
       });
     });
 
+    it('keeps an added User in the room when a read after the commit fails', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice);
+        const url = await listenOnRandomPort(app);
+        const aliceTab = await connectSocket(url, alice.token);
+        const bobTab = await connectSocket(url, bob.token);
+        vi.spyOn(app.get(MessagesService), 'get').mockRejectedValueOnce(new Error('read failed'));
+
+        await addMember(app, alice, group.id, bob.id);
+
+        expect(await inRoom(app, group.id)).toEqual(ids(aliceTab, bobTab));
+      });
+    });
+
+    it('does not put a User back in the room when a removal commits between the recheck read and its join', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice);
+        const url = await listenOnRandomPort(app);
+        const aliceTab = await connectSocket(url, alice.token);
+        const gateway = app.get(RealtimeGateway) as unknown as Rooms & {
+          reconcileGroupRooms(...args: unknown[]): Promise<void>;
+        };
+        const read = gateway.groupRoomsOf.bind(gateway);
+        // Handshake read: Bob is not a Member yet, then he is added. Recheck read: he is a
+        // Member, then he is removed before the socket joins. Later reads are real.
+        vi.spyOn(gateway, 'groupRoomsOf')
+          .mockImplementationOnce(async (userId) => {
+            const rooms = await read(userId);
+            await addMember(app, alice, group.id, bob.id);
+            return rooms;
+          })
+          .mockImplementationOnce(async (userId) => {
+            const rooms = await read(userId);
+            await removeMember(app, alice, group.id, bob.id);
+            return rooms;
+          });
+        const reconcile = gateway.reconcileGroupRooms.bind(gateway);
+        let reconciled: Promise<void> = Promise.resolve();
+        vi.spyOn(gateway, 'reconcileGroupRooms').mockImplementation((...args) => {
+          reconciled = reconcile(...args);
+          return reconciled;
+        });
+
+        await connectSocket(url, bob.token);
+        await reconciled;
+
+        expect(await inRoom(app, group.id)).toEqual(ids(aliceTab));
+      });
+    });
+
     it('delivers the first Message after an add to the added User, even when the add is slow to finish', async () => {
       await withApp({}, async (app) => {
         const alice = await signUp(app, 'Alice');

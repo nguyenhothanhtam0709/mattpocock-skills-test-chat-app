@@ -157,9 +157,12 @@ export class GroupsService {
         return { note, member };
       },
       async ({ note, member }) => {
+        // The room join comes before any read that can throw, as in remove and leave.
+        this.pushSafely(groupId, () => {
+          this.realtime.joinGroupRoom(userId, groupId);
+        });
         const response = await this.groupAs(callerId, groupId);
         try {
-          this.realtime.joinGroupRoom(userId, groupId);
           const [summary] = await this.queries.summaries(userId, groupId);
           this.realtime.push(
             RealtimeEvent.CONVERSATION_CREATED,

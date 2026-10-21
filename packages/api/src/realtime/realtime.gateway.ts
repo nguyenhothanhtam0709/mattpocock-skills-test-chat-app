@@ -63,8 +63,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   /**
    * Join first, then check against the database, so a change that committed between the
    * handshake read and the join is not lost: leave rooms the User no longer belongs to and
-   * join those they now do. A change committing after this read finds the socket already in
-   * its User room (and so in the rooms it joins or leaves).
+   * join those they now do. Those new joins are checked once more after joining, because a
+   * removal that committed between the read and the join already ran its leave. A change
+   * committing after a read finds the socket already in its User room (and so in the rooms it
+   * joins or leaves).
    */
   private async reconcileGroupRooms(
     socket: Socket,
@@ -74,7 +76,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     try {
       const current = new Set(await this.groupRoomsOf(userId));
       for (const room of joined) if (!current.has(room)) void socket.leave(room);
-      for (const room of current) if (!joined.includes(room)) void socket.join(room);
+      const added = [...current].filter((room) => !joined.includes(room));
+      if (added.length === 0) return;
+      void socket.join(added);
+      const stillCurrent = new Set(await this.groupRoomsOf(userId));
+      for (const room of added) if (!stillCurrent.has(room)) void socket.leave(room);
     } catch (error) {
       this.logger.error({ err: error, socketId: socket.id }, 'socket group rooms recheck failed');
     }

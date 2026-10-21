@@ -19,3 +19,4 @@
 - Guess: the serialiser is in-process, which is enough while the app is a single instance (Socket.IO rooms are in-memory too); a scale-out would need a cross-instance answer anyway. Residual: a User removed and re-added within the few milliseconds of one handshake could have the recheck undo the re-join; not handled.
 - The "removed while sending" test passes on the old code too (the old window is a few microtasks wide and cannot be forced); the handshake and slow-add tests failed before the change.
 - No package added, no migration.
+- Two gaps were closed later by ticket 34: `addMember` joins the room before any read that can throw, and the handshake recheck joins and then re-checks, so a removal committing between its read and its join no longer leaves the User in the room. The "removed and re-added within one handshake" residual above is still not handled.
