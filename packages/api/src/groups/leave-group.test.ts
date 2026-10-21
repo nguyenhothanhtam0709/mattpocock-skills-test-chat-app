@@ -117,8 +117,10 @@ describe('POST /groups/:id/leave', () => {
 
       expect(res.statusCode).toBe(200);
       const left = GroupMembershipResponseSchema.parse(res.json()).conversation;
-      expect(left.members.map((m) => m.id)).toEqual([alice.id]);
-      expect(left.ownerId).toBe(alice.id);
+      // The leaver is a Former Member now: the response shows them no Members and no Owner.
+      expect(left.members).toEqual([]);
+      expect(left.ownerId).toBeUndefined();
+      expect(left.closed).toBe(false);
       const posted = await post(app, bob, group.id);
       expect(posted.statusCode).toBe(403);
       expect(errorCode(posted)).toBe(ErrorCode.NOT_A_MEMBER);
@@ -163,7 +165,6 @@ describe('POST /groups/:id/leave', () => {
       const res = await leave(app, alice, group.id);
 
       expect(res.statusCode).toBe(200);
-      expect(GroupMembershipResponseSchema.parse(res.json()).conversation.ownerId).toBe(carol.id);
       expect(await ownerOf(app, bob, group.id)).toBe(carol.id);
       // The new Owner can manage Members.
       expect((await addMember(app, carol, group.id, alice.id)).statusCode).toBe(201);
@@ -291,6 +292,69 @@ describe('POST /groups/:id/leave', () => {
         isMember: false,
         members: [],
       });
+    });
+  });
+});
+
+describe('the closed flag', () => {
+  const getGroup = async (app: NestFastifyApplication, as: Person, groupId: string) => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/conversations/${groupId}`,
+      headers: bearer(as),
+    });
+    return GetConversationResponseSchema.parse(res.json()).conversation;
+  };
+  const listed = async (app: NestFastifyApplication, as: Person, groupId: string) => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/conversations',
+      headers: bearer(as),
+    });
+    return ListConversationsResponseSchema.parse(res.json()).conversations.find(
+      (c) => c.id === groupId,
+    );
+  };
+
+  it('is false while a Group has Members and true once the last one left, everywhere', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      expect(group.closed).toBe(false);
+      await leave(app, bob, group.id);
+
+      expect(await getGroup(app, alice, group.id)).toMatchObject({ closed: false });
+      expect(await listed(app, alice, group.id)).toMatchObject({ closed: false });
+      expect(await listed(app, bob, group.id)).toMatchObject({ closed: false, isMember: false });
+
+      const last = await leave(app, alice, group.id);
+      expect(GroupMembershipResponseSchema.parse(last.json()).conversation.closed).toBe(true);
+      for (const person of [alice, bob]) {
+        expect(await getGroup(app, person, group.id)).toMatchObject({ closed: true });
+        expect(await listed(app, person, group.id)).toMatchObject({ closed: true });
+      }
+    });
+  });
+
+  it('is false for a Direct Conversation in the list', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const sent = await app.inject({
+        method: 'POST',
+        url: '/api/v1/direct-messages',
+        headers: bearer(alice),
+        payload: { recipientId: bob.id, clientMessageId: randomUUID(), body: 'hi' },
+      });
+      expect(sent.statusCode).toBe(201);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/conversations',
+        headers: bearer(alice),
+      });
+      const [direct] = ListConversationsResponseSchema.parse(res.json()).conversations;
+      expect(direct).toMatchObject({ kind: 'direct', closed: false });
     });
   });
 });

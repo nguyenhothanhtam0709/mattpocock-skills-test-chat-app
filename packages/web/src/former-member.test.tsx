@@ -34,6 +34,7 @@ function formerMemberOf(isMember: boolean) {
             name: 'Book Club',
             members: [bob],
             isMember,
+            closed: false,
             lastMessage: {
               senderId: bob.id,
               preview: 'see you all',

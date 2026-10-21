@@ -118,8 +118,12 @@ export const GroupSchema = z.object({
   id: z.uuid(),
   kind: z.literal('group'),
   name: z.string(),
-  ownerId: z.uuid(),
+  /** Omitted for a Former Member, who sees no Members and so not who owns the Group. */
+  ownerId: z.uuid().optional(),
+  /** Empty for a Former Member of the Group (see `closed` for a Group nobody is left in). */
   members: z.array(ConversationMemberSchema),
+  /** Derived: true once no Member is left. A Closed Group is read-only, for ever. */
+  closed: z.boolean(),
 });
 
 export type Group = z.infer<typeof GroupSchema>;
@@ -148,6 +152,8 @@ export const ConversationSummarySchema = z.object({
   members: z.array(ConversationMemberSchema),
   /** False for a Former Member: they can read their windows but not post. */
   isMember: z.boolean(),
+  /** True for a Closed Group (no Members left); always false for a Direct Conversation. */
+  closed: z.boolean(),
   /** Null until the first Message (a new Group has none). */
   lastMessage: z
     .object({

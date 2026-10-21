@@ -51,6 +51,7 @@ function openLongConversation() {
             name: 'Bob',
             members: [aliceMember, bob],
             isMember: true,
+            closed: false,
             lastMessage: {
               senderId: bob.id,
               preview: `message ${TOTAL}`,

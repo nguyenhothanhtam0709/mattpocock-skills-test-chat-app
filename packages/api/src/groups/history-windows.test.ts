@@ -142,6 +142,49 @@ describe('membership periods and history windows', () => {
     });
   });
 
+  it('shows a Former Member no Members, and the Members again once they are re-added', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const carol = await signUp(app, 'Carol');
+      const dave = await signUp(app, 'Dave');
+      const group = await createGroup(app, alice, [bob.id]);
+      await removeMember(app, alice, group.id, bob.id);
+      await addMember(app, alice, group.id, carol.id);
+      const get = async (as: Person) =>
+        GetConversationResponseSchema.parse(
+          (
+            await app.inject({
+              method: 'GET',
+              url: `/api/v1/conversations/${group.id}`,
+              headers: bearer(as),
+            })
+          ).json(),
+        ).conversation;
+
+      const former = await get(bob);
+      expect(former).toMatchObject({ kind: 'group', members: [], closed: false });
+      expect(JSON.stringify(former)).not.toContain(carol.id);
+      expect((await summaryOf(app, bob, group.id))?.members).toEqual([]);
+      expect((await get(alice)).members.map((m) => m.id).sort()).toEqual(
+        [alice.id, carol.id].sort(),
+      );
+      const neverMember = await app.inject({
+        method: 'GET',
+        url: `/api/v1/conversations/${group.id}`,
+        headers: bearer(dave),
+      });
+      expect(neverMember.statusCode).toBe(404);
+
+      await addMember(app, alice, group.id, bob.id);
+
+      expect((await get(bob)).members.map((m) => m.id).sort()).toEqual(
+        [alice.id, bob.id, carol.id].sort(),
+      );
+      expect((await summaryOf(app, bob, group.id))?.members).toHaveLength(3);
+    });
+  });
+
   it('keeps the Group in a Former Member list, previewing the last Message of their window', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');

@@ -30,6 +30,7 @@ const groupOwnedBy = (ownerId: string, members: unknown[]) => ({
   name: 'Book Club',
   ownerId,
   members,
+  closed: members.length === 0,
 });
 
 /** Signed in as Alice, with a Group in the list; the server records membership changes. */
@@ -65,7 +66,10 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>) {
       return HttpResponse.json({ conversation: current });
     }),
   );
-  return { added, removed };
+  const setMembers = (members: unknown[]) => {
+    current = { ...current, members, closed: members.length === 0 };
+  };
+  return { added, removed, setMembers };
 }
 
 beforeEach(() => {
@@ -184,12 +188,13 @@ describe('membership notes', () => {
   });
 
   it('shows a pushed note once, and keeps the Member count current from the membership events', async () => {
-    signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
+    const { setMembers } = signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /Book Club/ }));
     await screen.findByText('2 members');
+    setMembers([aliceMember, bob, carol]);
 
     act(() => {
       fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol });
@@ -198,7 +203,8 @@ describe('membership notes', () => {
 
     expect(await screen.findByText('carol was added')).toBeInTheDocument();
     expect(screen.getAllByText('carol was added')).toHaveLength(1);
-    expect(screen.getByText('3 members')).toBeInTheDocument();
+    expect(await screen.findByText('3 members')).toBeInTheDocument();
+    setMembers([aliceMember, bob]);
 
     act(() => {
       fake.emit({ type: 'group.member_removed', conversationId: groupId, member: carol });
@@ -207,16 +213,17 @@ describe('membership notes', () => {
 
     expect(await screen.findByText('carol was removed')).toBeInTheDocument();
     expect(screen.getAllByText(/carol was/)).toHaveLength(2);
-    expect(screen.getByText('2 members')).toBeInTheDocument();
+    expect(await screen.findByText('2 members')).toBeInTheDocument();
   });
 
   it('does not render a note from the membership event alone', async () => {
-    signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
+    const { setMembers } = signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /Book Club/ }));
     await screen.findByText('2 members');
+    setMembers([aliceMember, bob, carol]);
 
     act(() => fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol }));
 

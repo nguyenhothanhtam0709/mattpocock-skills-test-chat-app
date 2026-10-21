@@ -334,8 +334,10 @@ export class MessagesService {
         id: row.id,
         kind: row.groupName === null ? ('direct' as const) : ('group' as const),
         name: row.groupName ?? other.nickname ?? other.username,
-        members: all,
+        // A Former Member of a Group sees no Members (who joined later is not theirs to know).
+        members: row.groupName !== null && !row.isMember ? [] : all,
         isMember: row.isMember,
+        closed: row.groupName !== null && all.length === 0,
         lastMessage:
           row.senderId === null
             ? null
@@ -355,11 +357,15 @@ export class MessagesService {
       .select({ name: groups.name, ownerId: groups.ownerId })
       .from(groups)
       .where(eq(groups.conversationId, conversationId));
-    return {
-      conversation: group
-        ? { id: conversationId, kind: 'group', ...group, members }
-        : { id: conversationId, kind: 'direct', members },
-    };
+    if (!group) return { conversation: { id: conversationId, kind: 'direct', members } };
+    const closed = members.length === 0;
+    // A Former Member sees no Members and no Owner (who joined later is not theirs to know).
+    if (!members.some((m) => m.id === userId)) {
+      return {
+        conversation: { id: conversationId, kind: 'group', name: group.name, members: [], closed },
+      };
+    }
+    return { conversation: { id: conversationId, kind: 'group', ...group, members, closed } };
   }
 
   /**
@@ -409,7 +415,7 @@ export class MessagesService {
 
     const members = (await this.membersOf([id])).get(id)!;
     await this.pushGroupCreated(id, memberIds);
-    return { conversation: { id, kind: 'group', name, ownerId, members } };
+    return { conversation: { id, kind: 'group', name, ownerId, members, closed: false } };
   }
 
   /** Serialises membership changes and Message sends on one Conversation. */
