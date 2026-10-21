@@ -23,6 +23,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { Logger } from 'pino';
 import { PINO } from '../logging/logging.module.js';
+import { KeyedSerializer, type Slot } from '../realtime/keyed-serializer.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import { PG_POOL } from '../db/database.module.js';
@@ -80,6 +81,7 @@ const asGroup = (conversation: GetConversationResponse['conversation']) =>
 @Injectable()
 export class MessagesService {
   private readonly db: NodePgDatabase;
+  private readonly commitOrder = new KeyedSerializer();
 
   constructor(
     @Inject(PG_POOL) pool: Pool,
@@ -138,13 +140,22 @@ export class MessagesService {
     request: SendMessageRequest,
   ): Promise<SentMessage> {
     try {
-      const message = await this.db.transaction(async (tx) => {
-        await this.lockConversation(tx, conversationId);
-        await this.requireMember(tx, conversationId, senderId, true);
-        return this.insertMessage(tx, conversationId, senderId, request);
-      });
-      await this.pushCreated(message, undefined);
-      return { message, created: true };
+      return await this.inCommitOrder(
+        conversationId,
+        async (queue) => {
+          const message = await this.db.transaction(async (tx) => {
+            await this.lockConversation(tx, conversationId);
+            queue();
+            await this.requireMember(tx, conversationId, senderId, true);
+            return this.insertMessage(tx, conversationId, senderId, request);
+          });
+          return message;
+        },
+        async (message) => {
+          await this.pushCreated(message, undefined);
+          return { message, created: true };
+        },
+      );
     } catch (error) {
       if (!(error instanceof DuplicateClientMessage)) throw error;
       return (await this.findByClientMessageId(senderId, request.clientMessageId))!;
@@ -411,6 +422,29 @@ export class MessagesService {
     );
   }
 
+  /**
+   * Runs a transaction that calls `queue()` right after taking the Conversation lock, then
+   * `after` with its result, once every earlier change of the Conversation has finished its
+   * own `after`. Room changes and pushes therefore happen in commit order: a Message is never
+   * pushed between a membership commit and its room change.
+   */
+  private async inCommitOrder<R, T>(
+    conversationId: string,
+    transaction: (queue: () => void) => Promise<R>,
+    after: (result: R) => Promise<T>,
+  ): Promise<T> {
+    const held: { slot?: Slot } = {};
+    try {
+      const result = await transaction(() => {
+        held.slot = this.commitOrder.enter(conversationId);
+      });
+      await held.slot?.turn;
+      return await after(result);
+    } finally {
+      held.slot?.release();
+    }
+  }
+
   /** Pushes are best-effort (ADR-0001): a failure is logged, never surfaced. */
   private logPushFailure(error: unknown, conversationId: string): void {
     this.logger.error({ err: error, conversationId }, 'socket push failed');
@@ -550,9 +584,18 @@ export class MessagesService {
     groupId: string,
     userId: string,
   ): Promise<GroupMembershipResponse> {
-    const { note, member } = await this.db.transaction(async (tx) => {
+    return this.inCommitOrder(
+      groupId,
+      (queue) => this.addGroupMemberTx(callerId, groupId, userId, queue),
+      ({ note, member }) => this.afterMemberAdded(callerId, groupId, userId, note, member),
+    );
+  }
+
+  private addGroupMemberTx(callerId: string, groupId: string, userId: string, queue: () => void) {
+    return this.db.transaction(async (tx) => {
       // Every rule is checked after the lock, so a concurrent change cannot slip past it.
       await this.lockConversation(tx, groupId);
+      queue();
       await this.requireOwner(tx, callerId, groupId);
       const member = await this.memberRow(tx, userId);
       if (!member) {
@@ -586,7 +629,15 @@ export class MessagesService {
       });
       return { note, member };
     });
+  }
 
+  private async afterMemberAdded(
+    callerId: string,
+    groupId: string,
+    userId: string,
+    note: Message,
+    member: ConversationMember,
+  ): Promise<GroupMembershipResponse> {
     const { conversation } = await this.get(callerId, groupId);
     try {
       this.realtime.joinGroupRoom(userId, groupId);
@@ -614,10 +665,24 @@ export class MessagesService {
     groupId: string,
     userId: string,
   ): Promise<GroupMembershipResponse> {
-    const { removed, member } = await this.db.transaction(async (tx) => {
+    return this.inCommitOrder(
+      groupId,
+      (queue) => this.removeGroupMemberTx(callerId, groupId, userId, queue),
+      ({ removed, member }) => this.afterMemberRemoved(callerId, groupId, userId, removed, member),
+    );
+  }
+
+  private removeGroupMemberTx(
+    callerId: string,
+    groupId: string,
+    userId: string,
+    queue: () => void,
+  ) {
+    return this.db.transaction(async (tx) => {
       // Lock the Conversation so the period ends exactly at the newest Message, then check
       // every rule against what is true now.
       await this.lockConversation(tx, groupId);
+      queue();
       await this.requireOwner(tx, callerId, groupId);
       if (userId === callerId) {
         throw new DomainException(
@@ -650,6 +715,15 @@ export class MessagesService {
         );
       return { removed: note, member };
     });
+  }
+
+  private async afterMemberRemoved(
+    callerId: string,
+    groupId: string,
+    userId: string,
+    removed: Message | undefined,
+    member: ConversationMember | undefined,
+  ): Promise<GroupMembershipResponse> {
     if (!removed || !member) {
       throw new DomainException(
         ErrorCode.NOT_A_MEMBER,
@@ -689,8 +763,17 @@ export class MessagesService {
    * If they were the last Member, the Group is closed. Pushes are best-effort (ADR-0001).
    */
   async leaveGroup(callerId: string, groupId: string): Promise<GroupMembershipResponse> {
-    const { outcome, leaver } = await this.db.transaction(async (tx) => {
+    return this.inCommitOrder(
+      groupId,
+      (queue) => this.leaveGroupTx(callerId, groupId, queue),
+      ({ outcome, leaver }) => this.afterLeft(callerId, groupId, outcome, leaver),
+    );
+  }
+
+  private leaveGroupTx(callerId: string, groupId: string, queue: () => void) {
+    return this.db.transaction(async (tx) => {
       await this.lockConversation(tx, groupId);
+      queue();
       const [group] = await tx
         .select({ ownerId: groups.ownerId })
         .from(groups)
@@ -748,7 +831,14 @@ export class MessagesService {
         .where(eq(groups.conversationId, groupId));
       return { leaver, outcome: { note, closed: false as const, newOwnerId: successor.userId } };
     });
+  }
 
+  private async afterLeft(
+    callerId: string,
+    groupId: string,
+    outcome: { note: Message; closed: boolean; newOwnerId: string | undefined },
+    leaver: ConversationMember,
+  ): Promise<GroupMembershipResponse> {
     try {
       this.realtime.leaveGroupRoom(callerId, groupId);
     } catch (error) {

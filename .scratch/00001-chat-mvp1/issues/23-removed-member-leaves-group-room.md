@@ -19,4 +19,3 @@
 - Event: new `group.membership_ended` `{ conversationId }` (the ticket named none), sent to a removed User and to a leaver. Guess: the last Member whose leaving closes the Group gets only `group.closed` (it already makes their other tabs read-only), so every socket gets a single event.
 - Two existing assertions changed (tickets 16 and 18 said the removed User and the leaver receive nothing): they now expect exactly `['group.membership_ended']`. Other push tests are untouched and pass.
 - SPA: the open view turns read-only ("no longer a member"), the details sheet drops Leave, and the Conversation list reloads so `isMember` flips.
-- Known gap (best-effort, ADR-0001): a socket whose handshake read the Group list just before a concurrent removal commits could keep the room until it reconnects.

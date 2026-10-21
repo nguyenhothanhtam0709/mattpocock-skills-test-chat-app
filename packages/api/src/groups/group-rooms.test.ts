@@ -6,7 +6,7 @@ import {
   type Group,
 } from '@chat/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withApp } from '../../test/app-harness.js';
 import {
   closeAllSockets,
@@ -14,6 +14,7 @@ import {
   listenOnRandomPort,
   type TestSocket,
 } from '../../test/socket-client.js';
+import { MessagesService } from '../messages/messages.service.js';
 import { RealtimeGateway, conversationRoom } from '../realtime/realtime.gateway.js';
 
 const password = 'correct horse battery';
@@ -218,6 +219,120 @@ describe('Group rooms', () => {
 
       expect(names(tab)).toEqual(['group.closed']);
       expect(await inRoom(app, group.id)).toEqual([]);
+    });
+  });
+
+  describe('leak windows', () => {
+    type Rooms = { groupRoomsOf(userId: string): Promise<string[]> };
+
+    it('does not keep a socket in the room when its handshake read lost a race with a removal', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice, [bob.id]);
+        const url = await listenOnRandomPort(app);
+        const aliceTab = await connectSocket(url, alice.token);
+        // The handshake reads Bob's Groups, then Bob is removed before the socket joins them.
+        const gateway = app.get(RealtimeGateway) as unknown as Rooms;
+        const read = gateway.groupRoomsOf.bind(gateway);
+        vi.spyOn(gateway, 'groupRoomsOf').mockImplementationOnce(async (userId) => {
+          const rooms = await read(userId);
+          await removeMember(app, alice, group.id, bob.id);
+          return rooms;
+        });
+
+        await connectSocket(url, bob.token);
+
+        await vi.waitFor(async () => expect(await inRoom(app, group.id)).toEqual(ids(aliceTab)));
+      });
+    });
+
+    it('joins a socket that connected while it was being added to the Group', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice);
+        const url = await listenOnRandomPort(app);
+        await connectSocket(url, alice.token);
+        // The handshake reads Bob's Groups, then Bob is added before the socket joins them.
+        const gateway = app.get(RealtimeGateway) as unknown as Rooms;
+        const read = gateway.groupRoomsOf.bind(gateway);
+        vi.spyOn(gateway, 'groupRoomsOf').mockImplementationOnce(async (userId) => {
+          const rooms = await read(userId);
+          await addMember(app, alice, group.id, bob.id);
+          return rooms;
+        });
+
+        const bobTab = await connectSocket(url, bob.token);
+
+        await vi.waitFor(async () =>
+          expect(await inRoom(app, group.id)).toContain(bobTab.socket.id),
+        );
+      });
+    });
+
+    it('delivers the first Message after an add to the added User, even when the add is slow to finish', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice);
+        const url = await listenOnRandomPort(app);
+        await connectSocket(url, alice.token);
+        const bobTab = await connectSocket(url, bob.token);
+        // Hold the add right after its commit, then send a Message while it is held.
+        const service = app.get(MessagesService);
+        const get = service.get.bind(service);
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        let reached!: () => void;
+        const afterCommit = new Promise<void>((resolve) => (reached = resolve));
+        vi.spyOn(service, 'get').mockImplementationOnce(async (userId, conversationId) => {
+          reached();
+          await held;
+          return get(userId, conversationId);
+        });
+        const adding = addMember(app, alice, group.id, bob.id);
+        await afterCommit;
+        const sending = post(app, alice, group.id, 'first after add');
+        release();
+        await Promise.all([adding, sending]);
+
+        await vi.waitFor(() => {
+          const bodies = bobTab.received
+            .filter(([name]) => name === 'message.created')
+            .map(([, payload]) => (payload as { message: { body: string | null } }).message.body);
+          expect(bodies).toContain('first after add');
+        });
+      });
+    });
+
+    it('sends nothing past their last Message to a User removed while Messages are being sent', async () => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const group = await createGroup(app, alice, [bob.id]);
+        const url = await listenOnRandomPort(app);
+        await connectSocket(url, alice.token);
+        const bobTab = await connectSocket(url, bob.token);
+
+        await Promise.all([
+          removeMember(app, alice, group.id, bob.id),
+          ...Array.from({ length: 20 }, (_, i) => post(app, alice, group.id, `m${i}`)),
+        ]);
+
+        const history = await app.inject({
+          method: 'GET',
+          url: `/api/v1/conversations/${group.id}/messages?limit=100`,
+          headers: bearer(alice),
+        });
+        const all = (history.json() as { messages: Array<{ kind: string; sequence: number }> })
+          .messages;
+        const removedAt = all.find((m) => m.kind === 'member_removed')!.sequence;
+        const pushed = bobTab.received
+          .filter(([name]) => name === 'message.created')
+          .map(([, payload]) => (payload as { message: { sequence: number } }).message.sequence);
+        for (const sequence of pushed) expect(sequence).toBeLessThan(removedAt);
+      });
     });
   });
 });
