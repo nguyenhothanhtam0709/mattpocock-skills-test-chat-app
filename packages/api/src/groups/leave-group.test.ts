@@ -201,7 +201,7 @@ describe('POST /groups/:id/leave', () => {
         });
       }
       await settle();
-      expect(sockets.alice.received).toEqual([]);
+      expect(sockets.alice.received.map(([name]) => name)).toEqual(['group.membership_ended']);
     });
   });
 

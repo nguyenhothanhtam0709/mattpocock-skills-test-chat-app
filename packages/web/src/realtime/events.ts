@@ -5,6 +5,7 @@ import type {
   GroupMemberLeftEvent,
   GroupOwnerChangedEvent,
   GroupClosedEvent,
+  GroupMembershipEndedEvent,
   MessageCreatedEvent,
 } from '@chat/contracts';
 
@@ -17,6 +18,7 @@ export type RealtimeEvent =
   | ({ type: 'group.member_left' } & GroupMemberLeftEvent)
   | ({ type: 'group.owner_changed' } & GroupOwnerChangedEvent)
   | ({ type: 'group.closed' } & GroupClosedEvent)
+  | ({ type: 'group.membership_ended' } & GroupMembershipEndedEvent)
   | { type: 'session.revoked' };
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';

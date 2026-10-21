@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { fakeRealtime } from './test/fake-realtime';
 import { server } from './test/server';
@@ -150,6 +150,52 @@ describe('Members leaving, seen by the others', () => {
     ]);
     expect(within(items[1]!).getByText('Owner')).toBeInTheDocument();
     expect(within(items[0]!).queryByText('Owner')).not.toBeInTheDocument();
+  });
+
+  it('turns the open view read-only, drops Leave, and reloads the list when group.membership_ended arrives', async () => {
+    signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
+    let listLoads = 0;
+    server.use(
+      http.get('*/api/v1/conversations', () => {
+        listLoads += 1;
+        const stillMember = listLoads === 1;
+        return HttpResponse.json({
+          conversations: [
+            {
+              ...groupOwnedBy(bob.id, stillMember ? [aliceMember, bob] : [bob]),
+              isMember: stillMember,
+              lastMessage: null,
+            },
+          ],
+        });
+      }),
+    );
+    const { user, fake } = await openGroup();
+    const sheet = await openDetails(user);
+    await within(sheet).findByRole('button', { name: /leave group/i });
+
+    act(() => fake.emit({ type: 'group.membership_ended', conversationId: groupId }));
+
+    expect(await screen.findByText(/no longer a member of this group/i)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /message/i })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: /leave group/i })).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(listLoads).toBe(2));
+  });
+
+  it('ignores group.membership_ended for another Group', async () => {
+    signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
+    const { fake } = await openGroup();
+    await screen.findByRole('textbox', { name: /message/i });
+
+    act(() =>
+      fake.emit({
+        type: 'group.membership_ended',
+        conversationId: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b99',
+      }),
+    );
+
+    expect(screen.getByRole('textbox', { name: /message/i })).toBeInTheDocument();
+    expect(screen.queryByText(/no longer a member of this group/i)).not.toBeInTheDocument();
   });
 
   it('turns read-only when the Group is closed from another tab', async () => {

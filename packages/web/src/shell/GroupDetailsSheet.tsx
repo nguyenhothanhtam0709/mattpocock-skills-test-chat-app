@@ -73,6 +73,14 @@ export function GroupDetailsSheet({
   useRealtimeEvents(
     useCallback(
       (event) => {
+        if (event.type === 'group.membership_ended') {
+          if (event.conversationId !== groupId) return;
+          setGroup(
+            (current) =>
+              current && { ...current, members: current.members.filter((m) => m.id !== user.id) },
+          );
+          return;
+        }
         if (event.type === 'group.owner_changed') {
           if (event.conversationId !== groupId) return;
           setGroup((current) => current && { ...current, ownerId: event.ownerId });

@@ -275,6 +275,11 @@ export function ConversationView({
           if (event.conversationId === conversationId) setClosedFlag(true);
           return;
         }
+        if (event.type === 'group.membership_ended') {
+          // This User's membership ended elsewhere (removed, or left on another tab).
+          if (event.conversationId === conversationId) setSelfLeft(true);
+          return;
+        }
         if (
           event.type !== 'group.member_added' &&
           event.type !== 'group.member_removed' &&
