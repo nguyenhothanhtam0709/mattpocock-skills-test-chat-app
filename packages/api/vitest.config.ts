@@ -16,6 +16,7 @@ export default defineConfig({
     globalSetup: ['./test/global-setup.ts'],
     setupFiles: ['./test/setup.ts'],
     fileParallelism: false,
+    execArgv: ['--max-old-space-size=1024'],
     testTimeout: 30_000,
     hookTimeout: 120_000,
   },

@@ -18,5 +18,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    maxWorkers: 2,
+    execArgv: ['--max-old-space-size=1024'],
   },
 });
