@@ -156,6 +156,46 @@ describe('POST /auth/register', () => {
     });
   });
 
+  it('does not rate limit registrations or logins when THROTTLE_DISABLED is true', async () => {
+    await withApp({ config: { THROTTLE_DISABLED: 'true' } }, async (app) => {
+      for (let i = 0; i < 7; i++) {
+        const ok = await register(app, {
+          ...valid,
+          username: `user_${i}`,
+          email: `user${i}@example.com`,
+        });
+        expect(ok.statusCode).toBe(201);
+      }
+
+      // Past the login limits (10 per IP, 5 per identifier): still 401, never 429.
+      for (let i = 0; i < 12; i++) {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/auth/login',
+          payload: { identifier: 'user_0', password: 'wrong password!!' },
+        });
+        expect(res.statusCode).toBe(401);
+      }
+    });
+  });
+
+  it('keeps the rate limits when THROTTLE_DISABLED is false', async () => {
+    await withApp({ config: { THROTTLE_DISABLED: 'false' } }, async (app) => {
+      for (let i = 0; i < 5; i++) {
+        const ok = await register(app, {
+          ...valid,
+          username: `user_${i}`,
+          email: `user${i}@example.com`,
+        });
+        expect(ok.statusCode).toBe(201);
+      }
+
+      const res = await register(app, { ...valid, username: 'user_6', email: 'user6@example.com' });
+
+      expect(res.statusCode).toBe(429);
+    });
+  });
+
   it('writes neither the password nor the email to the logs, on success or on conflict', async () => {
     await withApp({ config: { LOG_LEVEL: 'debug' } }, async (app, logs) => {
       const body = {

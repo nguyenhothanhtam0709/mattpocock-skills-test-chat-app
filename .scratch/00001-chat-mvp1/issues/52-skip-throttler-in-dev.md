@@ -4,13 +4,13 @@
 
 **Blocked by:** none
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] A documented switch that disables every throttler limit for local development; default stays fully enabled
-- [ ] A dedicated config option controls it (an env var parsed in `config.ts` with the existing `EnvBoolean`, default off), independent of `NODE_ENV`: the API does not read or branch on `NODE_ENV` for this
-- [ ] Tests (API harness): switch off means more than the limit of requests succeed; switch on or unset keeps today's limits (existing throttle tests pass untouched)
-- [ ] README mentions it under local-dev setup
-- [ ] No package changes (ask first if needed)
+- [x] A documented switch that disables every throttler limit for local development; default stays fully enabled
+- [x] A dedicated config option controls it (an env var parsed in `config.ts` with the existing `EnvBoolean`, default off), independent of `NODE_ENV`: the API does not read or branch on `NODE_ENV` for this
+- [x] Tests (API harness): switch off means more than the limit of requests succeed; switch on or unset keeps today's limits (existing throttle tests pass untouched)
+- [x] README mentions it under local-dev setup
+- [x] No package changes (ask first if needed)
 
 ## Questions (decide before building, no assumptions)
 
@@ -22,3 +22,5 @@
 - Requested by the user: "I think we should have a way to ignore throttler on dev mode".
 - Decision from the user: use a dedicated config to disable the throttler, not `NODE_ENV`. Open point to confirm when building: with no `NODE_ENV` guard, a deployment that sets this flag runs unthrottled, so log a startup warning when it is on (not added to the ticket's scope without the user's say-so).
 - Where the limits live: `packages/api/src/app.module.ts` (`ThrottlerModule.forRootAsync`, each throttler has a `skipIf`) and `@Throttle` on `register` and `login` in `auth.controller.ts`; `AppThrottlerGuard` is the global guard. A single `skipIf`/guard-level bypass would cover all of them.
+- Decisions from the user on the open questions: the env var is `THROTTLE_DISABLED` (`EnvBoolean`, default off); it is for a developer's `.env` only (not in any test config; tests set it per test as needed); no startup warning is logged.
+- Built: `THROTTLE_DISABLED` in `config.ts`; `AppThrottlerGuard.shouldSkip` returns true when it is on, which covers the global guard and the route-level search, send, login and register limits. Tests in `register.test.ts`; README and `.env.example` document it.

@@ -1,12 +1,22 @@
-import type { ExecutionContext } from '@nestjs/common';
+import { Inject, type ExecutionContext } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, type ThrottlerLimitDetail } from '@nestjs/throttler';
 import type { FastifyReply } from 'fastify';
+import type { Config } from '../config/config.js';
 
 /**
  * Named throttlers get a suffixed header (`Retry-After-identifier`); clients only know the
  * plain `Retry-After`, so every 429 carries that one too.
  */
 export class AppThrottlerGuard extends ThrottlerGuard {
+  @Inject(ConfigService)
+  private readonly appConfig!: ConfigService<Config, true>;
+
+  /** `THROTTLE_DISABLED` turns off every throttler (global, per-route and named). */
+  protected override async shouldSkip(context: ExecutionContext): Promise<boolean> {
+    return this.appConfig.get('THROTTLE_DISABLED', { infer: true }) || super.shouldSkip(context);
+  }
+
   protected override async throwThrottlingException(
     context: ExecutionContext,
     detail: ThrottlerLimitDetail,
