@@ -13,3 +13,5 @@
 ## Comments
 
 - From the final code review (spec axis, item 6). Also from that review, accepted as-is unless the user says otherwise: Former Members do not learn that a Group closed until a reload/reconnect (item 4), because no room remains to push to.
+
+- The spec already says "Single server process" and lists multi-instance Socket.IO adapters as out of scope (spec lines ~140, ~334); this ADR makes the reason and the scale-out path explicit and is optional beyond that. Do not edit the spec here (ticket 40).
