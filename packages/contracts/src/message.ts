@@ -39,8 +39,22 @@ export const SendDirectMessageRequestSchema = SendMessageRequestSchema.extend({
 
 export type SendDirectMessageRequest = z.input<typeof SendDirectMessageRequestSchema>;
 
-/** `text` is a Message a Member wrote; the rest are System Messages about a membership change. */
-export const MessageKindSchema = z.enum(['text', 'member_added', 'member_removed', 'member_left']);
+/** The kinds of Conversation; the one definition the API's SQL check and the schemas share. */
+export const CONVERSATION_KINDS = ['direct', 'group'] as const;
+
+export const ConversationKindSchema = z.enum(CONVERSATION_KINDS);
+
+export type ConversationKind = z.infer<typeof ConversationKindSchema>;
+
+/** The kinds of System Message: Messages about a membership change. */
+export const SYSTEM_MESSAGE_KINDS = ['member_added', 'member_removed', 'member_left'] as const;
+
+export type SystemMessageKind = (typeof SYSTEM_MESSAGE_KINDS)[number];
+
+/** `text` is a Message a Member wrote; the rest are System Messages. */
+export const MESSAGE_KINDS = ['text', ...SYSTEM_MESSAGE_KINDS] as const;
+
+export const MessageKindSchema = z.enum(MESSAGE_KINDS);
 
 export type MessageKind = z.infer<typeof MessageKindSchema>;
 
@@ -149,7 +163,7 @@ export const LAST_MESSAGE_PREVIEW_MAX = 100;
 
 export const ConversationSummarySchema = z.object({
   id: z.uuid(),
-  kind: z.enum(['direct', 'group']),
+  kind: ConversationKindSchema,
   /** For a Direct Conversation: the other User's Nickname, else their Username. */
   name: z.string(),
   members: z.array(ConversationMemberSchema),

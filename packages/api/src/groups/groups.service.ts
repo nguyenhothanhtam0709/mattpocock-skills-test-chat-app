@@ -8,6 +8,7 @@ import {
   type CreateGroupResponse,
   type GroupMembershipResponse,
   type Message,
+  type SystemMessageKind,
 } from '@chat/contracts';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -31,7 +32,7 @@ import { CommitOrder, lockConversation } from '../messages/commit-order.js';
 import { ConversationQueries } from '../messages/conversation-queries.js';
 import {
   conversationNotFound,
-  memberRow,
+  findMember,
   rejectIfClosed,
   requireGroup,
   requireMember,
@@ -39,9 +40,7 @@ import {
   requireReader,
 } from '../messages/conversation-rules.js';
 import { MessagesService } from '../messages/messages.service.js';
-import { nextSequence, only, toMessage, type Tx } from '../messages/message-rows.js';
-
-type SystemMessageKind = Exclude<Message['kind'], 'text'>;
+import { exactlyOne, nextSequence, toMessage, type Tx } from '../messages/message-rows.js';
 
 /** What leaving did, for the pushes that follow the commit. */
 interface LeaveOutcome {
@@ -91,7 +90,7 @@ export class GroupsService {
     }
 
     const id = await this.db.transaction(async (tx) => {
-      const created = only(
+      const created = exactlyOne(
         await tx
           .insert(conversations)
           .values({ kind: 'group' })
@@ -113,7 +112,11 @@ export class GroupsService {
     });
 
     const members = (await this.queries.membersOf([id])).get(id) ?? [];
-    await this.pushCreated(id, ownerId, memberIds);
+    await this.pushSafely(id, async () => {
+      for (const userId of memberIds) this.realtime.joinGroupRoom(userId, id);
+      const [conversation] = await this.queries.summaries(ownerId, id);
+      this.realtime.push(RealtimeEvent.CONVERSATION_CREATED, memberIds, { conversation }, id);
+    });
     return { conversation: { id, kind: 'group', name, ownerId, members, closed: false } };
   }
 
@@ -126,7 +129,7 @@ export class GroupsService {
       groupId,
       async (tx) => {
         await requireOwner(tx, callerId, groupId);
-        const member = await memberRow(tx, userId);
+        const member = await findMember(tx, userId);
         if (!member) {
           throw new DomainException(
             ErrorCode.USER_NOT_FOUND,
@@ -164,11 +167,11 @@ export class GroupsService {
       },
       async ({ systemMessage, member }) => {
         // The room join comes before any read that can throw, as in remove and leave.
-        this.pushSafely(groupId, () => {
+        await this.pushSafely(groupId, () => {
           this.realtime.joinGroupRoom(userId, groupId);
         });
-        const response = await this.groupAs(callerId, groupId);
-        try {
+        const response = await this.messagesService.getGroup(callerId, groupId);
+        await this.pushSafely(groupId, async () => {
           const [summary] = await this.queries.summaries(userId, groupId);
           this.realtime.push(
             RealtimeEvent.CONVERSATION_CREATED,
@@ -183,9 +186,7 @@ export class GroupsService {
           this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
             message: systemMessage,
           });
-        } catch (error) {
-          this.logPushFailure(error, groupId);
-        }
+        });
         return response;
       },
     );
@@ -208,7 +209,7 @@ export class GroupsService {
             'The Owner cannot be removed from their Group',
           );
         }
-        const member = await memberRow(tx, userId);
+        const member = await findMember(tx, userId);
         const wasMember = await dropMember(tx, groupId, userId);
         if (!wasMember || !member) return undefined;
         const systemMessage = await insertSystemMessage(
@@ -231,22 +232,16 @@ export class GroupsService {
         }
         const { removed, member } = outcome;
         // The removed User's sockets leave the room first, so they only get the ended event.
-        this.pushSafely(groupId, () => {
+        await this.pushSafely(groupId, () => {
           this.realtime.leaveGroupRoom(userId, groupId);
         });
-        const response = await this.groupAs(callerId, groupId);
-        this.pushSafely(groupId, () => {
-          this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_REMOVED, groupId, {
-            conversationId: groupId,
+        const response = await this.messagesService.getGroup(callerId, groupId);
+        await this.pushSafely(groupId, () => {
+          this.pushMembershipEnd(groupId, RealtimeEvent.GROUP_MEMBER_REMOVED, {
             member,
+            systemMessage: removed,
+            endedUserId: userId,
           });
-          this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, { message: removed });
-          this.realtime.push(
-            RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
-            [userId],
-            { conversationId: groupId },
-            groupId,
-          );
         });
         return response;
       },
@@ -266,7 +261,7 @@ export class GroupsService {
         await requireReader(tx, groupId, callerId);
         await rejectIfClosed(tx, groupId);
         await requireMember(tx, groupId, callerId, true);
-        const leaver = await memberRow(tx, callerId);
+        const leaver = await findMember(tx, callerId);
         if (!leaver) throw new Error('Expected the leaving Member to exist');
         if (!(await dropMember(tx, groupId, callerId))) throw conversationNotFound();
         const systemMessage = await insertSystemMessage(
@@ -293,11 +288,11 @@ export class GroupsService {
         return { leaver, outcome };
       },
       async ({ leaver, outcome }) => {
-        this.pushSafely(groupId, () => {
+        await this.pushSafely(groupId, () => {
           this.realtime.leaveGroupRoom(callerId, groupId);
         });
-        const response = await this.groupAs(callerId, groupId);
-        this.pushSafely(groupId, () => {
+        const response = await this.messagesService.getGroup(callerId, groupId);
+        await this.pushSafely(groupId, () => {
           if (outcome.closed) {
             this.realtime.push(
               RealtimeEvent.GROUP_CLOSED,
@@ -307,25 +302,12 @@ export class GroupsService {
             );
             return;
           }
-          this.realtime.pushToGroup(RealtimeEvent.GROUP_MEMBER_LEFT, groupId, {
-            conversationId: groupId,
+          this.pushMembershipEnd(groupId, RealtimeEvent.GROUP_MEMBER_LEFT, {
             member: leaver,
+            systemMessage: outcome.systemMessage,
+            endedUserId: callerId,
+            newOwnerId: outcome.newOwnerId,
           });
-          this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
-            message: outcome.systemMessage,
-          });
-          if (outcome.newOwnerId) {
-            this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
-              conversationId: groupId,
-              ownerId: outcome.newOwnerId,
-            });
-          }
-          this.realtime.push(
-            RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
-            [callerId],
-            { conversationId: groupId },
-            groupId,
-          );
         });
         return response;
       },
@@ -334,58 +316,64 @@ export class GroupsService {
 
   /**
    * The shared shape of a membership change. The lock comes first, then the commit-order slot,
-   * then `change` checks every rule against what is true now (so a concurrent change cannot
-   * slip past it); `after` runs once every earlier change of the Group has finished its own.
+   * then `applyChange` checks every rule against what is true now (so a concurrent change cannot
+   * slip past it); `afterCommit` runs once every earlier change of the Group has finished its own.
    */
   private changeMembership<R>(
     groupId: string,
-    change: (tx: Tx) => Promise<R>,
-    after: (result: R) => Promise<GroupMembershipResponse>,
+    applyChange: (tx: Tx) => Promise<R>,
+    afterCommit: (result: R) => Promise<GroupMembershipResponse>,
   ): Promise<GroupMembershipResponse> {
     return this.commitOrder.run(
       groupId,
-      (queue) =>
+      (takeSlot) =>
         this.db.transaction(async (tx) => {
           await lockConversation(tx, groupId);
-          queue();
-          return change(tx);
+          takeSlot();
+          return applyChange(tx);
         }),
-      after,
+      afterCommit,
     );
   }
 
-  /** The Group as the caller sees it now. */
-  private async groupAs(callerId: string, groupId: string): Promise<GroupMembershipResponse> {
-    const { conversation } = await this.messagesService.get(callerId, groupId);
-    if (conversation.kind !== 'group') throw new Error('Expected a Group conversation');
-    return { conversation };
+  /**
+   * The pushes that follow a Member's membership ending, in order: the member event, the System
+   * Message, a new Owner (when ownership passed), and last the ended event to the User it ended for.
+   */
+  private pushMembershipEnd(
+    groupId: string,
+    event: typeof RealtimeEvent.GROUP_MEMBER_REMOVED | typeof RealtimeEvent.GROUP_MEMBER_LEFT,
+    ended: {
+      member: ConversationMember;
+      systemMessage: Message;
+      endedUserId: string;
+      newOwnerId?: string | undefined;
+    },
+  ): void {
+    this.realtime.pushToGroup(event, groupId, { conversationId: groupId, member: ended.member });
+    this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
+      message: ended.systemMessage,
+    });
+    if (ended.newOwnerId) {
+      this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
+        conversationId: groupId,
+        ownerId: ended.newOwnerId,
+      });
+    }
+    this.realtime.push(
+      RealtimeEvent.GROUP_MEMBERSHIP_ENDED,
+      [ended.endedUserId],
+      { conversationId: groupId },
+      groupId,
+    );
   }
 
   /** Pushes are best-effort (ADR-0001): a failure is logged, never surfaced. */
-  private pushSafely(groupId: string, push: () => void): void {
+  private async pushSafely(groupId: string, push: () => void | Promise<void>): Promise<void> {
     try {
-      push();
+      await push();
     } catch (error) {
-      this.logPushFailure(error, groupId);
-    }
-  }
-
-  private logPushFailure(error: unknown, conversationId: string): void {
-    this.logger.error({ err: error, conversationId }, 'socket push failed');
-  }
-
-  private async pushCreated(conversationId: string, ownerId: string, memberIds: string[]) {
-    try {
-      for (const userId of memberIds) this.realtime.joinGroupRoom(userId, conversationId);
-      const [conversation] = await this.queries.summaries(ownerId, conversationId);
-      this.realtime.push(
-        RealtimeEvent.CONVERSATION_CREATED,
-        memberIds,
-        { conversation },
-        conversationId,
-      );
-    } catch (error) {
-      this.logPushFailure(error, conversationId);
+      this.logger.error({ err: error, conversationId: groupId }, 'socket push failed');
     }
   }
 }
@@ -450,7 +438,7 @@ async function insertSystemMessage(
   subject: ConversationMember,
   kind: SystemMessageKind,
 ): Promise<Message> {
-  const row = only(
+  const row = exactlyOne(
     await tx
       .insert(messages)
       .values({

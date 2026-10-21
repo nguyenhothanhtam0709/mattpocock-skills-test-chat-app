@@ -14,25 +14,25 @@ export class CommitOrder {
   private readonly slots = new KeyedSerializer();
 
   /**
-   * Runs a transaction that calls `queue()` right after taking the Conversation lock, then
-   * `after` with its result, once every earlier change of the Conversation has finished its
-   * own `after`. Room changes and pushes therefore happen in commit order: a Message is never
+   * Runs a transaction that calls `takeSlot()` right after taking the Conversation lock, then
+   * `afterCommit` with its result, once every earlier change of the Conversation has finished its
+   * own `afterCommit`. Room changes and pushes therefore happen in commit order: a Message is never
    * pushed between a membership commit and its room change.
    */
   async run<R, T>(
     conversationId: string,
-    transaction: (queue: () => void) => Promise<R>,
-    after: (result: R) => Promise<T>,
+    transaction: (takeSlot: () => void) => Promise<R>,
+    afterCommit: (result: R) => Promise<T>,
   ): Promise<T> {
-    const held: { slot?: Slot } = {};
+    const turnHolder: { slot?: Slot } = {};
     try {
       const result = await transaction(() => {
-        held.slot = this.slots.enter(conversationId);
+        turnHolder.slot = this.slots.enter(conversationId);
       });
-      await held.slot?.turn;
-      return await after(result);
+      await turnHolder.slot?.turn;
+      return await afterCommit(result);
     } finally {
-      held.slot?.release();
+      turnHolder.slot?.release();
     }
   }
 }
