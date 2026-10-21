@@ -50,7 +50,12 @@ type LeaveOutcome =
       /** Everyone who was ever a Member, who all hear of the closing. */
       notify: string[];
     }
-  | { kind: 'open'; systemMessage: Message; newOwnerId: string | undefined };
+  | {
+      kind: 'open';
+      systemMessage: Message;
+      /** Set when the leaver was the Owner: "<new Owner> is now the Owner". */
+      ownerChange: { newOwnerId: string; systemMessage: Message } | undefined;
+    };
 
 /**
  * Group lifecycle: create, add, remove, leave. Add, remove and leave share one shape: lock the
@@ -280,13 +285,26 @@ export class GroupsService {
         if (!successor) {
           outcome = { kind: 'closed', systemMessage, notify: await everMembers(tx, groupId) };
         } else if (group.ownerId !== callerId) {
-          outcome = { kind: 'open', systemMessage, newOwnerId: undefined };
+          outcome = { kind: 'open', systemMessage, ownerChange: undefined };
         } else {
           await tx
             .update(groups)
             .set({ ownerId: successor })
             .where(eq(groups.conversationId, groupId));
-          outcome = { kind: 'open', systemMessage, newOwnerId: successor };
+          const newOwner = await findMember(tx, successor);
+          if (!newOwner) throw new Error('Expected the new Owner to exist');
+          const ownerMessage = await insertSystemMessage(
+            tx,
+            groupId,
+            callerId,
+            newOwner,
+            'owner_changed',
+          );
+          outcome = {
+            kind: 'open',
+            systemMessage,
+            ownerChange: { newOwnerId: successor, systemMessage: ownerMessage },
+          };
         }
         return { leaver, outcome };
       },
@@ -310,7 +328,7 @@ export class GroupsService {
             member: leaver,
             systemMessage: outcome.systemMessage,
             endedUserId: callerId,
-            newOwnerId: outcome.newOwnerId,
+            ownerChange: outcome.ownerChange,
           });
         });
         return response;
@@ -342,7 +360,7 @@ export class GroupsService {
 
   /**
    * The pushes that follow a Member's membership ending, in order: the member event, the System
-   * Message, a new Owner (when ownership passed), and last the ended event to the User it ended for.
+   * Message, the new Owner's System Message and event (when ownership passed), and last the ended event to the User it ended for.
    */
   private pushMembershipEnd(
     groupId: string,
@@ -351,17 +369,20 @@ export class GroupsService {
       member: ConversationMember;
       systemMessage: Message;
       endedUserId: string;
-      newOwnerId?: string | undefined;
+      ownerChange?: { newOwnerId: string; systemMessage: Message } | undefined;
     },
   ): void {
     this.realtime.pushToGroup(event, groupId, { conversationId: groupId, member: ended.member });
     this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
       message: ended.systemMessage,
     });
-    if (ended.newOwnerId) {
+    if (ended.ownerChange) {
+      this.realtime.pushToGroup(RealtimeEvent.MESSAGE_CREATED, groupId, {
+        message: ended.ownerChange.systemMessage,
+      });
       this.realtime.pushToGroup(RealtimeEvent.GROUP_OWNER_CHANGED, groupId, {
         conversationId: groupId,
-        ownerId: ended.newOwnerId,
+        ownerId: ended.ownerChange.newOwnerId,
       });
     }
     this.realtime.push(

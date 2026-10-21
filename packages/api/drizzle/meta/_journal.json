@@ -99,6 +99,13 @@
       "when": 1792584310020,
       "tag": "0013_faithful_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792595399152,
+      "tag": "0014_wealthy_the_santerians",
+      "breakpoints": true
     }
   ]
 }

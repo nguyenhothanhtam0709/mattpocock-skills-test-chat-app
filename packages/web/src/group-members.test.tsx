@@ -159,7 +159,7 @@ describe('Group details', () => {
 
 const systemMessage = (
   sequence: number,
-  kind: 'member_added' | 'member_removed' | 'member_left',
+  kind: 'member_added' | 'member_removed' | 'member_left' | 'owner_changed',
   subject: { id: string; username: string; nickname: string | null },
 ) => ({
   id: `0198a2b4-7c3e-7a52-9f31-5d2f4c1e9${String(sequence).padStart(3, '0')}`,
@@ -180,7 +180,8 @@ describe('System Messages', () => {
       http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
         HttpResponse.json({
           messages: [
-            systemMessage(3, 'member_left', carol),
+            systemMessage(4, 'owner_changed', carol),
+            systemMessage(3, 'member_left', dave),
             systemMessage(2, 'member_removed', dave),
           ],
           hasMore: false,
@@ -192,7 +193,8 @@ describe('System Messages', () => {
     await user.click(await screen.findByRole('button', { name: /Book Club/ }));
 
     expect(await screen.findByText('dave was removed')).toBeInTheDocument();
-    expect(screen.getByText('carol left')).toBeInTheDocument();
+    expect(screen.getByText('dave left')).toBeInTheDocument();
+    expect(screen.getByText('carol is now the Owner')).toBeInTheDocument();
   });
 
   it('shows a pushed System Message once, and keeps the Member count current from the membership events', async () => {
