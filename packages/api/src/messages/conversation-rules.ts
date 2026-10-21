@@ -81,9 +81,9 @@ export async function requireMember(
 }
 
 /**
- * Passes only when `callerId` is the current Owner of an open Group; throws otherwise: 404 if it is not a Group or the caller was never a Member (or is a Former
- * Member), `GROUP_CLOSED` (409) if it is closed, `NOT_GROUP_OWNER` (403) if the caller is a
- * Member but not the Owner.
+ * Passes only when `callerId` is the current Owner of an open Group; throws otherwise: 404 if
+ * it is not a Group or the caller was never a Member (or is a Former Member), `GROUP_CLOSED`
+ * (409) if it is closed, `NOT_GROUP_OWNER` (403) if the caller is a Member but not the Owner.
  */
 export async function requireOwner(q: Reader, callerId: string, groupId: string): Promise<void> {
   const [group] = await q

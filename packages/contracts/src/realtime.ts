@@ -16,7 +16,7 @@ export const RealtimeEvent = {
 
 export type RealtimeEventName = (typeof RealtimeEvent)[keyof typeof RealtimeEvent];
 
-/** Pushed to every Member's User room, the sender's included, after the Message is saved. */
+/** Pushed to every Member, the sender's included, after the Message is saved. */
 export const MessageCreatedEventSchema = z.object({ message: MessageSchema });
 
 export type MessageCreatedEvent = z.infer<typeof MessageCreatedEventSchema>;
