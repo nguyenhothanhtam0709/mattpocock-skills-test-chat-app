@@ -170,4 +170,59 @@ describe('stored system messages', () => {
       expect(aliceTab.received.filter(([name]) => name === 'message.created')).toHaveLength(1);
     });
   });
+
+  it('stores "owner changed" right after the Owner\'s "left", for the remaining Members and not the leaver', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      await leave(app, alice, group.id);
+      await post(app, bob, group.id, 'now I am in charge');
+
+      expect(await timeline(app, bob, group.id)).toEqual([
+        ['member_left', 'Alice'],
+        ['owner_changed', 'Bob'],
+        ['text', 'now I am in charge'],
+      ]);
+      expect(await timeline(app, alice, group.id)).toEqual([['member_left', 'Alice']]);
+      const changed = GetMessagesResponseSchema.parse(
+        (await history(app, bob, group.id)).json(),
+      ).messages.find((m) => m.kind === 'owner_changed');
+      expect(changed?.senderId).toBe(alice.id);
+      expect(changed?.body).toBe('');
+    });
+  });
+
+  it('stores no "owner changed" when a non-Owner leaves or the last Member closes the Group', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      await leave(app, bob, group.id);
+      await leave(app, alice, group.id);
+
+      expect(await timeline(app, alice, group.id)).toEqual([
+        ['member_left', 'Bob'],
+        ['member_left', 'Alice'],
+      ]);
+    });
+  });
+
+  it('pushes the "owner changed" System Message to the remaining Members, after "left"', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      const url = await listenOnRandomPort(app);
+      const bobTab = await connectSocket(url, bob.token);
+      const first = bobTab.next('message.created');
+
+      await leave(app, alice, group.id);
+
+      expect(MessageCreatedEventSchema.parse(await first).message.kind).toBe('member_left');
+      const second = MessageCreatedEventSchema.parse(await bobTab.next('message.created'));
+      expect(second.message.kind).toBe('owner_changed');
+      expect(second.message.subject?.username).toBe('Bob');
+    });
+  });
 });

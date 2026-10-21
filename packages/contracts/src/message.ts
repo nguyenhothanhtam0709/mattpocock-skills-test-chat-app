@@ -47,8 +47,16 @@ export const ConversationKindSchema = z.enum(CONVERSATION_KINDS);
 
 export type ConversationKind = z.infer<typeof ConversationKindSchema>;
 
-/** The kinds of System Message: Messages about a membership change. */
-export const SYSTEM_MESSAGE_KINDS = ['member_added', 'member_removed', 'member_left'] as const;
+/**
+ * The kinds of System Message: Messages about a membership change. `owner_changed` is about the
+ * new Owner, stored right after the "left" of the Owner who passed ownership on.
+ */
+export const SYSTEM_MESSAGE_KINDS = [
+  'member_added',
+  'member_removed',
+  'member_left',
+  'owner_changed',
+] as const;
 
 export type SystemMessageKind = (typeof SYSTEM_MESSAGE_KINDS)[number];
 
@@ -62,7 +70,7 @@ export type MessageKind = z.infer<typeof MessageKindSchema>;
 export const MessageSchema = z.object({
   id: z.uuid(),
   conversationId: z.uuid(),
-  /** For a System Message: whoever made the change (the Owner, or the Member who left). */
+  /** For a System Message: whoever made the change (the Owner, or the Member who left; for `owner_changed`, the Owner who left). */
   senderId: z.uuid(),
   sequence: z.number().int().positive(),
   clientMessageId: z.uuid(),

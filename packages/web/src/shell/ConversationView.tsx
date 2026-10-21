@@ -72,6 +72,7 @@ const SYSTEM_MESSAGE_VERBS: Record<SystemMessageKind, string> = {
   member_added: 'was added',
   member_removed: 'was removed',
   member_left: 'left',
+  owner_changed: 'is now the Owner',
 };
 
 /** The systemMessage's text, or undefined for a Message a Member wrote. */
