@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -160,6 +160,57 @@ describe('the Member count', () => {
 
     state.members = [aliceMember, bob, carol];
     act(() => fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol }));
+
+    expect(await screen.findByText('3 members')).toBeInTheDocument();
+  });
+});
+
+describe('the Member count for a Member who did not cause the change', () => {
+  it('matches the details panel after each of added, removed and left', async () => {
+    const state: ServerGroup = { members: [aliceMember, bob], closed: false, isMember: true };
+    serverWith(state);
+    const { user, fake } = await openGroup();
+    await screen.findByText('2 members');
+    await user.click(screen.getByRole('button', { name: 'Group details' }));
+    const panel = await screen.findByRole('list', { name: 'Members' });
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
+
+    state.members = [aliceMember, bob, carol];
+    act(() => fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol }));
+    expect(await screen.findByText('3 members')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Members' })).getAllByRole('listitem'),
+    ).toHaveLength(3);
+
+    state.members = [aliceMember, bob];
+    act(() => fake.emit({ type: 'group.member_removed', conversationId: groupId, member: carol }));
+    expect(await screen.findByText('2 members')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Members' })).getAllByRole('listitem'),
+    ).toHaveLength(2);
+
+    state.members = [aliceMember];
+    act(() => fake.emit({ type: 'group.member_left', conversationId: groupId, member: bob }));
+    expect(await screen.findByText('1 member')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Members' })).getAllByRole('listitem'),
+    ).toHaveLength(1);
+  });
+});
+
+describe('the Member count of a Group opened after a change', () => {
+  it('is the server count even though the list was loaded before the change', async () => {
+    const state: ServerGroup = { members: [aliceMember, bob], closed: false, isMember: true };
+    serverWith(state);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    const user = userEvent.setup();
+    const entry = await screen.findByRole('button', { name: /Book Club/ });
+
+    // Nothing is open, so the list is not told about the change.
+    state.members = [aliceMember, bob, carol];
+    act(() => fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol }));
+    await user.click(entry);
 
     expect(await screen.findByText('3 members')).toBeInTheDocument();
   });
