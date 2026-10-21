@@ -14,4 +14,6 @@ pnpm test           # every package's tests (API tests start Postgres via Testco
 pnpm lint && pnpm typecheck
 ```
 
+The API's rate limits are held in memory, so repeated logins during local work can hit `429 RATE_LIMITED`. Set `THROTTLE_DISABLED=true` in `packages/api/.env` and restart the API to turn off every limit (default `false`; never set it in a deployment).
+
 Set `TEST_DATABASE_URL` to run API tests against an existing Postgres instead of Testcontainers. After changing `packages/api/src/db/schema.ts`, run `pnpm db:generate` and commit the new migration.

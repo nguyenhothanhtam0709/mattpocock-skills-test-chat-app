@@ -74,6 +74,8 @@ export const ConfigSchema = z.object({
   /** Default rate limit: THROTTLE_LIMIT requests per THROTTLE_TTL_MS per client. */
   THROTTLE_LIMIT: z.coerce.number().int().min(1).default(120),
   THROTTLE_TTL_MS: z.coerce.number().int().min(1).default(60_000),
+  /** Local development only: turns off every rate limit (global, login, register, search, send). */
+  THROTTLE_DISABLED: EnvBoolean.default(false),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
