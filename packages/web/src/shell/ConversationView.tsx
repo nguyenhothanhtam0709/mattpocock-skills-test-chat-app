@@ -272,11 +272,11 @@ export function ConversationView({
       const result = await getGroup(conversationId);
       if (!result.ok || mine !== refreshes.current) return;
       const { group } = result;
-      setInfo((current) => ({
+      setInfo({
         memberCount: group.members.length,
         closed: group.closed,
-        isMember: group.closed ? false : (current?.isMember ?? false),
-      }));
+        isMember: group.isMember,
+      });
     })();
   }, [conversationId, isGroup, getGroup]);
 

@@ -52,7 +52,12 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>, isMember = true) {
       }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
-      HttpResponse.json({ conversation: current }),
+      HttpResponse.json({
+        conversation: {
+          ...current,
+          isMember: isMember && current.members.some((m) => (m as { id: string }).id === alice.id),
+        },
+      }),
     ),
     http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
       HttpResponse.json({ messages: [], hasMore: false }),
@@ -182,7 +187,17 @@ describe('Members leaving, seen by the others', () => {
   it('turns the open view read-only, drops Leave, and reloads the list when group.membership_ended arrives', async () => {
     signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     let listLoads = 0;
+    let ended = false;
     server.use(
+      http.get(`*/api/v1/conversations/${groupId}`, () =>
+        HttpResponse.json({
+          conversation: {
+            ...groupOwnedBy(bob.id, ended ? [bob] : [aliceMember, bob]),
+            isMember: !ended,
+            closed: false,
+          },
+        }),
+      ),
       http.get('*/api/v1/conversations', () => {
         listLoads += 1;
         const stillMember = listLoads === 1;
@@ -202,6 +217,7 @@ describe('Members leaving, seen by the others', () => {
     const sheet = await openDetails(user);
     await within(sheet).findByRole('button', { name: /leave group/i });
 
+    ended = true;
     act(() => fake.emit({ type: 'group.membership_ended', conversationId: groupId }));
 
     expect(await screen.findByText(/no longer a member of this group/i)).toBeInTheDocument();
@@ -228,9 +244,21 @@ describe('Members leaving, seen by the others', () => {
 
   it('turns read-only when the Group is closed from another tab', async () => {
     signedIn(groupOwnedBy(alice.id, [aliceMember]));
+    let closed = false;
+    server.use(
+      http.get(`*/api/v1/conversations/${groupId}`, () =>
+        HttpResponse.json({
+          conversation: {
+            ...groupOwnedBy(alice.id, closed ? [] : [aliceMember]),
+            isMember: !closed,
+          },
+        }),
+      ),
+    );
     const { fake } = await openGroup();
     await screen.findByRole('textbox', { name: /message/i });
 
+    closed = true;
     act(() => fake.emit({ type: 'group.closed', conversationId: groupId }));
 
     expect(await screen.findByText(/this group is closed/i)).toBeInTheDocument();

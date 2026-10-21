@@ -120,6 +120,41 @@ describe('real-time push in the SPA', () => {
     expect(screen.getAllByRole('button', { name: /Bob/ })).toHaveLength(1);
   });
 
+  it('replaces a stale entry when conversation.created arrives for an ID already listed', async () => {
+    const stale = {
+      ...summary(withBob, bob, 'hi alice', '2020-03-05T10:00:00Z'),
+      kind: 'group' as const,
+      name: 'Book Club',
+      members: [],
+      isMember: false,
+    };
+    signedIn([stale]);
+    server.use(
+      http.get(`*/api/v1/conversations/${withBob}`, () =>
+        HttpResponse.json({
+          conversation: { ...stale, ownerId: bob.id, members: [aliceMember, bob], isMember: true },
+        }),
+      ),
+      http.get(`*/api/v1/conversations/${withBob}/messages`, () =>
+        HttpResponse.json({ messages: [], hasMore: false }),
+      ),
+    );
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await screen.findByRole('button', { name: /Book Club/ });
+
+    act(() =>
+      fake.emit({
+        type: 'conversation.created',
+        conversation: { ...stale, members: [aliceMember, bob], isMember: true },
+      }),
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Book Club/ }));
+    expect(await screen.findByRole('textbox', { name: /message/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Book Club/ })).toHaveLength(1);
+  });
+
   it('reloads the list when a Message arrives for a Conversation it does not know', async () => {
     let listed: unknown[] = [];
     signedIn([]);
