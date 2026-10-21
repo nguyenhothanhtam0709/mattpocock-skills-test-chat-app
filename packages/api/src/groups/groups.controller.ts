@@ -10,13 +10,13 @@ import {
 import { Auth, AuthGuard, type AuthContext } from '../auth/auth.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { z } from 'zod';
-import { MessagesService } from '../messages/messages.service.js';
+import { GroupsService } from './groups.service.js';
 
 const IdPipe = new ZodValidationPipe(z.uuid());
 
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(private readonly groups: GroupsService) {}
 
   /** The caller becomes the Owner and a Member; `memberIds` are the other initial Members. */
   @Post()
@@ -26,7 +26,7 @@ export class GroupsController {
     @Auth() auth: AuthContext,
     @Body(new ZodValidationPipe(CreateGroupRequestSchema)) body: CreateGroupRequest,
   ): Promise<CreateGroupResponse> {
-    return this.messages.createGroup(auth.userId, body);
+    return this.groups.create(auth.userId, body);
   }
 
   /** Owner only; the User is a Member at once. */
@@ -38,7 +38,7 @@ export class GroupsController {
     @Param('id', IdPipe) groupId: string,
     @Body(new ZodValidationPipe(AddGroupMemberRequestSchema)) body: AddGroupMemberRequest,
   ): Promise<GroupMembershipResponse> {
-    return this.messages.addGroupMember(auth.userId, groupId, body.userId);
+    return this.groups.addMember(auth.userId, groupId, body.userId);
   }
 
   /** Owner only; the Owner cannot remove themselves. */
@@ -49,7 +49,7 @@ export class GroupsController {
     @Param('id', IdPipe) groupId: string,
     @Param('userId', IdPipe) userId: string,
   ): Promise<GroupMembershipResponse> {
-    return this.messages.removeGroupMember(auth.userId, groupId, userId);
+    return this.groups.removeMember(auth.userId, groupId, userId);
   }
 
   /** Any Member may leave; ownership passes on and the last Member to leave closes the Group. */
@@ -60,6 +60,6 @@ export class GroupsController {
     @Auth() auth: AuthContext,
     @Param('id', IdPipe) groupId: string,
   ): Promise<GroupMembershipResponse> {
-    return this.messages.leaveGroup(auth.userId, groupId);
+    return this.groups.leave(auth.userId, groupId);
   }
 }

@@ -14,9 +14,8 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { displayName } from './conversation-target';
 import { UserSearchCombobox } from './NewConversationDialog';
-
-const displayName = (user: UserSearchResult): string => user.nickname ?? user.username;
 
 function NewGroupForm({ onCreated }: { onCreated: (group: Group) => void }) {
   const { createGroup } = useAuth();

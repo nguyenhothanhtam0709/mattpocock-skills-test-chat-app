@@ -12,6 +12,9 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+/** The values `messages.kind` may hold (also enforced by `messages_kind_check`). */
+const MESSAGE_KINDS = ['text', 'member_added', 'member_removed', 'member_left'] as const;
+
 /**
  * A registered person. Username and email are stored exactly as typed; the unique indexes
  * on their lowercased form make uniqueness case-insensitive.
@@ -194,7 +197,7 @@ export const messages = pgTable(
     clientMessageId: uuid('client_message_id')
       .notNull()
       .default(sql`gen_random_uuid()`),
-    kind: text('kind').notNull().default('text'),
+    kind: text('kind', { enum: MESSAGE_KINDS }).notNull().default('text'),
     body: text('body').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -217,7 +220,7 @@ export const messages = pgTable(
  * the composite foreign key keeps it equal to the message's kind, and the check keeps it away
  * from `text`. It also enforces that a note's `body` is empty (`messages_note_body_check`).
  * It cannot enforce "if" (every note-kind message has a row here): that needs a deferred
- * constraint trigger, which this project does not use, so `insertNote` in the messages
+ * constraint trigger, which this project does not use, so `insertNote` in the groups
  * service, which writes both rows in one transaction, is the only guard for that direction.
  */
 export const membershipNotes = pgTable(
