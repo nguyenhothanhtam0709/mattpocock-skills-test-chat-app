@@ -83,11 +83,18 @@ export class ConversationQueries {
     const members = await this.membersOf(rows.map((r) => r.id));
     return rows.map((row) => {
       const all = members.get(row.id) ?? [];
-      const other = all.find((m) => m.id !== userId) ?? all[0];
+      let name = row.groupName;
+      if (name === null) {
+        const other = all.find((m) => m.id !== userId);
+        if (other === undefined) {
+          throw new Error(`Invariant violated: Direct Conversation ${row.id} has no other Member`);
+        }
+        name = other.nickname ?? other.username;
+      }
       return {
         id: row.id,
         kind: row.groupName === null ? ('direct' as const) : ('group' as const),
-        name: row.groupName ?? (other ? (other.nickname ?? other.username) : ''),
+        name,
         // A Former Member of a Group sees no Members (who joined later is not theirs to know).
         members: row.groupName !== null && !row.isMember ? [] : all,
         isMember: row.isMember,

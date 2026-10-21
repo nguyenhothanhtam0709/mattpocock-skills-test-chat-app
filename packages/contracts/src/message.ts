@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { codePointOf } from './code-point.js';
 import { UserSearchResultSchema } from './user.js';
 
 export const MESSAGE_BODY_MAX = 4000;
@@ -17,7 +18,7 @@ export const MessageBodySchema = z.string().refine(
     return (
       chars.length <= MESSAGE_BODY_MAX &&
       value.trim() !== '' &&
-      !chars.some((char) => isForbiddenControl(char.codePointAt(0) ?? 0))
+      !chars.some((char) => isForbiddenControl(codePointOf(char)))
     );
   },
   { message: `must be 1-${MESSAGE_BODY_MAX} characters of text, not blank` },

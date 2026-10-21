@@ -11,7 +11,9 @@ import {
   type LoginResponse,
 } from '@chat/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { PG_POOL } from '../db/database.module.js';
 import { withApp } from '../../test/app-harness.js';
 
 const password = 'correct horse battery';
@@ -541,6 +543,23 @@ describe('GET /conversations', () => {
       expect(conversations[1]!.lastMessage?.preview).toBe('carol here');
       expect(conversations[0]!.members.map((m) => m.id).sort()).toEqual([alice.id, bob.id].sort());
       expect(JSON.stringify(res.json())).not.toContain('@example.com');
+    });
+  });
+
+  it('fails loudly (500) instead of inventing a name when a Direct Conversation has no other Member', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      await sendDirect(app, alice, { recipientId: bob.id });
+      // Impossible through the API: a Direct Conversation always has both Members.
+      await app
+        .get<Pool>(PG_POOL)
+        .query('delete from conversation_members where user_id = $1', [bob.id]);
+
+      const res = await listConversations(app, alice);
+
+      expect(res.statusCode).toBe(500);
+      expect(ErrorResponseSchema.parse(res.json()).error.code).toBe(ErrorCode.INTERNAL_ERROR);
     });
   });
 
