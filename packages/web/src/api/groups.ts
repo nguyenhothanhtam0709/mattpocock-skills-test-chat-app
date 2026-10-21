@@ -100,6 +100,9 @@ async function changeMembers(
   if (code === ErrorCode.NOT_GROUP_OWNER) {
     return { ok: false, error: 'Only the Owner can change the Members.' };
   }
+  if (code === ErrorCode.OWNER_CANNOT_BE_REMOVED) {
+    return { ok: false, error: 'The Owner cannot be removed from their Group.' };
+  }
   if (code === ErrorCode.NOT_A_MEMBER) return { ok: false, error: 'They are no longer a Member.' };
   return { ok: false, error: GENERIC_ERROR };
 }

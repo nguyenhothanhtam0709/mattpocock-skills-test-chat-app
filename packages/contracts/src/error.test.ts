@@ -19,6 +19,7 @@ describe('ErrorCode', () => {
       'NOT_GROUP_OWNER',
       'ALREADY_A_MEMBER',
       'GROUP_FULL',
+      'OWNER_CANNOT_BE_REMOVED',
       'GROUP_CLOSED',
       'CANNOT_MESSAGE_SELF',
       'RATE_LIMITED',

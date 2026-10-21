@@ -1,6 +1,7 @@
 import { SearchUsersQuerySchema, type UserSearchResult } from '@chat/contracts';
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
+import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
@@ -8,8 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 const DEBOUNCE_MS = 200;
 
@@ -50,7 +49,7 @@ function useUserSearch(query: string): SearchState {
   return state;
 }
 
-/** Username-prefix search with a keyboard-navigable result list; `onPick` gets the chosen User. */
+/** Username-prefix search in a `Command` list; `onPick` gets the chosen User. */
 export function UserSearchCombobox({
   onPick,
   autoFocus = true,
@@ -59,89 +58,51 @@ export function UserSearchCombobox({
   autoFocus?: boolean;
 }) {
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
-  const listId = useId();
   const state = useUserSearch(query);
   const users = state.status === 'done' ? state.users : [];
 
-  function onKeyDown(e: KeyboardEvent) {
-    if (users.length === 0) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActive((i) => (i + 1) % users.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActive((i) => (i - 1 + users.length) % users.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const picked = users[active];
-      if (picked) onPick(picked);
-    }
-  }
-
   return (
-    <div className="grid gap-2">
-      <Input
-        role="combobox"
-        aria-expanded={users.length > 0}
-        aria-controls={listId}
-        aria-activedescendant={users.length > 0 ? `${listId}-${active}` : undefined}
-        aria-autocomplete="list"
+    // The server does the matching and ranking, so cmdk's own filtering is off.
+    <Command shouldFilter={false} className="border">
+      <CommandInput
         aria-label="Username"
         placeholder="Search by Username"
         autoComplete="off"
         autoFocus={autoFocus}
         value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setActive(0);
-        }}
-        onKeyDown={onKeyDown}
+        onValueChange={setQuery}
       />
-      <div className="min-h-24 text-sm">
+      <CommandList aria-label="Matching users" className="min-h-24">
         {state.status === 'idle' && (
-          <p className="p-2 text-muted-foreground">Type at least 2 characters to search.</p>
+          <p className="p-2 text-sm text-muted-foreground">Type at least 2 characters to search.</p>
         )}
         {state.status === 'loading' && (
-          <p role="status" className="p-2 text-muted-foreground">
+          <p role="status" className="p-2 text-sm text-muted-foreground">
             Searching…
           </p>
         )}
         {state.status === 'error' && (
-          <p role="alert" className="p-2 text-destructive">
+          <p role="alert" className="p-2 text-sm text-destructive">
             {state.error}
           </p>
         )}
         {state.status === 'done' && users.length === 0 && (
-          <p className="p-2 text-muted-foreground">No users found.</p>
+          <p className="p-2 text-sm text-muted-foreground">No users found.</p>
         )}
-        <ul id={listId} role="listbox" aria-label="Matching users" className="grid gap-0.5">
-          {users.map((u, i) => (
-            <li
-              key={u.id}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              className={cn(
-                'flex cursor-pointer items-baseline gap-2 rounded-md px-2 py-1.5',
-                i === active && 'bg-accent text-accent-foreground',
-              )}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => onPick(u)}
-            >
-              {u.nickname !== null ? (
-                <>
-                  <span className="font-medium">{u.nickname}</span>
-                  <span className="text-muted-foreground">@{u.username}</span>
-                </>
-              ) : (
-                <span className="font-medium">{u.username}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+        {users.map((u) => (
+          <CommandItem key={u.id} value={u.id} onSelect={() => onPick(u)}>
+            {u.nickname !== null ? (
+              <>
+                <span className="font-medium">{u.nickname}</span>
+                <span className="text-muted-foreground">@{u.username}</span>
+              </>
+            ) : (
+              <span className="font-medium">{u.username}</span>
+            )}
+          </CommandItem>
+        ))}
+      </CommandList>
+    </Command>
   );
 }
 
