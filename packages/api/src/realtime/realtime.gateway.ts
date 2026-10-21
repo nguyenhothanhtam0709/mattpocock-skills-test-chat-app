@@ -33,7 +33,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
   afterInit(server: Server): void {
     server.use((socket, next) => {
-      void this.authenticate(socket).then(next);
+      void this.authenticate(socket).then((error) => {
+        next(error);
+        if (!error) return;
+        // Socket.IO sends the `connect_error` packet on the next tick after `next(error)`, and
+        // skips it if the connection is no longer open. So close afterwards. `close()` without
+        // discarding waits for the write buffer to drain, so the client still gets the error.
+        // `socket.disconnect(true)` is a no-op here: the socket never connected.
+        setImmediate(() => socket.client.conn.close());
+      });
     });
   }
 
