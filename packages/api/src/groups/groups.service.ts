@@ -45,7 +45,8 @@ import { exactlyOne, nextSequence, toMessage, type Tx } from '../messages/messag
 /** What leaving did, for the pushes that follow the commit. */
 interface LeaveOutcome {
   systemMessage: Message;
-  closed: boolean;
+  /** Set when the Group closed: everyone who was ever a Member, who all hear of it. */
+  closedFor: string[] | undefined;
   newOwnerId: string | undefined;
 }
 
@@ -275,15 +276,19 @@ export class GroupsService {
         const successor = await successorOwner(tx, groupId);
         let outcome: LeaveOutcome;
         if (!successor) {
-          outcome = { systemMessage, closed: true, newOwnerId: undefined };
+          outcome = {
+            systemMessage,
+            closedFor: await everMembers(tx, groupId),
+            newOwnerId: undefined,
+          };
         } else if (group.ownerId !== callerId) {
-          outcome = { systemMessage, closed: false, newOwnerId: undefined };
+          outcome = { systemMessage, closedFor: undefined, newOwnerId: undefined };
         } else {
           await tx
             .update(groups)
             .set({ ownerId: successor })
             .where(eq(groups.conversationId, groupId));
-          outcome = { systemMessage, closed: false, newOwnerId: successor };
+          outcome = { systemMessage, closedFor: undefined, newOwnerId: successor };
         }
         return { leaver, outcome };
       },
@@ -293,10 +298,11 @@ export class GroupsService {
         });
         const response = await this.messagesService.getGroup(callerId, groupId);
         await this.pushSafely(groupId, () => {
-          if (outcome.closed) {
+          if (outcome.closedFor) {
+            // Former Members are no longer in the Group room, so this goes to their User rooms.
             this.realtime.push(
               RealtimeEvent.GROUP_CLOSED,
-              [callerId],
+              outcome.closedFor,
               { conversationId: groupId },
               groupId,
             );
@@ -408,6 +414,15 @@ async function endPeriod(tx: Tx, groupId: string, userId: string, endSequence: n
         eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
       ),
     );
+}
+
+/** Every User who has a membership period in the Group, current or former (at most 256). */
+async function everMembers(tx: Tx, groupId: string): Promise<string[]> {
+  const rows = await tx
+    .selectDistinct({ userId: membershipPeriods.userId })
+    .from(membershipPeriods)
+    .where(eq(membershipPeriods.conversationId, groupId));
+  return rows.map((r) => r.userId);
 }
 
 /** The Member whose open period began first (ties: lowest User ID), if any is left. */

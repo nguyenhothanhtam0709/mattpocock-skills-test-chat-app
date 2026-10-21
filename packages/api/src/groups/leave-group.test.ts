@@ -247,6 +247,36 @@ describe('POST /groups/:id/leave', () => {
     });
   });
 
+  it('pushes group.closed to Former Members, who left or were removed earlier', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const carol = await signUp(app, 'Carol');
+      const group = await createGroup(app, alice, [bob.id, carol.id]);
+      await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/groups/${group.id}/members/${bob.id}`,
+        headers: bearer(alice),
+      });
+      await leave(app, carol, group.id);
+      const url = await listenOnRandomPort(app);
+      const bobSocket = await connectSocket(url, bob.token);
+      const carolSocket = await connectSocket(url, carol.token);
+      const bobClosed = bobSocket.next('group.closed');
+      const carolClosed = carolSocket.next('group.closed');
+
+      await leave(app, alice, group.id);
+
+      expect(GroupClosedEventSchema.parse(await bobClosed)).toEqual({ conversationId: group.id });
+      expect(GroupClosedEventSchema.parse(await carolClosed)).toEqual({
+        conversationId: group.id,
+      });
+      await settle();
+      expect(bobSocket.received.map(([name]) => name)).toEqual(['group.closed']);
+      expect(carolSocket.received.map(([name]) => name)).toEqual(['group.closed']);
+    });
+  });
+
   it('rejects sending to, adding to and leaving a Closed Group with GROUP_CLOSED', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');

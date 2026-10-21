@@ -101,6 +101,20 @@ describe('the Member count', () => {
     expect(await screen.findByText('3 members')).toBeInTheDocument();
   });
 
+  it("flips a Former Member's open view to closed when group.closed arrives", async () => {
+    const state: ServerGroup = { members: [bob], closed: false, isMember: false };
+    serverWith(state);
+    const { fake } = await openGroup();
+    expect(await screen.findByText(/no longer a member of this group/i)).toBeInTheDocument();
+    expect(screen.queryByText(/this group is closed/i)).not.toBeInTheDocument();
+
+    state.members = [];
+    state.closed = true;
+    act(() => fake.emit({ type: 'group.closed', conversationId: groupId }));
+
+    expect(await screen.findByText(/this group is closed/i)).toBeInTheDocument();
+  });
+
   it('does not count a Member twice when group.member_added arrives after a reload', async () => {
     const state: ServerGroup = {
       members: [aliceMember, bob, carol],
