@@ -9,7 +9,7 @@ export type Reader = Pick<NodePgDatabase, 'select'>;
 export type MessageRow = typeof messages.$inferSelect;
 
 /** The one row a query is known to return (an insert's `returning`, a row just locked). */
-export const only = <T>(rows: T[], what: string): T => {
+export const exactlyOne = <T>(rows: T[], what: string): T => {
   const [row] = rows;
   if (row === undefined) throw new Error(`Expected ${what}`);
   return row;
@@ -32,7 +32,7 @@ export const toMessage = (row: MessageRow, subject?: ConversationMember | null):
  * value, so sequences are strictly increasing in commit order.
  */
 export async function nextSequence(tx: Tx, conversationId: string): Promise<number> {
-  const counter = only(
+  const counter = exactlyOne(
     await tx
       .update(conversations)
       .set({ lastSequence: sql`${conversations.lastSequence} + 1` })

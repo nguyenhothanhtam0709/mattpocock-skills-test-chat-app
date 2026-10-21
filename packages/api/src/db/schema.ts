@@ -1,3 +1,4 @@
+import { CONVERSATION_KINDS, MESSAGE_KINDS } from '@chat/contracts';
 import { sql } from 'drizzle-orm';
 import {
   check,
@@ -12,8 +13,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-/** The values `messages.kind` may hold (also enforced by `messages_kind_check`). */
-const MESSAGE_KINDS = ['text', 'member_added', 'member_removed', 'member_left'] as const;
+/** `'a', 'b'` for a SQL `in (...)` list, from the shared definition in contracts. */
+const sqlList = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(', '));
 
 /**
  * A registered person. Username and email are stored exactly as typed; the unique indexes
@@ -79,12 +80,12 @@ export const conversations = pgTable(
     id: uuid('id')
       .primaryKey()
       .default(sql`uuidv7()`),
-    kind: text('kind').notNull(),
+    kind: text('kind', { enum: CONVERSATION_KINDS }).notNull(),
     /** Sequence of the newest Message; bumped under the row lock when a Message is inserted. */
     lastSequence: integer('last_sequence').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check('conversations_kind_check', sql`${t.kind} in ('direct', 'group')`)],
+  (t) => [check('conversations_kind_check', sql`${t.kind} in (${sqlList(CONVERSATION_KINDS)})`)],
 );
 
 export const conversationMembers = pgTable(
@@ -204,10 +205,7 @@ export const messages = pgTable(
   (t) => [
     uniqueIndex('messages_conversation_sequence_unique').on(t.conversationId, t.sequence),
     uniqueIndex('messages_sender_client_message_id_unique').on(t.senderId, t.clientMessageId),
-    check(
-      'messages_kind_check',
-      sql`${t.kind} in ('text', 'member_added', 'member_removed', 'member_left')`,
-    ),
+    check('messages_kind_check', sql`${t.kind} in (${sqlList(MESSAGE_KINDS)})`),
     check('messages_system_message_body_check', sql`${t.kind} = 'text' or ${t.body} = ''`),
     // The target of the composite foreign key from `system_messages`.
     uniqueIndex('messages_id_kind_unique').on(t.id, t.kind),

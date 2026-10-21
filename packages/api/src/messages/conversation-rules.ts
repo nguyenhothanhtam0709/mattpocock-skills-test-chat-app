@@ -113,7 +113,7 @@ export async function requireGroup(q: Reader, groupId: string): Promise<{ ownerI
   return group;
 }
 
-export async function memberRow(
+export async function findMember(
   q: Reader,
   userId: string,
 ): Promise<ConversationMember | undefined> {

@@ -10,6 +10,7 @@ import {
   type Message,
   type SendDirectMessageRequest,
   type SendMessageRequest,
+  type GroupMembershipResponse,
 } from '@chat/contracts';
 import { and, asc, desc, eq, exists, gt, lt, lte, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -31,8 +32,8 @@ import {
 } from '../db/schema.js';
 import { CommitOrder, lockConversation } from './commit-order.js';
 import { ConversationQueries } from './conversation-queries.js';
-import { requireMember, requireReader } from './conversation-rules.js';
-import { nextSequence, only, toMessage, type Tx } from './message-rows.js';
+import { conversationNotFound, requireMember, requireReader } from './conversation-rules.js';
+import { nextSequence, exactlyOne, toMessage, type Tx } from './message-rows.js';
 
 export interface SentMessage {
   message: Message;
@@ -276,6 +277,13 @@ export class MessagesService {
     };
   }
 
+  /** The Group as `userId` sees it now; 404 when the Conversation is not a Group. */
+  async getGroup(userId: string, groupId: string): Promise<GroupMembershipResponse> {
+    const { conversation } = await this.get(userId, groupId);
+    if (conversation.kind !== 'group') throw conversationNotFound();
+    return { conversation };
+  }
+
   private async findByClientMessageId(
     senderId: string,
     clientMessageId: string,
@@ -324,7 +332,7 @@ export class MessagesService {
       .where(pair);
     if (existing) return { id: existing.id, created: false };
 
-    const created = only(
+    const created = exactlyOne(
       await tx.insert(conversations).values({ kind: 'direct' }).returning({ id: conversations.id }),
       'the new Conversation',
     );
@@ -345,7 +353,7 @@ export class MessagesService {
       return { id: created.id, created: true };
     }
     await tx.delete(conversations).where(eq(conversations.id, created.id));
-    const winner = only(
+    const winner = exactlyOne(
       await tx
         .select({ id: directConversations.conversationId })
         .from(directConversations)

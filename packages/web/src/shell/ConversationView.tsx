@@ -2,6 +2,7 @@ import {
   MESSAGE_BODY_MAX,
   MessageBodySchema,
   type Message as ChatMessage,
+  type SystemMessageKind,
   type User,
 } from '@chat/contracts';
 import { ArrowDown, ArrowUp, Info } from 'lucide-react';
@@ -67,11 +68,11 @@ interface Row {
   systemMessage?: string;
 }
 
-const SYSTEM_MESSAGE_VERBS = {
+const SYSTEM_MESSAGE_VERBS: Record<SystemMessageKind, string> = {
   member_added: 'was added',
   member_removed: 'was removed',
   member_left: 'left',
-} as const;
+};
 
 /** The systemMessage's text, or undefined for a Message a Member wrote. */
 const systemMessageText = (m: ChatMessage): string | undefined =>
