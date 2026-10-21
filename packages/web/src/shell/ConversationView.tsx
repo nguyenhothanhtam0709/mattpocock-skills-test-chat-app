@@ -175,7 +175,14 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
 export type ConversationTarget =
   | { kind: 'direct'; peer: UserSearchResult }
   /** `isMember` is false for a Former Member, who can read their windows but not post. */
-  | { kind: 'group'; name: string; memberCount: number; isMember: boolean };
+  | { kind: 'group'; name: string; memberCount: number; closed: boolean; isMember: boolean };
+
+/** What the server last told us about the Group; events and refetches keep it current. */
+interface GroupInfo {
+  memberCount: number;
+  closed: boolean;
+  isMember: boolean;
+}
 
 /**
  * A Direct Conversation with a peer, or a Group. A Direct Conversation starts without a
@@ -198,7 +205,7 @@ export function ConversationView({
   /** Called after the User left the Group, so the Conversation list can follow. */
   onLeft?: () => void;
 }) {
-  const { sendDirectMessage, sendMessage, messagesPage } = useAuth();
+  const { sendDirectMessage, sendMessage, messagesPage, getGroup } = useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
   // just the first send reporting the Conversation it created.
   const [openedWith] = useState(initialConversationId);
@@ -248,11 +255,45 @@ export function ConversationView({
     }
   }, [messages, loadOlder]);
 
+  const [info, setInfo] = useState<GroupInfo | undefined>(
+    target.kind === 'group'
+      ? { memberCount: target.memberCount, closed: target.closed, isMember: target.isMember }
+      : undefined,
+  );
+  const isGroup = target.kind === 'group';
+  const listedCount = target.kind === 'group' ? target.memberCount : 0;
+  const listedClosed = target.kind === 'group' ? target.closed : false;
+  const listedIsMember = target.kind === 'group' ? target.isMember : false;
+  // A reload of the Conversation list hands down a fresh snapshot: it replaces ours.
+  useEffect(() => {
+    if (!isGroup) return;
+    setInfo({ memberCount: listedCount, closed: listedClosed, isMember: listedIsMember });
+  }, [isGroup, listedCount, listedClosed, listedIsMember]);
+
+  // The server is the source of truth for the count and the closed flag. Only the newest
+  // request counts, so a slow answer never overwrites a newer one.
+  const refreshes = useRef(0);
+  const refreshGroup = useCallback(() => {
+    if (!conversationId || !isGroup) return;
+    const mine = ++refreshes.current;
+    void (async () => {
+      const result = await getGroup(conversationId);
+      if (!result.ok || mine !== refreshes.current) return;
+      const { group } = result;
+      setInfo((current) => ({
+        memberCount: group.members.length,
+        closed: group.closed,
+        isMember: group.closed ? false : (current?.isMember ?? false),
+      }));
+    })();
+  }, [conversationId, isGroup, getGroup]);
+
   // Messages pushed while the connection was down are gone for good: fetch what came after the
   // last one seen, page by page. Duplicates with pushes are merged by ID.
   useReconnected(() => {
     const id = conversationId;
     if (!id) return;
+    refreshGroup();
     void (async () => {
       // Resume from the page's own newest Message, not the newest seen: a push that lands
       // meanwhile must not make the fetch skip the Messages before it.
@@ -270,21 +311,21 @@ export function ConversationView({
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [memberDelta, setMemberDelta] = useState(0);
-  // Set once this User left the Group, or the Group was closed (from another tab or by them).
-  const [selfLeft, setSelfLeft] = useState(false);
-  const [closedFlag, setClosedFlag] = useState(false);
 
   useRealtimeEvents(
     useCallback(
       (event) => {
         if (event.type === 'group.closed') {
-          if (event.conversationId === conversationId) setClosedFlag(true);
+          if (event.conversationId !== conversationId) return;
+          setInfo((current) => current && { ...current, closed: true, isMember: false });
+          refreshGroup();
           return;
         }
         if (event.type === 'group.membership_ended') {
           // This User's membership ended elsewhere (removed, or left on another tab).
-          if (event.conversationId === conversationId) setSelfLeft(true);
+          if (event.conversationId !== conversationId) return;
+          setInfo((current) => current && { ...current, isMember: false });
+          refreshGroup();
           return;
         }
         if (
@@ -295,10 +336,14 @@ export function ConversationView({
           return;
         }
         if (event.conversationId !== conversationId) return;
-        // The note itself arrives as a stored `message.created`; this only keeps the count.
-        setMemberDelta((n) => n + (event.type === 'group.member_added' ? 1 : -1));
+        // Being added (again) makes this User a Member. The count is not adjusted here: the
+        // server's answer already includes everyone, so adding one would count them twice.
+        if (event.type === 'group.member_added' && event.member.id === user.id) {
+          setInfo((current) => current && { ...current, isMember: true });
+        }
+        refreshGroup();
       },
-      [conversationId],
+      [conversationId, user.id, refreshGroup],
     ),
   );
 
@@ -377,8 +422,9 @@ export function ConversationView({
     void transmit(pending);
   }
 
-  const closed = target.kind === 'group' && (closedFlag || target.memberCount + memberDelta <= 0);
-  const canPost = target.kind !== 'group' || (target.isMember && !selfLeft && !closed);
+  const closed = info?.closed ?? false;
+  const memberCount = info?.memberCount ?? 0;
+  const canPost = target.kind !== 'group' || (!!info?.isMember && !closed);
 
   const rows: Row[] = [
     ...messages.map((m) => {
@@ -407,8 +453,7 @@ export function ConversationView({
           <>
             <h1 className="truncate text-base font-semibold">{target.name}</h1>
             <span className="shrink-0 text-sm text-muted-foreground">
-              {target.memberCount + memberDelta}{' '}
-              {target.memberCount + memberDelta === 1 ? 'member' : 'members'}
+              {memberCount} {memberCount === 1 ? 'member' : 'members'}
             </span>
             {conversationId && (
               <>
@@ -427,9 +472,14 @@ export function ConversationView({
                   user={user}
                   open={detailsOpen}
                   onOpenChange={setDetailsOpen}
-                  onLeft={() => {
-                    setSelfLeft(true);
-                    setMemberDelta((n) => n - 1);
+                  onLeft={(group) => {
+                    // The response is the server's word on the Group after leaving.
+                    refreshes.current += 1;
+                    setInfo({
+                      memberCount: group.members.length,
+                      closed: group.closed,
+                      isMember: false,
+                    });
                     onLeft?.();
                   }}
                 />

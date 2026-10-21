@@ -29,6 +29,7 @@ const groupOwnedBy = (ownerId: string, members: unknown[]) => ({
   name: 'Book Club',
   ownerId,
   members,
+  closed: members.length === 0,
 });
 
 /** Signed in as Alice with a Group in the list; the server records leaves. */
@@ -39,7 +40,16 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>, isMember = true) {
     http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: fakeAccessToken() })),
     http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
     http.get('*/api/v1/conversations', () =>
-      HttpResponse.json({ conversations: [{ ...current, isMember, lastMessage: null }] }),
+      HttpResponse.json({
+        conversations: [
+          {
+            ...current,
+            isMember:
+              isMember && current.members.some((m) => (m as { id: string }).id === alice.id),
+            lastMessage: null,
+          },
+        ],
+      }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
       HttpResponse.json({ conversation: current }),
@@ -52,6 +62,7 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>, isMember = true) {
       current = {
         ...current,
         members: current.members.filter((m) => (m as { id: string }).id !== alice.id),
+        closed: current.members.length === 1,
       };
       return HttpResponse.json({ conversation: current });
     }),
@@ -180,6 +191,7 @@ describe('Members leaving, seen by the others', () => {
             {
               ...groupOwnedBy(bob.id, stillMember ? [aliceMember, bob] : [bob]),
               isMember: stillMember,
+              closed: false,
               lastMessage: null,
             },
           ],
