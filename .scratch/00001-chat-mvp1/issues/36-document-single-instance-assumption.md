@@ -1,0 +1,15 @@
+# 36: Document the single-instance assumption
+
+**What to build:** Commit order equals slot order (`CommitOrder` / `KeyedSerializer`) and Socket.IO rooms are in memory, so ordering and room membership only hold with one API process. Nothing in the docs says so.
+
+**Blocked by:** none
+
+**Status:** ready-for-agent
+
+- [ ] New ADR (next number) recording that the API runs as a single instance, why (in-memory rooms, in-process serializer), and what would have to change to scale out (Socket.IO Redis adapter, DB-level ordering)
+- [ ] Spec and `docs/laters.md` link to it
+- [ ] Docs only; no code or package changes
+
+## Comments
+
+- From the final code review (spec axis, item 6). Also from that review, accepted as-is unless the user says otherwise: Former Members do not learn that a Group closed until a reload/reconnect (item 4), because no room remains to push to.
