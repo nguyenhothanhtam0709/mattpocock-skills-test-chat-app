@@ -39,6 +39,8 @@ import {
 } from '../db/schema.js';
 
 type Tx = Parameters<Parameters<NodePgDatabase['transaction']>[0]>[0];
+/** Where a rule check reads: inside the Conversation lock, the transaction. */
+type Reader = Pick<NodePgDatabase, 'select'>;
 type MessageRow = typeof messages.$inferSelect;
 
 export interface SentMessage {
@@ -135,11 +137,12 @@ export class MessagesService {
     conversationId: string,
     request: SendMessageRequest,
   ): Promise<SentMessage> {
-    await this.requireMember(conversationId, senderId, true);
     try {
-      const message = await this.db.transaction((tx) =>
-        this.insertMessage(tx, conversationId, senderId, request),
-      );
+      const message = await this.db.transaction(async (tx) => {
+        await this.lockConversation(tx, conversationId);
+        await this.requireMember(tx, conversationId, senderId, true);
+        return this.insertMessage(tx, conversationId, senderId, request);
+      });
       await this.pushCreated(message, undefined);
       return { message, created: true };
     } catch (error) {
@@ -157,7 +160,7 @@ export class MessagesService {
     conversationId: string,
     { limit, before, after }: GetMessagesQuery,
   ): Promise<GetMessagesResponse> {
-    await this.requireReader(conversationId, userId);
+    await this.requireReader(this.db, conversationId, userId);
     const forward = after !== undefined;
     const rows = await this.db
       .select({
@@ -335,7 +338,7 @@ export class MessagesService {
   }
 
   async get(userId: string, conversationId: string): Promise<GetConversationResponse> {
-    await this.requireReader(conversationId, userId);
+    await this.requireReader(this.db, conversationId, userId);
     const members = (await this.membersOf([conversationId])).get(conversationId) ?? [];
     const [group] = await this.db
       .select({ name: groups.name, ownerId: groups.ownerId })
@@ -449,8 +452,8 @@ export class MessagesService {
   }
 
   /** Anyone with a membership period, current or past, may read; else 404 (never a Member). */
-  private async requireReader(conversationId: string, userId: string): Promise<void> {
-    const [period] = await this.db
+  private async requireReader(q: Reader, conversationId: string, userId: string): Promise<void> {
+    const [period] = await q
       .select({ id: membershipPeriods.id })
       .from(membershipPeriods)
       .where(
@@ -468,11 +471,12 @@ export class MessagesService {
    * never-Member, the Conversation is not found.
    */
   private async requireMember(
+    q: Reader,
     conversationId: string,
     userId: string,
     forPosting = false,
   ): Promise<void> {
-    const [member] = await this.db
+    const [member] = await q
       .select({ userId: conversationMembers.userId })
       .from(conversationMembers)
       .where(
@@ -483,8 +487,8 @@ export class MessagesService {
       );
     if (member) return;
     if (forPosting) {
-      await this.requireReader(conversationId, userId);
-      await this.rejectIfClosed(conversationId);
+      await this.requireReader(q, conversationId, userId);
+      await this.rejectIfClosed(q, conversationId);
       throw new DomainException(
         ErrorCode.NOT_A_MEMBER,
         HttpStatus.FORBIDDEN,
@@ -495,15 +499,15 @@ export class MessagesService {
   }
 
   /** The Group the caller is a Member of, and whether the caller owns it; else 404. */
-  private async requireOwner(callerId: string, groupId: string): Promise<void> {
-    const [group] = await this.db
+  private async requireOwner(q: Reader, callerId: string, groupId: string): Promise<void> {
+    const [group] = await q
       .select({ ownerId: groups.ownerId })
       .from(groups)
       .where(eq(groups.conversationId, groupId));
     if (!group) throw conversationNotFound();
-    await this.requireReader(groupId, callerId);
-    await this.rejectIfClosed(groupId);
-    await this.requireMember(groupId, callerId);
+    await this.requireReader(q, groupId, callerId);
+    await this.rejectIfClosed(q, groupId);
+    await this.requireMember(q, groupId, callerId);
     if (group.ownerId !== callerId) {
       throw new DomainException(
         ErrorCode.NOT_GROUP_OWNER,
@@ -514,8 +518,8 @@ export class MessagesService {
   }
 
   /** A Group with no Members left is a Closed Group: read-only, for ever. */
-  private async rejectIfClosed(conversationId: string): Promise<void> {
-    const [member] = await this.db
+  private async rejectIfClosed(q: Reader, conversationId: string): Promise<void> {
+    const [member] = await q
       .select({ userId: conversationMembers.userId })
       .from(conversationMembers)
       .where(eq(conversationMembers.conversationId, conversationId))
@@ -529,8 +533,8 @@ export class MessagesService {
     }
   }
 
-  private async memberRow(userId: string) {
-    const [row] = await this.db
+  private async memberRow(q: Reader, userId: string) {
+    const [row] = await q
       .select({ id: users.id, username: users.username, nickname: users.nickname })
       .from(users)
       .where(eq(users.id, userId));
@@ -546,13 +550,14 @@ export class MessagesService {
     groupId: string,
     userId: string,
   ): Promise<GroupMembershipResponse> {
-    await this.requireOwner(callerId, groupId);
-    const member = await this.memberRow(userId);
-    if (!member) {
-      throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found');
-    }
-    const note = await this.db.transaction(async (tx) => {
+    const { note, member } = await this.db.transaction(async (tx) => {
+      // Every rule is checked after the lock, so a concurrent change cannot slip past it.
       await this.lockConversation(tx, groupId);
+      await this.requireOwner(tx, callerId, groupId);
+      const member = await this.memberRow(tx, userId);
+      if (!member) {
+        throw new DomainException(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'User not found');
+      }
       const current = await tx
         .select({ userId: conversationMembers.userId })
         .from(conversationMembers)
@@ -579,7 +584,7 @@ export class MessagesService {
         userId,
         startSequence: note.sequence - 1,
       });
-      return note;
+      return { note, member };
     });
 
     const { conversation } = await this.get(callerId, groupId);
@@ -609,18 +614,19 @@ export class MessagesService {
     groupId: string,
     userId: string,
   ): Promise<GroupMembershipResponse> {
-    await this.requireOwner(callerId, groupId);
-    if (userId === callerId) {
-      throw new DomainException(
-        ErrorCode.OWNER_CANNOT_BE_REMOVED,
-        HttpStatus.CONFLICT,
-        'The Owner cannot be removed from their Group',
-      );
-    }
-    const member = await this.memberRow(userId);
-    const removed = await this.db.transaction(async (tx) => {
-      // Lock the Conversation so the period ends exactly at the newest Message.
+    const { removed, member } = await this.db.transaction(async (tx) => {
+      // Lock the Conversation so the period ends exactly at the newest Message, then check
+      // every rule against what is true now.
       await this.lockConversation(tx, groupId);
+      await this.requireOwner(tx, callerId, groupId);
+      if (userId === callerId) {
+        throw new DomainException(
+          ErrorCode.OWNER_CANNOT_BE_REMOVED,
+          HttpStatus.CONFLICT,
+          'The Owner cannot be removed from their Group',
+        );
+      }
+      const member = await this.memberRow(tx, userId);
       const deleted = await tx
         .delete(conversationMembers)
         .where(
@@ -630,7 +636,7 @@ export class MessagesService {
           ),
         )
         .returning({ userId: conversationMembers.userId });
-      if (deleted.length === 0 || !member) return undefined;
+      if (deleted.length === 0 || !member) return { removed: undefined, member };
       const note = await this.insertNote(tx, groupId, callerId, member, 'member_removed');
       await tx
         .update(membershipPeriods)
@@ -642,7 +648,7 @@ export class MessagesService {
             eq(membershipPeriods.endSequence, OPEN_PERIOD_END),
           ),
         );
-      return note;
+      return { removed: note, member };
     });
     if (!removed || !member) {
       throw new DomainException(
@@ -683,18 +689,17 @@ export class MessagesService {
    * If they were the last Member, the Group is closed. Pushes are best-effort (ADR-0001).
    */
   async leaveGroup(callerId: string, groupId: string): Promise<GroupMembershipResponse> {
-    const [group] = await this.db
-      .select({ ownerId: groups.ownerId })
-      .from(groups)
-      .where(eq(groups.conversationId, groupId));
-    if (!group) throw conversationNotFound();
-    await this.requireReader(groupId, callerId);
-    await this.rejectIfClosed(groupId);
-    await this.requireMember(groupId, callerId, true);
-
-    const leaver = (await this.memberRow(callerId))!;
-    const outcome = await this.db.transaction(async (tx) => {
+    const { outcome, leaver } = await this.db.transaction(async (tx) => {
       await this.lockConversation(tx, groupId);
+      const [group] = await tx
+        .select({ ownerId: groups.ownerId })
+        .from(groups)
+        .where(eq(groups.conversationId, groupId));
+      if (!group) throw conversationNotFound();
+      await this.requireReader(tx, groupId, callerId);
+      await this.rejectIfClosed(tx, groupId);
+      await this.requireMember(tx, groupId, callerId, true);
+      const leaver = (await this.memberRow(tx, callerId))!;
       const deleted = await tx
         .delete(conversationMembers)
         .where(
@@ -704,7 +709,7 @@ export class MessagesService {
           ),
         )
         .returning({ userId: conversationMembers.userId });
-      if (deleted.length === 0) return undefined;
+      if (deleted.length === 0) throw conversationNotFound();
       const note = await this.insertNote(tx, groupId, callerId, leaver, 'member_left');
       await tx
         .update(membershipPeriods)
@@ -731,23 +736,18 @@ export class MessagesService {
         )
         .orderBy(asc(membershipPeriods.createdAt), asc(membershipPeriods.userId))
         .limit(1);
-      if (!successor) return { note, closed: true as const, newOwnerId: undefined };
+      if (!successor) {
+        return { leaver, outcome: { note, closed: true as const, newOwnerId: undefined } };
+      }
       if (current!.ownerId !== callerId) {
-        return { note, closed: false as const, newOwnerId: undefined };
+        return { leaver, outcome: { note, closed: false as const, newOwnerId: undefined } };
       }
       await tx
         .update(groups)
         .set({ ownerId: successor.userId })
         .where(eq(groups.conversationId, groupId));
-      return { note, closed: false as const, newOwnerId: successor.userId };
+      return { leaver, outcome: { note, closed: false as const, newOwnerId: successor.userId } };
     });
-    if (!outcome) {
-      throw new DomainException(
-        ErrorCode.NOT_A_MEMBER,
-        HttpStatus.FORBIDDEN,
-        'You are no longer a Member of this Group',
-      );
-    }
 
     try {
       this.realtime.leaveGroupRoom(callerId, groupId);
