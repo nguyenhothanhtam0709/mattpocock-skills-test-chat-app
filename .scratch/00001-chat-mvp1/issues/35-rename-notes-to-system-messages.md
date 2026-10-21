@@ -4,12 +4,15 @@
 
 **Blocked by:** 33, 34
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Rename table, constraint, code identifiers, comments and UI-internal names from "note" to "system message" (user-facing `Marker` text is unchanged); schema renames via `pnpm db:generate` only (rename, not drop/create, if drizzle-kit offers it; otherwise accept drop/create since no data exists)
-- [ ] Remove `memberIds[0]!` in `groups.service.ts` and `!prev!.note` in `ConversationView.tsx` `toEntries` with properly typed code; remove avoidable casts in the files touched by this range (e.g. `socket-realtime.ts`'s `name as RealtimeEventName`)
-- [ ] No behaviour change; the existing test suite passes (test names and imports may be renamed)
+- [x] Rename table, constraint, code identifiers, comments and UI-internal names from "note" to "system message" (user-facing `Marker` text is unchanged); schema renames via `pnpm db:generate` only (rename, not drop/create, if drizzle-kit offers it; otherwise accept drop/create since no data exists)
+- [x] Remove `memberIds[0]!` in `groups.service.ts` and `!prev!.note` in `ConversationView.tsx` `toEntries` with properly typed code; remove avoidable casts in the files touched by this range (e.g. `socket-realtime.ts`'s `name as RealtimeEventName`)
+- [x] No behaviour change; the existing test suite passes (test names and imports may be renamed)
 
 ## Comments
 
 - From the final code review (standards axis, hard findings 1 and 2). The `!` rule is a judgement call, not an ADR.
+- Table `membership_notes` is now `system_messages` and `messages_note_body_check` is `messages_system_message_body_check`; migration `0013` (from `pnpm db:generate`, table rename chosen at the prompt) renames the table and re-creates its constraints under the new names. Code, comments and tests use "System Message"; `Marker` text is unchanged.
+- `memberIds[0]!` is gone (`pushCreated` takes the `ownerId`); `toEntries` narrows `prev` without `!`; `socket-realtime.ts` uses an `isRealtimeEventName` type guard instead of `as RealtimeEventName`.
+- No package added; no behaviour change, the suites pass unchanged apart from renames.

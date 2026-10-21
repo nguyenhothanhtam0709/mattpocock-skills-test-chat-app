@@ -157,7 +157,7 @@ describe('Group details', () => {
   });
 });
 
-const note = (
+const systemMessage = (
   sequence: number,
   kind: 'member_added' | 'member_removed' | 'member_left',
   subject: { id: string; username: string; nickname: string | null },
@@ -173,13 +173,16 @@ const note = (
   createdAt: '2020-03-05T10:00:00.000Z',
 });
 
-describe('membership notes', () => {
-  it('shows stored notes from the history as Marker notes after a reload', async () => {
+describe('System Messages', () => {
+  it('shows stored System Messages from the history as Markers after a reload', async () => {
     signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     server.use(
       http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
         HttpResponse.json({
-          messages: [note(3, 'member_left', carol), note(2, 'member_removed', dave)],
+          messages: [
+            systemMessage(3, 'member_left', carol),
+            systemMessage(2, 'member_removed', dave),
+          ],
           hasMore: false,
         }),
       ),
@@ -192,7 +195,7 @@ describe('membership notes', () => {
     expect(screen.getByText('carol left')).toBeInTheDocument();
   });
 
-  it('shows a pushed note once, and keeps the Member count current from the membership events', async () => {
+  it('shows a pushed System Message once, and keeps the Member count current from the membership events', async () => {
     const { setMembers } = signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
@@ -203,7 +206,7 @@ describe('membership notes', () => {
 
     act(() => {
       fake.emit({ type: 'group.member_added', conversationId: groupId, member: carol });
-      fake.emit({ type: 'message.created', message: note(2, 'member_added', carol) });
+      fake.emit({ type: 'message.created', message: systemMessage(2, 'member_added', carol) });
     });
 
     expect(await screen.findByText('carol was added')).toBeInTheDocument();
@@ -213,7 +216,7 @@ describe('membership notes', () => {
 
     act(() => {
       fake.emit({ type: 'group.member_removed', conversationId: groupId, member: carol });
-      fake.emit({ type: 'message.created', message: note(3, 'member_removed', carol) });
+      fake.emit({ type: 'message.created', message: systemMessage(3, 'member_removed', carol) });
     });
 
     expect(await screen.findByText('carol was removed')).toBeInTheDocument();
@@ -221,7 +224,7 @@ describe('membership notes', () => {
     expect(await screen.findByText('2 members')).toBeInTheDocument();
   });
 
-  it('does not render a note from the membership event alone', async () => {
+  it('does not render a System Message from the membership event alone', async () => {
     const { setMembers } = signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
@@ -236,7 +239,7 @@ describe('membership notes', () => {
     expect(screen.queryByText('carol was added')).not.toBeInTheDocument();
   });
 
-  it('does not let a note change the Conversation preview in the list', async () => {
+  it('does not let a System Message change the Conversation preview in the list', async () => {
     signedIn(groupOwnedBy(bob.id, [aliceMember, bob]));
     server.use(
       http.get('*/api/v1/conversations', () =>
@@ -259,7 +262,9 @@ describe('membership notes', () => {
     render(<App createRealtime={() => fake.realtime} />);
     await screen.findByText('hello everyone');
 
-    act(() => fake.emit({ type: 'message.created', message: note(2, 'member_added', carol) }));
+    act(() =>
+      fake.emit({ type: 'message.created', message: systemMessage(2, 'member_added', carol) }),
+    );
 
     expect(screen.getByText('hello everyone')).toBeInTheDocument();
   });

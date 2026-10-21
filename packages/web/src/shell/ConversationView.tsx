@@ -63,19 +63,21 @@ interface Row {
   createdAt: string;
   body: string;
   outgoing?: Outgoing;
-  /** Set for a stored membership note ("Bob was added"): rendered as a `Marker`, not a bubble. */
-  note?: string;
+  /** Set for a stored membership systemMessage ("Bob was added"): rendered as a `Marker`, not a bubble. */
+  systemMessage?: string;
 }
 
-const NOTE_VERBS = {
+const SYSTEM_MESSAGE_VERBS = {
   member_added: 'was added',
   member_removed: 'was removed',
   member_left: 'left',
 } as const;
 
-/** The note's text, or undefined for a Message a Member wrote. */
-const noteText = (m: ChatMessage): string | undefined =>
-  m.kind === 'text' || !m.subject ? undefined : `${displayName(m.subject)} ${NOTE_VERBS[m.kind]}`;
+/** The systemMessage's text, or undefined for a Message a Member wrote. */
+const systemMessageText = (m: ChatMessage): string | undefined =>
+  m.kind === 'text' || !m.subject
+    ? undefined
+    : `${displayName(m.subject)} ${SYSTEM_MESSAGE_VERBS[m.kind]}`;
 
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
@@ -99,7 +101,8 @@ function toEntries(rows: Row[]): Entry[] {
     return {
       row,
       ...(newDay ? { day: row.createdAt } : {}),
-      continuesRun: !newDay && !row.note && !prev!.note && prev!.senderId === row.senderId,
+      continuesRun:
+        !newDay && !row.systemMessage && !prev.systemMessage && prev.senderId === row.senderId,
     };
   });
 }
@@ -420,13 +423,13 @@ export function ConversationView({
 
   const rows: Row[] = [
     ...messages.map((m) => {
-      const note = noteText(m);
+      const systemMessage = systemMessageText(m);
       return {
         key: m.clientMessageId,
         senderId: m.senderId,
         createdAt: m.createdAt,
         body: m.body,
-        ...(note === undefined ? {} : { note }),
+        ...(systemMessage === undefined ? {} : { systemMessage }),
       };
     }),
     ...outgoing.map((o) => ({
@@ -517,9 +520,9 @@ export function ConversationView({
                           <MarkerContent>{dayLabel(day)}</MarkerContent>
                         </Marker>
                       )}
-                      {m.note !== undefined ? (
+                      {m.systemMessage !== undefined ? (
                         <Marker>
-                          <MarkerContent>{m.note}</MarkerContent>
+                          <MarkerContent>{m.systemMessage}</MarkerContent>
                         </Marker>
                       ) : (
                         <Message align={m.senderId === user.id ? 'end' : 'start'}>

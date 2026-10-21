@@ -205,7 +205,7 @@ describe('Group rules are re-checked under the Conversation lock', () => {
     });
   });
 
-  it('a Member removed while their leave is queued is told NOT_A_MEMBER and gets no second note', async () => {
+  it('a Member removed while their leave is queued is told NOT_A_MEMBER and gets no second System Message', async () => {
     await withApp({}, async (app) => {
       const alice = await signUp(app, 'Alice');
       const bob = await signUp(app, 'Bob');
