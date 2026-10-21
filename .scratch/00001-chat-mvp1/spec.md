@@ -102,7 +102,7 @@ A person registers as a User (Username, email, password, optional Nickname) and 
 66. As a User, I want to open a Conversation and see its most recent Messages, so that I can catch up.
 67. As a User, I want older Messages to load as I scroll up, without my view jumping, so that I can read history comfortably.
 68. As a User, I want Messages grouped by sender and separated by day, so that long histories are easy to scan.
-69. As a User, I want system notes like "Bob was added" shown inline, so that I understand membership changes in context.
+69. As a User, I want System Messages like "Bob was added" shown inline, so that I understand membership changes in context.
 70. As a User, I want a "jump to latest" control when I've scrolled up, so that I can return to the live edge.
 71. As a User, I want a helpful empty state when I have no Conversations or a Conversation has no Messages, so that I know what to do next.
 
@@ -185,7 +185,8 @@ A person registers as a User (Username, email, password, optional Nickname) and 
   - A User sees only Messages whose sequence falls within one of their membership periods. A **Former Member** keeps that read access. Re-adding a Former Member opens a new period; the gap stays hidden.
   - A Closed Group rejects new Messages and new Members.
 - **Message**: immutable plain text, belongs to exactly one Conversation, has a sender, a server-assigned per-Conversation sequence number, a server timestamp, and the sender's client message ID.
-- **System Message** (membership note, ticket 24): adding, removing or leaving a Member stores a note ("Bob was added", "Bob was removed", "Bob left") as a Message row with `kind` `member_added` / `member_removed` / `member_left` (ordinary Messages are `text`). It takes the next sequence in the same transaction as the membership change; `senderId` is whoever made the change (the Owner, or the leaver), `body` is empty, and the User it is about is its `subject`. A note sits inside the subject's own membership period (an added User's period starts just before their "added" note; a removed or leaving User's period ends at their note), so each reader sees a note only inside one of their periods. History, gap-fill and `limit` treat notes like any Message. Notes never become a Conversation's preview and never move it in the list. Creating a Group writes no notes: the initial Members are not "added". Past membership changes are not backfilled.
+- **System Message** (ticket 24): adding, removing or leaving a Member stores a System Message ("Bob was added", "Bob was removed", "Bob left") as a Message row with `kind` `member_added` / `member_removed` / `member_left` (ordinary Messages are `text`). It takes the next sequence in the same transaction as the membership change; `senderId` is whoever made the change (the Owner, or the leaver), `body` is empty, and the User it is about is its `subject`. A System Message sits inside the subject's own membership period (an added User's period starts just before their "added" System Message; a removed or leaving User's period ends at their note), so each reader sees a System Message only inside one of their periods. History, gap-fill and `limit` treat System Messages like any Message. System Messages never become a Conversation's preview and never move it in the list. Creating a Group writes no System Messages: the initial Members are not "added". Past membership changes are not backfilled.
+- Concurrency (single process only, ADR-0006): every membership change and Message send first takes the Conversation row lock (`select ... for update`), then checks the group rules (Owner, Member, full, closed) inside that same transaction, so a concurrent change cannot slip between check and write (lock-then-check, ticket 26). Room changes and pushes run in commit order: a shared per-Conversation serializer takes its slot right after the lock and runs the room change and push once every earlier change has finished, so a Message is never pushed between a membership commit and its room change (ticket 27). This ordering relies on one process; it does not hold across several instances.
 - Sequence assignment: each Conversation holds a last-sequence counter; sending increments it and inserts the Message within one transaction (row-locked), so `(conversation, sequence)` is unique and strictly increasing. Client clocks are never trusted.
 - Idempotency: `(sender, client message ID)` is unique. Re-sending with the same client message ID returns the original Message with `200` instead of `201`.
 
@@ -197,12 +198,16 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
 - Current User: get profile, update Nickname (set or clear).
 - User search: `q` (2–32 chars), Username prefix match only, case-insensitive, `%` and `_` escaped, exact match ranked first, max 20 results, excludes the searcher, returns ID + Username + Nickname only.
 - Direct send: send a Message to a User (by User ID), creating the Direct Conversation if needed. Returns the Message and Conversation.
-- Conversations: list the current User's Conversations (including ones they are a Former Member of), sorted by latest Message, each with display name, kind, last Message preview, and time. Each summary carries `isMember`, false for a Former Member (they can read their windows but not post). Get one Conversation (Members, Owner, closed flag).
+- Conversations: list the current User's Conversations (including ones they are a Former Member of), sorted by latest Message, each with display name, kind, last Message preview, and time. Each summary carries `isMember`, false for a Former Member (they can read their windows but not post). Get one Conversation (`GET /conversations/:id`): Members, Owner, the `closed` flag (true for a Closed Group), and the caller's own `isMember`. A Former Member gets `members: []` and no `ownerId` (who joined later is not theirs to know, ticket 29) together with `isMember: false`; `isMember` is also false for a Closed Group. A Direct Conversation carries only `id`, `kind` and `members`.
 - Messages:
   - Send to an existing Conversation.
   - History with `before=<sequence>` (scroll up, newest first) or `after=<sequence>` (gap fill, oldest first). `limit` 1–100, default 10. Responses include `hasMore`.
   - All reads are restricted to the caller's membership periods.
-- Groups: create (name + initial Member IDs), add Member, remove Member, leave.
+- Groups (all authenticated; every response is `{ conversation }`, the Group as the caller sees it after the change: `id`, `kind`, `name`, `ownerId` (omitted for a Former Member), `members`, `closed`):
+  - `POST /groups` with `{ name, memberIds }`: create; the caller becomes Owner and Member. `201`.
+  - `POST /groups/:id/members` with `{ userId }`: Owner adds a Member, who is a Member at once. `201`.
+  - `DELETE /groups/:id/members/:userId`: Owner removes a Member. `200`.
+  - `POST /groups/:id/leave`: any Member leaves; ownership passes on, and the last Member to leave closes the Group. `200`; the leaver sees the Group as a Former Member does.
 - Health: unauthenticated, checks the database.
 - Never-Members asking about a Conversation get `404 CONVERSATION_NOT_FOUND`, so existence is not leaked. Former Members trying to post get `403 NOT_A_MEMBER`.
 
@@ -220,12 +225,22 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
   - `CONVERSATION_NOT_FOUND`
   - `NOT_A_MEMBER`
   - `NOT_GROUP_OWNER`
+  - `OWNER_CANNOT_BE_REMOVED`
   - `ALREADY_A_MEMBER`
   - `GROUP_FULL`
   - `GROUP_CLOSED`
   - `CANNOT_MESSAGE_SELF`
   - `RATE_LIMITED`
   - `INTERNAL_ERROR`
+- HTTP status per code, as implemented:
+  - `400`: `VALIDATION_FAILED`, `CANNOT_MESSAGE_SELF`
+  - `401`: `UNAUTHENTICATED`, `SESSION_REVOKED`, `INVALID_CREDENTIALS`
+  - `403`: `NOT_A_MEMBER`, `NOT_GROUP_OWNER`
+  - `404`: `USER_NOT_FOUND`, `CONVERSATION_NOT_FOUND`
+  - `409`: `USERNAME_TAKEN`, `EMAIL_TAKEN`, `ALREADY_A_MEMBER`, `GROUP_FULL`, `GROUP_CLOSED`, `OWNER_CANNOT_BE_REMOVED`
+  - `429`: `RATE_LIMITED`
+  - `500`: `INTERNAL_ERROR`
+- `NOT_A_MEMBER` is also the `403` for the Owner removing a User who is not a Member.
 - Clients and tests branch on `code`, never on `message`.
 
 ### Real-time push (ADR-0001)
@@ -234,7 +249,7 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
 - The socket is **server-push only**: all writes go through HTTP, and any client-emitted event is ignored.
 - Authentication uses the access token in the Socket.IO handshake `auth` payload, checked against signature, expiry, and the deny-list. Failure rejects the connection.
 - Each socket joins a per-User room (`user:<id>`), a per-session room, and a per-Group room (`conversation:<id>`) for every Group it is currently a Member of. Rooms exist for Groups only; Direct Conversations push to the two Users' rooms.
-- Group room rules (ticket 23): the handshake reads the User's current Group memberships and joins those rooms, so a removed User's reconnect does not re-join. Adding a Member joins all that User's sockets to the room; removing a Member or a Member leaving takes all their sockets out of it, before the final push. Group `message.created` (including System Messages) and `group.member_added`, `group.member_removed`, `group.member_left`, `group.owner_changed` go through the Group room. `conversation.created`, `group.closed` and `group.membership_ended` go to User rooms. A socket whose handshake read the Group list just before a concurrent removal commits may keep the room until it reconnects (best-effort, ADR-0001).
+- Group room rules (ticket 23): the handshake reads the User's current Group memberships and joins those rooms, so a removed User's reconnect does not re-join. Adding a Member joins all that User's sockets to the room; removing a Member or a Member leaving takes all their sockets out of it, before the final push. Group `message.created` (including System Messages) and `group.member_added`, `group.member_removed`, `group.member_left`, `group.owner_changed` go through the Group room. `conversation.created`, `group.closed` and `group.membership_ended` go to User rooms. When the last Member leaves, `group.closed` (payload `{ conversationId }` only) goes to the per-User rooms of the leaver and of every Former Member (found from membership periods, at most 256), since none of them is in the Group room any more (ticket 38). A socket whose handshake read the Group list just before a concurrent removal commits may keep the room until it reconnects (best-effort, ADR-0001).
 - Messages are persisted before they are pushed. Push is best-effort; clients recover gaps with the `after=<sequence>` history query on reconnect.
 - Event catalogue (payload schemas live in contracts):
   - `message.created`
@@ -246,7 +261,7 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
   - `group.closed`
   - `group.membership_ended` (`{ conversationId }`, sent to every socket of a removed User or a leaver after they left the room, so `isMember` flips on every tab without a reload; the last Member whose leaving closes the Group gets only `group.closed`)
   - `session.revoked`
-- `message.created` payloads carry the Message shape, including `kind` (`text` or a note kind; defaults to `text` when absent) and, for notes, `subject` (Username and Nickname of the User concerned). The SPA renders notes as `Marker`s from stored Messages only, not from the `group.member_*` events, which just keep the Member count and details list current.
+- `message.created` payloads carry the Message shape, including `kind` (`text` or a System Message kind; defaults to `text` when absent) and, for System Messages, `subject` (Username and Nickname of the User concerned). The SPA renders System Messages as `Marker`s from stored Messages only, not from the `group.member_*` events, which just keep the Member count and details list current.
 - No `user.updated` event in MVP1.
 
 ### Security baseline
@@ -285,7 +300,7 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
   - **Conversation view**:
     - Message list: the `MessageScroller` family, with `MessageScrollerButton` for jump-to-latest.
     - Messages: `MessageGroup` and `Message` (own Messages on the end side), `Bubble`.
-    - Day dividers and membership notes: `Marker`.
+    - Day dividers and System Messages: `Marker`.
     - Pending and failed Messages: `muted` and `destructive` Bubble variants, with a retry action that reuses the original client message ID.
   - **Composer**: `InputGroup` with a textarea, a character counter, and a send button. Enter sends, Shift+Enter inserts a newline.
   - **New Direct Conversation / add Member**: `Command` inside `Dialog`, backed by server-side Username prefix search.
