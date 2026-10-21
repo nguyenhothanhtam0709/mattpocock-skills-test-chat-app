@@ -4,13 +4,15 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Spec describes per-Group rooms and their join/leave rules
-- [ ] Event catalogue lists `group.membership_ended` and the system-Message `kind`/`subject` fields on Messages, and `isMember` on Conversation summaries
-- [ ] Spec notes that creating a Group writes no membership notes
-- [ ] Docs only; no code or package changes
+- [x] Spec describes per-Group rooms and their join/leave rules
+- [x] Event catalogue lists `group.membership_ended` and the system-Message `kind`/`subject` fields on Messages, and `isMember` on Conversation summaries
+- [x] Spec notes that creating a Group writes no membership notes
+- [x] Docs only; no code or package changes
 
 ## Comments
 
 - From the second code review (spec axis).
+
+- Spec updated from the shipped contracts (`packages/contracts`) and the comments of tickets 23 and 24. Also added a System Message paragraph to the domain model and a glossary entry; no ADR was affected. No code or package changes.
