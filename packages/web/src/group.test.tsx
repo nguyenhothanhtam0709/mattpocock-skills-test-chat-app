@@ -28,6 +28,7 @@ const group = {
   name: 'Book Club',
   ownerId: alice.id,
   members: [aliceMember, bob, carol],
+  closed: false,
 };
 
 /** Signed in as Alice with the server recording what is created and sent. */
@@ -145,7 +146,9 @@ describe('a Group in the sidebar', () => {
     signedIn();
     server.use(
       http.get('*/api/v1/conversations', () =>
-        HttpResponse.json({ conversations: [{ ...group, isMember: true, lastMessage: null }] }),
+        HttpResponse.json({
+          conversations: [{ ...group, isMember: true, closed: false, lastMessage: null }],
+        }),
       ),
       http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
         HttpResponse.json({ messages: [], hasMore: false }),

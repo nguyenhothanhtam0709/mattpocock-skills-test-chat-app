@@ -70,6 +70,7 @@ describe('realtime event contracts', () => {
       name: 'Alice',
       members: [{ id, username: 'Alice', nickname: null }],
       isMember: true,
+      closed: false,
       lastMessage: { senderId: id, preview: 'hi', createdAt: message.createdAt },
     };
     expect(ConversationCreatedEventSchema.safeParse({ conversation }).success).toBe(true);

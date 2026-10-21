@@ -91,6 +91,7 @@ function targetOf(conversation: ConversationSummary, user: User): ConversationTa
       kind: 'group',
       name: conversation.name,
       memberCount: conversation.members.length,
+      closed: conversation.closed,
       isMember: conversation.isMember,
     };
   }
@@ -123,6 +124,7 @@ export function AppShell({ user }: { user: User }) {
               kind: 'group',
               name: group.name,
               memberCount: group.members.length,
+              closed: group.closed,
               isMember: true,
             },
             conversationId: group.id,
@@ -159,6 +161,15 @@ export function AppShell({ user }: { user: User }) {
             <ConversationList
               selectedId={open?.conversationId}
               refreshKey={refreshKey}
+              onLoaded={(list) =>
+                // A reload hands the open Group's view the server's latest count and flags.
+                setOpen((current) => {
+                  if (current?.target.kind !== 'group') return current;
+                  const fresh = list.find((c) => c.id === current.conversationId);
+                  const target = fresh && targetOf(fresh, user);
+                  return target ? { ...current, target } : current;
+                })
+              }
               onSelect={(conversation) => {
                 const target = targetOf(conversation, user);
                 if (target) setOpen({ target, conversationId: conversation.id });

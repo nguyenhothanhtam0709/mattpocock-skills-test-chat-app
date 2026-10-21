@@ -1,7 +1,7 @@
 import type { ConversationSummary } from '@chat/contracts';
 import { LAST_MESSAGE_PREVIEW_MAX } from '@chat/contracts';
 import { MessageSquare } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -56,21 +56,29 @@ function ListSkeleton() {
 export function ConversationList({
   selectedId,
   refreshKey,
+  onLoaded,
   onSelect,
 }: {
   selectedId: string | undefined;
   refreshKey: number;
+  /** Called with every list the server returns (first load, reloads, reconnects). */
+  onLoaded?: (list: ConversationSummary[]) => void;
   onSelect: (conversation: ConversationSummary) => void;
 }) {
   const { listConversations } = useAuth();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [pushedReloads, setPushedReloads] = useState(0);
+  const onLoadedRef = useRef(onLoaded);
+  useLayoutEffect(() => {
+    onLoadedRef.current = onLoaded;
+  });
 
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
       const result = await listConversations(controller.signal);
       if (controller.signal.aborted) return;
+      if (result.ok) onLoadedRef.current?.(result.conversations);
       setState(
         result.ok
           ? { status: 'ready', list: result.conversations }

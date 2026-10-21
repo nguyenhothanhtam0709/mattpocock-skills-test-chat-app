@@ -325,6 +325,7 @@ export class MessagesService {
         name: row.groupName ?? other.nickname ?? other.username,
         members: all,
         isMember: row.isMember,
+        closed: row.groupName !== null && all.length === 0,
         lastMessage:
           row.senderId === null
             ? null
@@ -346,7 +347,7 @@ export class MessagesService {
       .where(eq(groups.conversationId, conversationId));
     return {
       conversation: group
-        ? { id: conversationId, kind: 'group', ...group, members }
+        ? { id: conversationId, kind: 'group', ...group, members, closed: members.length === 0 }
         : { id: conversationId, kind: 'direct', members },
     };
   }
@@ -398,7 +399,7 @@ export class MessagesService {
 
     const members = (await this.membersOf([id])).get(id)!;
     await this.pushGroupCreated(id, memberIds);
-    return { conversation: { id, kind: 'group', name, ownerId, members } };
+    return { conversation: { id, kind: 'group', name, ownerId, members, closed: false } };
   }
 
   /** Serialises membership changes and Message sends on one Conversation. */
