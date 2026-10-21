@@ -22,6 +22,16 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// cmdk (shadcn Command) needs ResizeObserver and scrollIntoView, which jsdom lacks.
+if (typeof window !== 'undefined') {
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  Element.prototype.scrollIntoView ??= () => {};
+}
+
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   cleanup();
