@@ -452,9 +452,12 @@ export function ConversationView({
         {target.kind === 'group' ? (
           <>
             <h1 className="truncate text-base font-semibold">{target.name}</h1>
-            <span className="shrink-0 text-sm text-muted-foreground">
-              {memberCount} {memberCount === 1 ? 'member' : 'members'}
-            </span>
+            {/* A Former Member sees no Members, so no count of them either. */}
+            {info?.isMember && !closed && (
+              <span className="shrink-0 text-sm text-muted-foreground">
+                {memberCount} {memberCount === 1 ? 'member' : 'members'}
+              </span>
+            )}
             {conversationId && (
               <>
                 <Button

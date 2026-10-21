@@ -170,3 +170,35 @@ describe('being re-added', () => {
     expect(await screen.findByRole('textbox', { name: /message/i })).toBeInTheDocument();
   });
 });
+
+describe('a Former Member', () => {
+  it('sees no Member count and no Member list, and sees both again when re-added', async () => {
+    const state: ServerGroup = { members: [], closed: false, isMember: false };
+    serverWith(state);
+    const { user, fake } = await openGroup();
+    await screen.findByText(/you are no longer a member of this group/i);
+
+    expect(screen.queryByText(/\d+ members?$/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Group details' }));
+    await screen.findByText(/only members can see who is in this group/i);
+    expect(screen.queryByRole('list', { name: 'Members' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ members?$/)).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    state.members = [aliceMember, bob, carol];
+    state.isMember = true;
+    act(() =>
+      fake.emit({ type: 'group.member_added', conversationId: groupId, member: aliceMember }),
+    );
+
+    expect(await screen.findByText('3 members')).toBeInTheDocument();
+  });
+
+  it('is still told when the Group is closed, with no count', async () => {
+    serverWith({ members: [], closed: true, isMember: false });
+    await openGroup();
+
+    expect(await screen.findByText(/this group is closed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ members?$/)).not.toBeInTheDocument();
+  });
+});

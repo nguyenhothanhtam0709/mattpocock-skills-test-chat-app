@@ -127,9 +127,11 @@ export function GroupDetailsSheet({
         <SheetHeader>
           <SheetTitle>{group?.name ?? 'Group'}</SheetTitle>
           <SheetDescription>
-            {group
-              ? `${group.members.length} ${group.members.length === 1 ? 'member' : 'members'}`
-              : 'Loading members'}
+            {!group
+              ? 'Loading members'
+              : isMember
+                ? `${group.members.length} ${group.members.length === 1 ? 'member' : 'members'}`
+                : 'Only members can see who is in this group.'}
           </SheetDescription>
         </SheetHeader>
         <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 pb-4">
@@ -155,7 +157,7 @@ export function GroupDetailsSheet({
               Leave group
             </Button>
           )}
-          {group && (
+          {group && isMember && (
             <ul aria-label="Members" className="grid gap-1">
               {group.members.map((member) => (
                 <li key={member.id} className="flex items-center gap-2 rounded-md py-1">

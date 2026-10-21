@@ -323,7 +323,8 @@ export class MessagesService {
         id: row.id,
         kind: row.groupName === null ? ('direct' as const) : ('group' as const),
         name: row.groupName ?? other.nickname ?? other.username,
-        members: all,
+        // A Former Member of a Group sees no Members (who joined later is not theirs to know).
+        members: row.groupName !== null && !row.isMember ? [] : all,
         isMember: row.isMember,
         closed: row.groupName !== null && all.length === 0,
         lastMessage:
@@ -345,11 +346,15 @@ export class MessagesService {
       .select({ name: groups.name, ownerId: groups.ownerId })
       .from(groups)
       .where(eq(groups.conversationId, conversationId));
-    return {
-      conversation: group
-        ? { id: conversationId, kind: 'group', ...group, members, closed: members.length === 0 }
-        : { id: conversationId, kind: 'direct', members },
-    };
+    if (!group) return { conversation: { id: conversationId, kind: 'direct', members } };
+    const closed = members.length === 0;
+    // A Former Member sees no Members and no Owner (who joined later is not theirs to know).
+    if (!members.some((m) => m.id === userId)) {
+      return {
+        conversation: { id: conversationId, kind: 'group', name: group.name, members: [], closed },
+      };
+    }
+    return { conversation: { id: conversationId, kind: 'group', ...group, members, closed } };
   }
 
   /**

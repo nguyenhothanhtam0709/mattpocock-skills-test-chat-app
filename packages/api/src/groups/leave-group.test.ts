@@ -117,8 +117,10 @@ describe('POST /groups/:id/leave', () => {
 
       expect(res.statusCode).toBe(200);
       const left = GroupMembershipResponseSchema.parse(res.json()).conversation;
-      expect(left.members.map((m) => m.id)).toEqual([alice.id]);
-      expect(left.ownerId).toBe(alice.id);
+      // The leaver is a Former Member now: the response shows them no Members and no Owner.
+      expect(left.members).toEqual([]);
+      expect(left.ownerId).toBeUndefined();
+      expect(left.closed).toBe(false);
       const posted = await post(app, bob, group.id);
       expect(posted.statusCode).toBe(403);
       expect(errorCode(posted)).toBe(ErrorCode.NOT_A_MEMBER);
@@ -163,7 +165,6 @@ describe('POST /groups/:id/leave', () => {
       const res = await leave(app, alice, group.id);
 
       expect(res.statusCode).toBe(200);
-      expect(GroupMembershipResponseSchema.parse(res.json()).conversation.ownerId).toBe(carol.id);
       expect(await ownerOf(app, bob, group.id)).toBe(carol.id);
       // The new Owner can manage Members.
       expect((await addMember(app, carol, group.id, alice.id)).statusCode).toBe(201);
