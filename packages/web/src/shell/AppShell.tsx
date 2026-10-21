@@ -101,7 +101,9 @@ export function AppShell({ user }: { user: User }) {
   const [open, setOpen] = useState<{ target: ConversationTarget; conversationId?: string }>();
   const [refreshKey, setRefreshKey] = useState(0);
   return (
-    <SidebarProvider>
+    // h-svh: the message scroller sizes its spacer from its viewport, so the frame needs a
+    // definite height; with only min-h-svh the pane grows with the spacer without bound.
+    <SidebarProvider className="h-svh">
       <NewConversationDialog
         open={newConversationOpen}
         onOpenChange={setNewConversationOpen}
