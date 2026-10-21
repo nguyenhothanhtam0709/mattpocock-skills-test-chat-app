@@ -43,12 +43,14 @@ import { MessagesService } from '../messages/messages.service.js';
 import { exactlyOne, nextSequence, toMessage, type Tx } from '../messages/message-rows.js';
 
 /** What leaving did, for the pushes that follow the commit. */
-interface LeaveOutcome {
-  systemMessage: Message;
-  /** Set when the Group closed: everyone who was ever a Member, who all hear of it. */
-  closedFor: string[] | undefined;
-  newOwnerId: string | undefined;
-}
+type LeaveOutcome =
+  | {
+      kind: 'closed';
+      systemMessage: Message;
+      /** Everyone who was ever a Member, who all hear of the closing. */
+      notify: string[];
+    }
+  | { kind: 'open'; systemMessage: Message; newOwnerId: string | undefined };
 
 /**
  * Group lifecycle: create, add, remove, leave. Add, remove and leave share one shape: lock the
@@ -276,19 +278,15 @@ export class GroupsService {
         const successor = await successorOwner(tx, groupId);
         let outcome: LeaveOutcome;
         if (!successor) {
-          outcome = {
-            systemMessage,
-            closedFor: await everMembers(tx, groupId),
-            newOwnerId: undefined,
-          };
+          outcome = { kind: 'closed', systemMessage, notify: await everMembers(tx, groupId) };
         } else if (group.ownerId !== callerId) {
-          outcome = { systemMessage, closedFor: undefined, newOwnerId: undefined };
+          outcome = { kind: 'open', systemMessage, newOwnerId: undefined };
         } else {
           await tx
             .update(groups)
             .set({ ownerId: successor })
             .where(eq(groups.conversationId, groupId));
-          outcome = { systemMessage, closedFor: undefined, newOwnerId: successor };
+          outcome = { kind: 'open', systemMessage, newOwnerId: successor };
         }
         return { leaver, outcome };
       },
@@ -298,11 +296,11 @@ export class GroupsService {
         });
         const response = await this.messagesService.getGroup(callerId, groupId);
         await this.pushSafely(groupId, () => {
-          if (outcome.closedFor) {
+          if (outcome.kind === 'closed') {
             // Former Members are no longer in the Group room, so this goes to their User rooms.
             this.realtime.push(
               RealtimeEvent.GROUP_CLOSED,
-              outcome.closedFor,
+              outcome.notify,
               { conversationId: groupId },
               groupId,
             );
