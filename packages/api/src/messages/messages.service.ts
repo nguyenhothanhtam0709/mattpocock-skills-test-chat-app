@@ -576,8 +576,8 @@ export class MessagesService {
     await this.requireOwner(callerId, groupId);
     if (userId === callerId) {
       throw new DomainException(
-        ErrorCode.VALIDATION_FAILED,
-        HttpStatus.BAD_REQUEST,
+        ErrorCode.OWNER_CANNOT_BE_REMOVED,
+        HttpStatus.CONFLICT,
         'The Owner cannot be removed from their Group',
       );
     }
