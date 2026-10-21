@@ -17,7 +17,7 @@ export const MessageBodySchema = z.string().refine(
     return (
       chars.length <= MESSAGE_BODY_MAX &&
       value.trim() !== '' &&
-      !chars.some((char) => isForbiddenControl(char.codePointAt(0)!))
+      !chars.some((char) => isForbiddenControl(char.codePointAt(0) ?? 0))
     );
   },
   { message: `must be 1-${MESSAGE_BODY_MAX} characters of text, not blank` },

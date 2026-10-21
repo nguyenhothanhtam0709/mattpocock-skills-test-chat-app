@@ -83,11 +83,11 @@ export class ConversationQueries {
     const members = await this.membersOf(rows.map((r) => r.id));
     return rows.map((row) => {
       const all = members.get(row.id) ?? [];
-      const other = all.find((m) => m.id !== userId) ?? all[0]!;
+      const other = all.find((m) => m.id !== userId) ?? all[0];
       return {
         id: row.id,
         kind: row.groupName === null ? ('direct' as const) : ('group' as const),
-        name: row.groupName ?? other.nickname ?? other.username,
+        name: row.groupName ?? (other ? (other.nickname ?? other.username) : ''),
         // A Former Member of a Group sees no Members (who joined later is not theirs to know).
         members: row.groupName !== null && !row.isMember ? [] : all,
         isMember: row.isMember,
