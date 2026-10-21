@@ -261,9 +261,13 @@ export function ConversationView({
   const listedCount = target.kind === 'group' ? target.memberCount : 0;
   const listedClosed = target.kind === 'group' ? target.closed : false;
   const listedIsMember = target.kind === 'group' ? target.isMember : false;
-  // A reload of the Conversation list hands down a fresh snapshot: it replaces ours.
+  // Set once the Group's own endpoint has answered: its answers are fresher than any list
+  // snapshot, whose request may have been made before a Member change and answered after it.
+  const answered = useRef(false);
+  // A reload of the Conversation list hands down a fresh snapshot: it replaces ours, until the
+  // server has answered about this Group itself.
   useEffect(() => {
-    if (!isGroup) return;
+    if (!isGroup || answered.current) return;
     setInfo({ memberCount: listedCount, closed: listedClosed, isMember: listedIsMember });
   }, [isGroup, listedCount, listedClosed, listedIsMember]);
 
@@ -277,6 +281,7 @@ export function ConversationView({
       const result = await getGroup(conversationId);
       if (!result.ok || mine !== refreshes.current) return;
       const { group } = result;
+      answered.current = true;
       setInfo({
         memberCount: group.members.length,
         closed: group.closed,
