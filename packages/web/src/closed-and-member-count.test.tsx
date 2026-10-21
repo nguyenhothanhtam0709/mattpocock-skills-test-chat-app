@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { fakeRealtime } from './test/fake-realtime';
@@ -111,6 +111,26 @@ describe('the Member count', () => {
     state.members = [];
     state.closed = true;
     act(() => fake.emit({ type: 'group.closed', conversationId: groupId }));
+
+    expect(await screen.findByText(/this group is closed/i)).toBeInTheDocument();
+  });
+
+  it("flips a Former Member's sidebar entry to closed when group.closed arrives", async () => {
+    const state: ServerGroup = { members: [bob], closed: false, isMember: false };
+    serverWith(state);
+    // The Group's own endpoint never answers, so the entry alone decides what opening it shows.
+    server.use(http.get(`*/api/v1/conversations/${groupId}`, () => delay('infinite')));
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    const user = userEvent.setup();
+    const entry = await screen.findByRole('button', { name: /Book Club/ });
+
+    state.members = [];
+    state.closed = true;
+    act(() => fake.emit({ type: 'group.closed', conversationId: groupId }));
+    // The event reloads the list; wait for the reloaded entry before opening it.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await user.click(entry);
 
     expect(await screen.findByText(/this group is closed/i)).toBeInTheDocument();
   });
