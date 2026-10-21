@@ -51,3 +51,7 @@ _Avoid_: Ex-member, removed user
 **Message**:
 An immutable piece of plain text sent by a Member to exactly one Conversation.
 _Avoid_: Post, chat
+
+**System Message**:
+A Message the system stores to record a membership change in a Group ("Bob was added", "Bob was removed", "Bob left"); it has a kind and a subject User, and takes a place in the sequence like any Message.
+_Avoid_: Notification, event, note (as a stored thing)

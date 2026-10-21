@@ -137,7 +137,7 @@ A person registers as a User (Username, email, password, optional Nickname) and 
 
 - pnpm workspace monorepo with three packages: the **API** (NestJS), the **web** SPA (React), and **contracts** (shared Zod schemas, inferred types, the `ErrorCode` enum, and push-event definitions). Contracts is the single source of truth for every payload shape crossing a boundary.
 - Node 24, native ESM throughout, TypeScript strict mode. Confirm NestJS 12 ESM support while scaffolding.
-- Single server process, single PostgreSQL database for MVP1; no horizontal scaling. Design choices (UUIDv7 IDs, per-Conversation sequence, per-User push rooms, ports for stores) are made so that scaling/sharding by Conversation later is not blocked.
+- Single server process, single PostgreSQL database for MVP1; no horizontal scaling. Design choices (UUIDv7 IDs, per-Conversation sequence, per-User and per-Group push rooms, ports for stores) are made so that scaling/sharding by Conversation later is not blocked.
 - ESLint + Prettier. Lint rules ban `dangerouslySetInnerHTML` in application code and any import of `class-validator` / `class-transformer`.
 - Local Postgres via a docker-compose file.
 
@@ -185,6 +185,7 @@ A person registers as a User (Username, email, password, optional Nickname) and 
   - A User sees only Messages whose sequence falls within one of their membership periods. A **Former Member** keeps that read access. Re-adding a Former Member opens a new period; the gap stays hidden.
   - A Closed Group rejects new Messages and new Members.
 - **Message**: immutable plain text, belongs to exactly one Conversation, has a sender, a server-assigned per-Conversation sequence number, a server timestamp, and the sender's client message ID.
+- **System Message** (membership note, ticket 24): adding, removing or leaving a Member stores a note ("Bob was added", "Bob was removed", "Bob left") as a Message row with `kind` `member_added` / `member_removed` / `member_left` (ordinary Messages are `text`). It takes the next sequence in the same transaction as the membership change; `senderId` is whoever made the change (the Owner, or the leaver), `body` is empty, and the User it is about is its `subject`. A note sits inside the subject's own membership period (an added User's period starts just before their "added" note; a removed or leaving User's period ends at their note), so each reader sees a note only inside one of their periods. History, gap-fill and `limit` treat notes like any Message. Notes never become a Conversation's preview and never move it in the list. Creating a Group writes no notes: the initial Members are not "added". Past membership changes are not backfilled.
 - Sequence assignment: each Conversation holds a last-sequence counter; sending increments it and inserts the Message within one transaction (row-locked), so `(conversation, sequence)` is unique and strictly increasing. Client clocks are never trusted.
 - Idempotency: `(sender, client message ID)` is unique. Re-sending with the same client message ID returns the original Message with `200` instead of `201`.
 
@@ -196,7 +197,7 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
 - Current User: get profile, update Nickname (set or clear).
 - User search: `q` (2–32 chars), Username prefix match only, case-insensitive, `%` and `_` escaped, exact match ranked first, max 20 results, excludes the searcher, returns ID + Username + Nickname only.
 - Direct send: send a Message to a User (by User ID), creating the Direct Conversation if needed. Returns the Message and Conversation.
-- Conversations: list the current User's Conversations (including ones they are a Former Member of), sorted by latest Message, each with display name, kind, last Message preview, and time. Get one Conversation (Members, Owner, closed flag).
+- Conversations: list the current User's Conversations (including ones they are a Former Member of), sorted by latest Message, each with display name, kind, last Message preview, and time. Each summary carries `isMember`, false for a Former Member (they can read their windows but not post). Get one Conversation (Members, Owner, closed flag).
 - Messages:
   - Send to an existing Conversation.
   - History with `before=<sequence>` (scroll up, newest first) or `after=<sequence>` (gap fill, oldest first). `limit` 1–100, default 10. Responses include `hasMore`.
@@ -232,7 +233,8 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
 - Socket.IO via the official NestJS Socket.IO adapter, WebSocket transport only (no long-polling fallback), MessagePack parser, and per-message deflate.
 - The socket is **server-push only**: all writes go through HTTP, and any client-emitted event is ignored.
 - Authentication uses the access token in the Socket.IO handshake `auth` payload, checked against signature, expiry, and the deny-list. Failure rejects the connection.
-- Each socket joins a per-User room and a per-session room. Pushes target the per-User rooms of the relevant Members. Membership changes need no room bookkeeping.
+- Each socket joins a per-User room (`user:<id>`), a per-session room, and a per-Group room (`conversation:<id>`) for every Group it is currently a Member of. Rooms exist for Groups only; Direct Conversations push to the two Users' rooms.
+- Group room rules (ticket 23): the handshake reads the User's current Group memberships and joins those rooms, so a removed User's reconnect does not re-join. Adding a Member joins all that User's sockets to the room; removing a Member or a Member leaving takes all their sockets out of it, before the final push. Group `message.created` (including System Messages) and `group.member_added`, `group.member_removed`, `group.member_left`, `group.owner_changed` go through the Group room. `conversation.created`, `group.closed` and `group.membership_ended` go to User rooms. A socket whose handshake read the Group list just before a concurrent removal commits may keep the room until it reconnects (best-effort, ADR-0001).
 - Messages are persisted before they are pushed. Push is best-effort; clients recover gaps with the `after=<sequence>` history query on reconnect.
 - Event catalogue (payload schemas live in contracts):
   - `message.created`
@@ -242,7 +244,9 @@ All routes are under `/api/v1`, JSON bodies use camelCase, and timestamps are IS
   - `group.member_left`
   - `group.owner_changed`
   - `group.closed`
+  - `group.membership_ended` (`{ conversationId }`, sent to every socket of a removed User or a leaver after they left the room, so `isMember` flips on every tab without a reload; the last Member whose leaving closes the Group gets only `group.closed`)
   - `session.revoked`
+- `message.created` payloads carry the Message shape, including `kind` (`text` or a note kind; defaults to `text` when absent) and, for notes, `subject` (Username and Nickname of the User concerned). The SPA renders notes as `Marker`s from stored Messages only, not from the `group.member_*` events, which just keep the Member count and details list current.
 - No `user.updated` event in MVP1.
 
 ### Security baseline

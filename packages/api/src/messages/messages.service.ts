@@ -887,7 +887,7 @@ export class MessagesService {
       .insert(messages)
       .values({ conversationId, senderId: actorId, sequence: counter!.sequence, kind })
       .returning();
-    await tx.insert(membershipNotes).values({ messageId: row!.id, subjectId: subject.id });
+    await tx.insert(membershipNotes).values({ messageId: row!.id, kind, subjectId: subject.id });
     return toMessage(row!, subject);
   }
 
