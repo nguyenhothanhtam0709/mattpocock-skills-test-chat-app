@@ -139,6 +139,22 @@ describe('Members leaving, seen by the others', () => {
 
     act(() => fake.emit({ type: 'group.member_left', conversationId: groupId, member: bob }));
     act(() =>
+      fake.emit({
+        type: 'message.created',
+        message: {
+          id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e9a01',
+          conversationId: groupId,
+          senderId: bob.id,
+          sequence: 4,
+          clientMessageId: '0198a2b4-7c3e-7a52-9f31-5d2f4d1e9a01',
+          kind: 'member_left',
+          body: '',
+          subject: bob,
+          createdAt: '2020-03-05T10:00:00.000Z',
+        },
+      }),
+    );
+    act(() =>
       fake.emit({ type: 'group.owner_changed', conversationId: groupId, ownerId: carol.id }),
     );
 

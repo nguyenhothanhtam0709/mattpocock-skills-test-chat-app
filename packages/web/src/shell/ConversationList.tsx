@@ -101,6 +101,8 @@ export function ConversationList({
         }
         if (event.type !== 'message.created') return;
         const { message } = event;
+        // Membership notes do not touch the preview or the order (spec: only Messages do).
+        if (message.kind !== 'text') return;
         const known = listed.find((c) => c.id === message.conversationId);
         if (!known) {
           // Not listed (e.g. the sender's other tab started it): the server knows the rest.

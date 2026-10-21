@@ -82,7 +82,9 @@ const history = (app: NestFastifyApplication, as: Person, groupId: string, query
   });
 
 const bodies = (res: { json(): unknown }) =>
-  GetMessagesResponseSchema.parse(res.json()).messages.map((m) => m.body);
+  GetMessagesResponseSchema.parse(res.json())
+    .messages.filter((m) => m.kind === 'text')
+    .map((m) => m.body);
 
 async function summaryOf(app: NestFastifyApplication, as: Person, groupId: string) {
   const res = await app.inject({
@@ -206,7 +208,7 @@ describe('membership periods and history windows', () => {
         'first period',
       ]);
       expect(bodies(await history(app, bob, group.id))).toEqual(['second period', 'first period']);
-      const paged = await history(app, bob, group.id, '?limit=1');
+      const paged = await history(app, bob, group.id, '?limit=2');
       expect(bodies(paged)).toEqual(['second period']);
       expect(GetMessagesResponseSchema.parse(paged.json()).hasMore).toBe(true);
       expect(bodies(await history(app, bob, group.id, '?before=3'))).toEqual(['first period']);

@@ -44,6 +44,7 @@ const message = (over: Partial<Record<string, unknown>>) => ({
   senderId: bob.id,
   sequence: 3,
   clientMessageId: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8d10',
+  kind: 'text',
   body: 'new one',
   createdAt: '2020-03-05T10:00:00.000Z',
   ...over,

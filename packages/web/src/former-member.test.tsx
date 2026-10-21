@@ -47,6 +47,17 @@ function formerMemberOf(isMember: boolean) {
       HttpResponse.json({
         messages: [
           {
+            id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c03',
+            conversationId: groupId,
+            senderId: bob.id,
+            sequence: 2,
+            clientMessageId: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c04',
+            kind: 'member_removed',
+            body: '',
+            subject: { id: alice.id, username: alice.username, nickname: alice.nickname },
+            createdAt: '2026-10-20T09:31:00.000Z',
+          },
+          {
             id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8c01',
             conversationId: groupId,
             senderId: bob.id,
@@ -75,6 +86,7 @@ describe('a Group the User is a Former Member of', () => {
     await user.click(await screen.findByRole('button', { name: /Book Club/ }));
 
     expect(await screen.findByText('see you all', { selector: 'div' })).toBeInTheDocument();
+    expect(screen.getByText('Alice was removed')).toBeInTheDocument();
     expect(screen.getByText(/you are no longer a member of this group/i)).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /message/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^send$/i })).not.toBeInTheDocument();

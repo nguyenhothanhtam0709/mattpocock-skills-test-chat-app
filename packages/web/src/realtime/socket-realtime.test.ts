@@ -30,6 +30,7 @@ const message = {
   senderId: id,
   sequence: 1,
   clientMessageId: id,
+  kind: 'text',
   body: 'hi',
   createdAt: '2030-01-01T00:00:00.000Z',
 };
