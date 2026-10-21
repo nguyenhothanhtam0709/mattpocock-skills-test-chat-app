@@ -4,13 +4,14 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Add `cmdk` to `packages/web` (approved by the user for this ticket; no other package changes)
-- [ ] Add the shadcn `command` component the project's usual way
-- [ ] New Group dialog and Add Member picker use `Command` with the existing user-search endpoint
-- [ ] Existing SPA tests for both flows pass or are updated; behaviour is unchanged
+- [x] Add `cmdk` to `packages/web` (approved by the user for this ticket; no other package changes)
+- [x] Add the shadcn `command` component the project's usual way
+- [x] New Group dialog and Add Member picker use `Command` with the existing user-search endpoint
+- [x] Existing SPA tests for both flows pass or are updated; behaviour is unchanged
 
 ## Comments
 
 - Package approval: the user approved adding `cmdk` (2026-10-21).
+- Implementation: the shared `UserSearchCombobox` now renders shadcn `Command` (cmdk with `shouldFilter={false}`; server does the matching), so the New Conversation dialog uses it too. Test setup gained jsdom stubs for `ResizeObserver`/`scrollIntoView` (no package change). The shadcn CLI also added a bogus `cn` dependency and `from "cn"` import; both were removed in favour of `@/lib/utils`.
