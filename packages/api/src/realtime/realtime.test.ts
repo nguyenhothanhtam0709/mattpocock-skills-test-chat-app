@@ -13,7 +13,13 @@ import { LEVEL } from '../../test/log-capture.js';
 import { RealtimeGateway } from './realtime.gateway.js';
 import { testClock } from '../../test/test-clock.js';
 import { withApp } from '../../test/app-harness.js';
-import { closeAllSockets, connectSocket, listenOnRandomPort } from '../../test/socket-client.js';
+import {
+  closeAllRawSockets,
+  closeAllSockets,
+  connectRawSocket,
+  connectSocket,
+  listenOnRandomPort,
+} from '../../test/socket-client.js';
 
 const ACCESS_TTL = 900;
 const password = 'correct horse battery';
@@ -46,7 +52,10 @@ async function logIn(app: NestFastifyApplication, username: string): Promise<Per
   return { id: login.user.id, token: login.accessToken, sessionId };
 }
 
-afterEach(closeAllSockets);
+afterEach(() => {
+  closeAllSockets();
+  closeAllRawSockets();
+});
 
 describe('socket handshake', () => {
   it('accepts a valid access token in the auth payload', async () => {
@@ -91,6 +100,31 @@ describe('socket handshake', () => {
       });
 
       await expect(connectSocket(url, alice.token)).rejects.toThrow('SESSION_REVOKED');
+    });
+  });
+
+  it('closes the connection after rejecting a missing, garbage or revoked-session handshake', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const url = await listenOnRandomPort(app);
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/logout',
+        headers: { authorization: `Bearer ${alice.token}` },
+      });
+      const valid = await signUp(app, 'Bob');
+      const stays = await connectSocket(url, valid.token);
+
+      for (const [token, code] of [
+        [undefined, 'UNAUTHENTICATED'],
+        ['not-a-token', 'UNAUTHENTICATED'],
+        [alice.token, 'SESSION_REVOKED'],
+      ] as const) {
+        const rejected = await connectRawSocket(url, token);
+        expect(rejected.error).toBe(code);
+        expect(await rejected.closedByServer(1000)).toBe('closed');
+      }
+      expect(stays.socket.connected).toBe(true);
     });
   });
 
