@@ -14,6 +14,7 @@
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @chat/api db:generate",
     "db:migrate": "pnpm --filter @chat/api db:migrate",
+    "db:seed": "pnpm --filter @chat/api db:seed",
     "test": "pnpm build:contracts && pnpm -r --workspace-concurrency=1 test",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

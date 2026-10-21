@@ -12,6 +12,7 @@ import { PG_POOL } from '../db/database.module.js';
 import { sessions, users } from '../db/schema.js';
 import { TOKEN_DENY_LIST, type TokenDenyList } from './token-deny-list.js';
 import type { AuthContext } from './auth.guard.js';
+import { hashPassword } from './password-hash.js';
 import { TokenService } from './token.service.js';
 
 export interface NewUser {
@@ -202,7 +203,7 @@ export class AuthService {
   }
 
   async register(input: NewUser): Promise<RegisterResponse> {
-    const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+    const passwordHash = await hashPassword(input.password);
     try {
       const [row] = await this.db
         .insert(users)
