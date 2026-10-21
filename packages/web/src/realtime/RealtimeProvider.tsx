@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -36,7 +37,9 @@ export function RealtimeProvider({
 export function useRealtimeEvents(listener: (event: RealtimeEvent) => void): void {
   const realtime = useContext(RealtimeContext);
   const latest = useRef(listener);
-  useEffect(() => {
+  // Layout effect, not passive: the new listener must be in place as soon as the render that
+  // produced it is visible, or a push landing in that gap reaches a stale listener and is lost.
+  useLayoutEffect(() => {
     latest.current = listener;
   });
   useEffect(() => realtime.subscribe((event) => latest.current(event)), [realtime]);
@@ -54,7 +57,7 @@ export function useConnectionStatus(): ConnectionStatus {
 export function useReconnected(onReconnect: () => void): void {
   const realtime = useContext(RealtimeContext);
   const latest = useRef(onReconnect);
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = onReconnect;
   });
   useEffect(() => {
