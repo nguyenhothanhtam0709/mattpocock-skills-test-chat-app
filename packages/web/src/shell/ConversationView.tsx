@@ -3,7 +3,6 @@ import {
   MessageBodySchema,
   type Message as ChatMessage,
   type User,
-  type UserSearchResult,
 } from '@chat/contracts';
 import { ArrowDown, ArrowUp, Info } from 'lucide-react';
 import {
@@ -27,6 +26,7 @@ import {
   InputGroupTextarea,
 } from '@/components/ui/input-group';
 import { GroupDetailsSheet } from './GroupDetailsSheet';
+import { displayName, type ConversationTarget } from './conversation-target';
 import { Marker, MarkerContent } from '@/components/ui/marker';
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message';
 import {
@@ -75,9 +75,7 @@ const NOTE_VERBS = {
 
 /** The note's text, or undefined for a Message a Member wrote. */
 const noteText = (m: ChatMessage): string | undefined =>
-  m.kind === 'text' || !m.subject
-    ? undefined
-    : `${m.subject.nickname ?? m.subject.username} ${NOTE_VERBS[m.kind]}`;
+  m.kind === 'text' || !m.subject ? undefined : `${displayName(m.subject)} ${NOTE_VERBS[m.kind]}`;
 
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
@@ -170,12 +168,6 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
     </form>
   );
 }
-
-/** What a view is showing: a Direct Conversation with a peer, or an existing Group. */
-export type ConversationTarget =
-  | { kind: 'direct'; peer: UserSearchResult }
-  /** `isMember` is false for a Former Member, who can read their windows but not post. */
-  | { kind: 'group'; name: string; memberCount: number; closed: boolean; isMember: boolean };
 
 /** What the server last told us about the Group; events and refetches keep it current. */
 interface GroupInfo {
@@ -491,9 +483,7 @@ export function ConversationView({
           </>
         ) : (
           <>
-            <h1 className="truncate text-base font-semibold">
-              {target.peer.nickname ?? target.peer.username}
-            </h1>
+            <h1 className="truncate text-base font-semibold">{displayName(target.peer)}</h1>
             {target.peer.nickname !== null && (
               <span className="truncate text-sm text-muted-foreground">
                 @{target.peer.username}
@@ -508,7 +498,7 @@ export function ConversationView({
             No messages yet.{' '}
             {target.kind === 'group'
               ? 'Say hello to the Group.'
-              : `Say hello to ${target.peer.nickname ?? target.peer.username}.`}
+              : `Say hello to ${displayName(target.peer)}.`}
           </p>
         ) : (
           <MessageScrollerProvider>

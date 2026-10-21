@@ -29,9 +29,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useRealtimeEvents } from '@/realtime/RealtimeProvider';
+import { displayName } from './conversation-target';
 import { UserSearchCombobox } from './NewConversationDialog';
-
-const displayName = (user: UserSearchResult): string => user.nickname ?? user.username;
 
 /**
  * A Group's Members, with the Owner marked. Only the Owner can add Users (by Username search)

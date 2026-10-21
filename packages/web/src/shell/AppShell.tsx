@@ -29,7 +29,8 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useConnectionStatus } from '@/realtime/RealtimeProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ConversationList } from './ConversationList';
-import { ConversationView, type ConversationTarget } from './ConversationView';
+import { ConversationView } from './ConversationView';
+import { groupTarget, type ConversationTarget } from './conversation-target';
 import { NewConversationDialog } from './NewConversationDialog';
 import { NewGroupDialog } from './NewGroupDialog';
 import { ProfileDialog } from './ProfileDialog';
@@ -87,13 +88,7 @@ function UserMenu({ user }: { user: User }) {
 
 function targetOf(conversation: ConversationSummary, user: User): ConversationTarget | undefined {
   if (conversation.kind === 'group') {
-    return {
-      kind: 'group',
-      name: conversation.name,
-      memberCount: conversation.members.length,
-      closed: conversation.closed,
-      isMember: conversation.isMember,
-    };
+    return groupTarget(conversation, conversation.isMember);
   }
   const peer = conversation.members.find((m) => m.id !== user.id);
   return peer && { kind: 'direct', peer };
@@ -120,13 +115,7 @@ export function AppShell({ user }: { user: User }) {
         onOpenChange={setNewGroupOpen}
         onCreated={(group) => {
           setOpen({
-            target: {
-              kind: 'group',
-              name: group.name,
-              memberCount: group.members.length,
-              closed: group.closed,
-              isMember: true,
-            },
+            target: groupTarget(group, true),
             conversationId: group.id,
           });
           setRefreshKey((k) => k + 1);
