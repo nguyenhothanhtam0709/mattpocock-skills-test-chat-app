@@ -21,3 +21,9 @@ Things noticed but deliberately not done now.
 - **Seen:** while verifying ticket 46 at 375x667 with touch emulation, choosing a Conversation in the sidebar sheet left the sheet open until Escape was pressed.
 - **Not done:** not ticketed, and not part of ticket 46.
 - **Idea:** close the sheet when a Conversation is selected on mobile.
+
+## Throttler route strings are duplicated away from the controllers
+
+- **Seen:** in the spec 00002 code review. `throttling/throttling.module.ts` hard-codes `SEARCH_URL`, `SEND_URLS` and `/api/v1/auth/login`, separate from the controllers that define those routes. Renaming a route or the global prefix would silently switch the matching limit off, and no test ties the strings to the real routes.
+- **Not done:** spec 00002 said to move the limits and route rules unchanged, so this was left as it was.
+- **Idea:** derive the throttler routes from the controllers' route metadata, or add a test that each limited route is actually limited.
