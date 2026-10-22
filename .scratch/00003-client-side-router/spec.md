@@ -1,6 +1,6 @@
 # Spec: Client-side router
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

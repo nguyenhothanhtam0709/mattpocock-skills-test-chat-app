@@ -16,4 +16,4 @@
 
 ## Comments
 
-Adopted `react-router` in declarative mode: `BrowserRouter` inside `App`, `RequireSignedIn` and `SignedOutOnly` wrapper routes, a catch-all shell route, `replace` redirects. Deleted `router.ts`; the login form's sign-up link is now a `Link`. Added `routing.test.tsx` (signed-in `/login`, unknown path signed in and out, redirect adds no history entry). Web tests, typecheck and lint pass; API tests need Docker and were not run. Manual dev/serve pass not done (needs a browser).
+Adopted `react-router` in declarative mode: `BrowserRouter` inside `App`, `RequireSignedIn` and `SignedOutOnly` wrapper routes, a catch-all shell route, `replace` redirects. Deleted `router.ts`; the login form's sign-up link is now a `Link`. Added `routing.test.tsx` (signed-in `/login`, unknown path signed in and out, redirect adds no history entry). Web tests, typecheck and lint pass; API tests need Docker and were not run. Manual pass in Chrome against `pnpm dev:web` (StrictMode) with a mocked API: all routing cases behave as specified; `pnpm serve:web` and session revocation not manually checked.
