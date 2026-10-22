@@ -6,11 +6,11 @@
 
 **Status:** ready-for-agent
 
-- [ ] The auth module does not import the realtime module, directly or indirectly
-- [ ] The auth and users controllers are in their own module that imports auth and realtime
-- [ ] The realtime module imports auth and memberships
-- [ ] No `forwardRef`
-- [ ] All existing tests pass without edits
-- [ ] No new package or dependency
+- [x] The auth module does not import the realtime module, directly or indirectly
+- [x] The auth and users controllers are in their own module that imports auth and realtime
+- [x] The realtime module imports auth and memberships
+- [x] No `forwardRef`
+- [x] All existing tests pass without edits
+- [x] No new package or dependency
 
 ## Comments
