@@ -1,15 +1,10 @@
 import { and, eq, gt, lte, sql } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Pool } from 'pg';
+import type { Database } from '../db/database.module.js';
 import { tokenDenyList } from '../db/schema.js';
 import type { TokenDenyList } from './token-deny-list.js';
 
 export class PostgresTokenDenyList implements TokenDenyList {
-  private readonly db: NodePgDatabase;
-
-  constructor(pool: Pool) {
-    this.db = drizzle(pool);
-  }
+  constructor(private readonly db: Database) {}
 
   async add(jti: string, expiresAt: Date): Promise<void> {
     await this.db

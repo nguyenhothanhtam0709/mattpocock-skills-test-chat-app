@@ -13,13 +13,12 @@ import {
   type GroupMembershipResponse,
 } from '@chat/contracts';
 import { and, asc, desc, eq, exists, gt, lt, lte, sql } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Pool } from 'pg';
 import type { Logger } from 'pino';
 import { PINO } from '../logging/logging.module.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { DomainException } from '../common/all-exceptions.filter.js';
-import { PG_POOL } from '../db/database.module.js';
+import { InjectDrizzle } from '@nestjs/drizzle';
+import type { Database } from '../db/database.module.js';
 import {
   conversationMembers,
   conversations,
@@ -47,17 +46,13 @@ class DuplicateClientMessage extends Error {}
 /** Direct sending, history, and the Conversation read side. Group lifecycle is `GroupsService`. */
 @Injectable()
 export class MessagesService {
-  private readonly db: NodePgDatabase;
-
   constructor(
-    @Inject(PG_POOL) pool: Pool,
+    @InjectDrizzle() private readonly db: Database,
     private readonly realtime: RealtimeGateway,
     private readonly commitOrder: CommitOrder,
     private readonly queries: ConversationQueries,
     @Inject(PINO) private readonly logger: Logger,
-  ) {
-    this.db = drizzle(pool);
-  }
+  ) {}
 
   /** Sends to a User, creating the Direct Conversation with the first Message. */
   async sendDirect(
