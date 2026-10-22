@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `react-router` is the only package added or changed
 - [ ] The hand-rolled router module, its navigate/path helpers and the redirect effect are gone
@@ -15,3 +15,5 @@
 - [ ] `pnpm typecheck`, `pnpm test` and `pnpm lint` pass
 
 ## Comments
+
+Adopted `react-router` in declarative mode: `BrowserRouter` inside `App`, `RequireSignedIn` and `SignedOutOnly` wrapper routes, a catch-all shell route, `replace` redirects. Deleted `router.ts`; the login form's sign-up link is now a `Link`. Added `routing.test.tsx` (signed-in `/login`, unknown path signed in and out, redirect adds no history entry). Web tests, typecheck and lint pass; API tests need Docker and were not run. Manual dev/serve pass not done (needs a browser).

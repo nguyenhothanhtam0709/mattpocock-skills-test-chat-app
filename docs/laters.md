@@ -2,9 +2,9 @@
 
 Decisions to revisit after MVP1. These are intentions, not commitments; turn each into a spec/ADR before starting.
 
-## Client-side router
+## Conversation URLs
 
-The SPA has no router. After ticket 03, `App` picks the signup page when the path is `/signup` and the health page otherwise, as a stopgap. Add a real router when ticket 04 (login, session, app shell) lands, and delete the path check.
+A URL per Conversation, so reload, Back and deep links work. Today the open Conversation lives in app shell state. Awkward for a new Direct Conversation, which has no id until the first Message is sent.
 
 ## Contract-first development
 

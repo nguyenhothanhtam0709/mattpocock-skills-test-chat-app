@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { navigate } from '@/router';
+import { Link } from 'react-router';
 
 type LoginField = 'identifier' | 'password';
 type Errors = Partial<Record<LoginField, string>>;
@@ -77,16 +77,7 @@ export function LoginForm({ ...props }: React.ComponentProps<typeof Card>) {
                 Login
               </Button>
               <FieldDescription className="text-center">
-                Don&apos;t have an account?{' '}
-                <a
-                  href="/signup"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate('/signup');
-                  }}
-                >
-                  Sign up
-                </a>
+                Don&apos;t have an account? <Link to="/signup">Sign up</Link>
               </FieldDescription>
             </Field>
           </FieldGroup>

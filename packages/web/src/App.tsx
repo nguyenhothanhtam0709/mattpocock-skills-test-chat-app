@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignupPage } from '@/auth/SignupPage';
@@ -9,31 +9,47 @@ import {
   type CreateRealtime,
 } from '@/realtime/RealtimeProvider';
 import { noRealtime } from '@/realtime/events';
-import { navigate, usePath } from '@/router';
 import { AppShell } from '@/shell/AppShell';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
-/**
- * No router library yet. `/signup` and `/health` are public; `/login` is for signed-out
- * Users; everything else is the app shell, which signed-out Users are sent away from.
- */
-function Routes() {
-  const path = usePath();
+/** Renders nothing while auth is loading; signed-out Users are sent to `/login`. */
+function RequireSignedIn() {
   const { state } = useAuth();
-  const signedIn = state.status === 'signedIn';
-  const signedOut = state.status === 'signedOut';
-  const isPublic = path === '/signup' || path === '/health';
-
-  useEffect(() => {
-    if (signedOut && !isPublic && path !== '/login') navigate('/login');
-    if (signedIn && path === '/login') navigate('/');
-  }, [signedIn, signedOut, isPublic, path]);
-
-  if (path === '/signup') return <SignupPage />;
-  if (path === '/health') return <HealthPage />;
   if (state.status === 'loading') return null;
-  if (state.status === 'signedIn') return path === '/login' ? null : <AppShell user={state.user} />;
-  return path === '/login' ? <LoginPage /> : null;
+  if (state.status === 'signedOut') return <Navigate to="/login" replace />;
+  return <Outlet />;
+}
+
+/** Renders nothing while auth is loading; signed-in Users are sent to `/`. */
+function SignedOutOnly() {
+  const { state } = useAuth();
+  if (state.status === 'loading') return null;
+  if (state.status === 'signedIn') return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
+function Shell() {
+  const { state } = useAuth();
+  return state.status === 'signedIn' ? <AppShell user={state.user} /> : null;
+}
+
+/**
+ * `/signup` and `/health` are public; `/login` is for signed-out Users; everything else
+ * is the app shell, which signed-out Users are sent away from.
+ */
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/health" element={<HealthPage />} />
+      <Route element={<SignedOutOnly />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+      <Route element={<RequireSignedIn />}>
+        <Route path="*" element={<Shell />} />
+      </Route>
+    </Routes>
+  );
 }
 
 /** The server ended this session (e.g. logout in another tab): sign out and go to login. */
@@ -58,7 +74,9 @@ export function App({ createRealtime = noConnection }: { createRealtime?: Create
       <AuthProvider>
         <RealtimeProvider create={createRealtime}>
           <SessionRevocationWatcher />
-          <Routes />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
         </RealtimeProvider>
       </AuthProvider>
     </ThemeProvider>
