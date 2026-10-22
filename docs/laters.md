@@ -6,9 +6,14 @@ Decisions to revisit after MVP1. These are intentions, not commitments; turn eac
 
 The SPA has no router. After ticket 03, `App` picks the signup page when the path is `/signup` and the health page otherwise, as a stopgap. Add a real router when ticket 04 (login, session, app shell) lands, and delete the path check.
 
-## Migrate to `@nestjs/drizzle`
+## Finish the move to `@nestjs/drizzle`
 
-The API wires Drizzle in by hand (`packages/api/src/db/database.module.ts`). In a later MVP, move to `@nestjs/drizzle`. At the time of writing it is at `0.0.x`, so check its maturity first. The migration must keep ADR 0003: the Drizzle schema stays the source of truth and migrations stay generated.
+The move itself is specced in `.scratch/00002-api-modules-and-nestjs-drizzle/spec.md` (see ADR [0007](adr/0007-api-feature-modules-and-nestjs-drizzle.md)). It leaves two things on the raw `pg` pool, on purpose:
+
+- `HealthController` still checks the database through the raw pool. Move it to the injected Drizzle database later.
+- The migration and seed CLIs and the tests run outside Nest and keep calling `pg` and `drizzle` directly.
+
+`@nestjs/drizzle` is at `0.0.x`, so re-check its API on upgrades. Any change must keep ADR 0003: the Drizzle schema stays the source of truth and migrations stay generated.
 
 ## Contract-first development
 
