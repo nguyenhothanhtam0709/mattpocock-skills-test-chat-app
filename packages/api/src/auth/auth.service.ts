@@ -4,11 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { ErrorCode, type RegisterResponse, type SearchUsersResponse } from '@chat/contracts';
 import * as argon2 from 'argon2';
 import { and, eq, gt, ne, or, sql } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Pool } from 'pg';
 import { DomainException } from '../common/all-exceptions.filter.js';
 import type { Config } from '../config/config.js';
-import { PG_POOL } from '../db/database.module.js';
+import { InjectDrizzle } from '@nestjs/drizzle';
+import type { Database } from '../db/database.module.js';
 import { sessions, users } from '../db/schema.js';
 import { TOKEN_DENY_LIST, type TokenDenyList } from './token-deny-list.js';
 import type { AuthContext } from './auth.guard.js';
@@ -40,18 +39,16 @@ const publicUser = {
 
 @Injectable()
 export class AuthService {
-  private readonly db: NodePgDatabase;
   private readonly refreshTtlSeconds: number;
   /** Verified against when the User does not exist, so both paths do the same hashing work. */
   private readonly dummyHash: Promise<string>;
 
   constructor(
-    @Inject(PG_POOL) pool: Pool,
+    @InjectDrizzle() private readonly db: Database,
     private readonly tokens: TokenService,
     @Inject(TOKEN_DENY_LIST) private readonly denyList: TokenDenyList,
     config: ConfigService<Config, true>,
   ) {
-    this.db = drizzle(pool);
     this.refreshTtlSeconds = config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }) * 24 * 60 * 60;
     this.dummyHash = argon2.hash(randomBytes(16).toString('hex'), { type: argon2.argon2id });
   }

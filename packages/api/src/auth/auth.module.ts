@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
-import type { Pool } from 'pg';
-import { CLOCK } from '../clock/clock.js';
-import { PG_POOL } from '../db/database.module.js';
+import { getDrizzleToken } from '@nestjs/drizzle';
+import type { Database } from '../db/database.module.js';
 import { AccessTokenAuthenticator } from './access-token-authenticator.js';
 import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
@@ -18,8 +17,8 @@ import { TokenService } from './token.service.js';
     AuthGuard,
     {
       provide: TOKEN_DENY_LIST,
-      inject: [PG_POOL, CLOCK],
-      useFactory: (pool: Pool) => new PostgresTokenDenyList(pool),
+      inject: [getDrizzleToken()],
+      useFactory: (db: Database) => new PostgresTokenDenyList(db),
     },
   ],
   exports: [AuthService, TokenService, AccessTokenAuthenticator, AuthGuard],

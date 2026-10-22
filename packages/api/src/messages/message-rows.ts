@@ -1,9 +1,15 @@
 import type { ConversationMember, Message } from '@chat/contracts';
 import { eq, sql } from 'drizzle-orm';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { NodePgDatabase, NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
 import { conversations, messages } from '../db/schema.js';
 
-export type Tx = Parameters<Parameters<NodePgDatabase['transaction']>[0]>[0];
+/**
+ * A transaction of either the injected (schema-aware) database or a plain `drizzle(pool)`
+ * (the seed CLI and tests), so the schema type argument is left open.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Tx = PgTransaction<NodePgQueryResultHKT, any, any>;
 /** Where a rule check reads: inside the Conversation lock, the transaction. */
 export type Reader = Pick<NodePgDatabase, 'select'>;
 export type MessageRow = typeof messages.$inferSelect;

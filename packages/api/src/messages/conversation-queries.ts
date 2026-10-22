@@ -1,13 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   LAST_MESSAGE_PREVIEW_MAX,
   type ConversationMember,
   type ConversationSummary,
 } from '@chat/contracts';
 import { and, desc, eq, exists, inArray, sql } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Pool } from 'pg';
-import { PG_POOL } from '../db/database.module.js';
+import { InjectDrizzle } from '@nestjs/drizzle';
+import type { Database } from '../db/database.module.js';
 import {
   conversationMembers,
   conversations,
@@ -20,11 +19,7 @@ import {
 /** Read models of Conversations, shared by the Message and Group services. */
 @Injectable()
 export class ConversationQueries {
-  private readonly db: NodePgDatabase;
-
-  constructor(@Inject(PG_POOL) pool: Pool) {
-    this.db = drizzle(pool);
-  }
+  constructor(@InjectDrizzle() private readonly db: Database) {}
 
   async summaries(userId: string, onlyConversationId?: string): Promise<ConversationSummary[]> {
     // The newest Message inside one of the caller's membership periods (Former Members must
