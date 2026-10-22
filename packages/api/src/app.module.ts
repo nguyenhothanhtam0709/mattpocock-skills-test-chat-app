@@ -11,14 +11,10 @@ import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig } from './config/config.js';
 import { DatabaseModule } from './db/database.module.js';
 import { MembershipsModule } from './memberships/memberships.module.js';
-import { GroupsController } from './groups/groups.controller.js';
-import { GroupsService } from './groups/groups.service.js';
+import { GroupsModule } from './groups/groups.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
-import { CommitOrder } from './messages/commit-order.js';
-import { ConversationQueries } from './messages/conversation-queries.js';
-import { MessagesController } from './messages/messages.controller.js';
-import { MessagesService } from './messages/messages.service.js';
+import { MessagesModule } from './messages/messages.module.js';
 
 @Module({})
 export class AppModule {
@@ -44,9 +40,9 @@ export class AppModule {
         AuthModule,
         RealtimeModule,
         AuthApiModule,
+        MessagesModule,
+        GroupsModule,
       ],
-      controllers: [MessagesController, GroupsController],
-      providers: [MessagesService, GroupsService, CommitOrder, ConversationQueries],
     };
   }
 }
