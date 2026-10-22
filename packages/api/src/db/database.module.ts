@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { Logger } from 'pino';
 import type { Config } from '../config/config.js';
@@ -11,8 +11,15 @@ import * as schema from './schema.js';
 
 export const PG_POOL = Symbol('PG_POOL');
 
-/** The Drizzle database registered by `DatabaseModule`; inject it with `@InjectDrizzle()`. */
-export type Database = NodePgDatabase<typeof schema> & { $client: Pool };
+function createDatabase(pool: Pool) {
+  return drizzle(pool, { schema });
+}
+
+/**
+ * The Drizzle database registered by `DatabaseModule`; inject it with `@InjectDrizzle()`.
+ * Derived from what the factory builds, so the two cannot drift apart.
+ */
+export type Database = ReturnType<typeof createDatabase>;
 
 @Global()
 @Module({
@@ -31,7 +38,7 @@ export type Database = NodePgDatabase<typeof schema> & { $client: Pool };
           logger,
           config.get('DB_SLOW_QUERY_MS', { infer: true }),
         );
-        return { db: drizzle(instrumented, { schema }) };
+        return { db: createDatabase(instrumented) };
       },
     }),
   ],

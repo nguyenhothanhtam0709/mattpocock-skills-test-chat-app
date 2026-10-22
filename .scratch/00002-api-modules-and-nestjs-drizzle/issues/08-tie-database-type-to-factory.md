@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Changing the `schema` argument in the factory without updating `Database` fails typecheck
-- [ ] The `@InjectDrizzle()` parameters still use the one shared `Database` type
-- [ ] All existing tests pass without edits
+- [x] Changing the `schema` argument in the factory without updating `Database` fails typecheck
+- [x] The `@InjectDrizzle()` parameters still use the one shared `Database` type
+- [x] All existing tests pass without edits
 
 ## Comments
