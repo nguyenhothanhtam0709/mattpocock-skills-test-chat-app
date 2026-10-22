@@ -2,15 +2,12 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import type { Logger } from 'pino';
 import { AuthApiModule } from './auth/auth-api.module.js';
-import { AuthModule } from './auth/auth.module.js';
-import { RealtimeModule } from './realtime/realtime.module.js';
 import type { Clock } from './clock/clock.js';
 import { ThrottlingModule } from './throttling/throttling.module.js';
 import { ClockModule } from './clock/clock.module.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig } from './config/config.js';
 import { DatabaseModule } from './db/database.module.js';
-import { MembershipsModule } from './memberships/memberships.module.js';
 import { GroupsModule } from './groups/groups.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
@@ -36,9 +33,6 @@ export class AppModule {
         ErrorsModule,
         ClockModule.register(clock),
         HealthModule,
-        MembershipsModule,
-        AuthModule,
-        RealtimeModule,
         AuthApiModule,
         MessagesModule,
         GroupsModule,

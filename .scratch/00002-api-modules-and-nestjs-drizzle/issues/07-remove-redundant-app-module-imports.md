@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `AppModule` lists no module that another listed module already brings in only for its own use (keep it if something outside that chain needs it)
-- [ ] App still boots, no `forwardRef`, no cycles
-- [ ] All existing tests pass without edits
+- [x] `AppModule` lists no module that another listed module already brings in only for its own use (keep it if something outside that chain needs it)
+- [x] App still boots, no `forwardRef`, no cycles
+- [x] All existing tests pass without edits
 
 ## Comments
