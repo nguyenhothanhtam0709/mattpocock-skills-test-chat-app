@@ -9,7 +9,7 @@ import { RealtimeEvent, type RealtimeEventName } from '@chat/contracts';
 import type { Logger } from 'pino';
 import type { IoServer as Server, IoSocket as Socket } from './socket-types.js';
 import { AccessTokenAuthenticator } from '../auth/access-token-authenticator.js';
-import { GroupMemberships } from '../groups/group-memberships.js';
+import { GroupMemberships } from '../memberships/group-memberships.js';
 import { PINO } from '../logging/logging.module.js';
 
 export const userRoom = (userId: string) => `user:${userId}`;

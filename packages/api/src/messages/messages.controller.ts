@@ -14,7 +14,7 @@ import {
 } from '@chat/contracts';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { SendThrottlerGuard } from '../common/app-throttler.guard.js';
+import { SendThrottlerGuard } from '../throttling/app-throttler.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { Auth, AuthGuard, type AuthContext } from '../auth/auth.guard.js';
 import { MessagesService } from './messages.service.js';
