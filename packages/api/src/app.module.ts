@@ -1,21 +1,15 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import type { Logger } from 'pino';
-import type { Pool } from 'pg';
-import { AccessTokenAuthenticator } from './auth/access-token-authenticator.js';
-import { AuthController } from './auth/auth.controller.js';
-import { AuthGuard } from './auth/auth.guard.js';
-import { AuthService } from './auth/auth.service.js';
-import { PostgresTokenDenyList } from './auth/postgres-token-deny-list.js';
-import { TOKEN_DENY_LIST } from './auth/token-deny-list.js';
-import { TokenService } from './auth/token.service.js';
-import { UsersController } from './auth/users.controller.js';
+import { AuthApiModule } from './auth/auth-api.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
+import type { Clock } from './clock/clock.js';
 import { ThrottlingModule } from './throttling/throttling.module.js';
 import { ClockModule } from './clock/clock.module.js';
-import { CLOCK, type Clock } from './clock/clock.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig } from './config/config.js';
-import { DatabaseModule, PG_POOL } from './db/database.module.js';
+import { DatabaseModule } from './db/database.module.js';
 import { MembershipsModule } from './memberships/memberships.module.js';
 import { GroupsController } from './groups/groups.controller.js';
 import { GroupsService } from './groups/groups.service.js';
@@ -25,7 +19,6 @@ import { CommitOrder } from './messages/commit-order.js';
 import { ConversationQueries } from './messages/conversation-queries.js';
 import { MessagesController } from './messages/messages.controller.js';
 import { MessagesService } from './messages/messages.service.js';
-import { RealtimeGateway } from './realtime/realtime.gateway.js';
 
 @Module({})
 export class AppModule {
@@ -48,24 +41,12 @@ export class AppModule {
         ClockModule.register(clock),
         HealthModule,
         MembershipsModule,
+        AuthModule,
+        RealtimeModule,
+        AuthApiModule,
       ],
-      controllers: [AuthController, UsersController, MessagesController, GroupsController],
-      providers: [
-        AuthService,
-        MessagesService,
-        GroupsService,
-        CommitOrder,
-        ConversationQueries,
-        AuthGuard,
-        AccessTokenAuthenticator,
-        RealtimeGateway,
-        TokenService,
-        {
-          provide: TOKEN_DENY_LIST,
-          inject: [PG_POOL, CLOCK],
-          useFactory: (pool: Pool) => new PostgresTokenDenyList(pool),
-        },
-      ],
+      controllers: [MessagesController, GroupsController],
+      providers: [MessagesService, GroupsService, CommitOrder, ConversationQueries],
     };
   }
 }
