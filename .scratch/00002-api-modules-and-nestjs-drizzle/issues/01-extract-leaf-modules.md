@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] A global clock module, a throttling module (config and the global throttler guard, limits and route rules moved unchanged), a health module and a memberships module exist and own what they should
-- [ ] `AppModule.register(rawConfig, clock, logger)` keeps its signature; `createApp` and the test harness are unchanged
-- [ ] No `forwardRef`, no new global module beyond the clock
-- [ ] All existing tests pass without edits
-- [ ] No new package or dependency
+- [x] A global clock module, a throttling module (config and the global throttler guard, limits and route rules moved unchanged), a health module and a memberships module exist and own what they should
+- [x] `AppModule.register(rawConfig, clock, logger)` keeps its signature; `createApp` and the test harness are unchanged
+- [x] No `forwardRef`, no new global module beyond the clock
+- [x] All existing tests pass without edits
+- [x] No new package or dependency
 
 ## Comments

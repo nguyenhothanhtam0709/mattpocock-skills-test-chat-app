@@ -7,7 +7,7 @@ import {
   type SearchUsersResponse,
   type UpdateProfileRequest,
 } from '@chat/contracts';
-import { SearchThrottlerGuard } from '../common/app-throttler.guard.js';
+import { SearchThrottlerGuard } from '../throttling/app-throttler.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { Auth, AuthGuard, type AuthContext } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
