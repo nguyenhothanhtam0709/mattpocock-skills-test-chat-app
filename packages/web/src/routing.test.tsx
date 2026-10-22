@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 import { server } from './test/server';
@@ -63,5 +63,38 @@ describe('routing', () => {
     await screen.findByLabelText(/username or email/i);
 
     expect(window.history.length).toBe(before);
+  });
+
+  it('redirects a signed-in User away from /login without adding a history entry', async () => {
+    signedInSession();
+    window.history.pushState({}, '', '/start');
+    window.history.pushState({}, '', '/login');
+    const before = window.history.length;
+
+    render(<App />);
+    await screen.findByText(/no conversations yet/i);
+
+    expect(window.location.pathname).toBe('/');
+    expect(window.history.length).toBe(before);
+  });
+
+  it('renders neither the login form nor the app shell while auth is loading', async () => {
+    server.use(
+      http.post('*/api/v1/auth/refresh', async () => {
+        await delay(150);
+        return HttpResponse.json({ accessToken: fakeAccessToken() });
+      }),
+      http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
+    );
+    window.history.pushState({}, '', '/login');
+
+    render(<App />);
+
+    expect(screen.queryByLabelText(/username or email/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no conversations yet/i)).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/login');
+
+    expect(await screen.findByText(/no conversations yet/i)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
   });
 });

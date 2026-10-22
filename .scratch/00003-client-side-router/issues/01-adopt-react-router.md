@@ -6,13 +6,13 @@
 
 **Status:** resolved
 
-- [ ] `react-router` is the only package added or changed
-- [ ] The hand-rolled router module, its navigate/path helpers and the redirect effect are gone
-- [ ] Signed-in `/login` goes to `/`; an unknown path shows the app shell when signed in and goes to `/login` when signed out (new tests that render `<App />` after `history.pushState`)
-- [ ] No wrong-page flash while auth is loading; Back does not loop on redirects
-- [ ] All existing tests pass without edits
-- [ ] `docs/laters.md` updated as described
-- [ ] `pnpm typecheck`, `pnpm test` and `pnpm lint` pass
+- [x] `react-router` is the only package added or changed
+- [x] The hand-rolled router module, its navigate/path helpers and the redirect effect are gone
+- [x] Signed-in `/login` goes to `/`; an unknown path shows the app shell when signed in and goes to `/login` when signed out (new tests that render `<App />` after `history.pushState`)
+- [x] No wrong-page flash while auth is loading; Back does not loop on redirects
+- [x] All existing tests pass without edits
+- [x] `docs/laters.md` updated as described
+- [x] `pnpm typecheck`, `pnpm test` and `pnpm lint` pass
 
 ## Comments
 

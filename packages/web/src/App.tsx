@@ -28,7 +28,7 @@ function SignedOutOnly() {
   return <Outlet />;
 }
 
-function Shell() {
+function SignedInShell() {
   const { state } = useAuth();
   return state.status === 'signedIn' ? <AppShell user={state.user} /> : null;
 }
@@ -46,7 +46,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
       </Route>
       <Route element={<RequireSignedIn />}>
-        <Route path="*" element={<Shell />} />
+        <Route path="*" element={<SignedInShell />} />
       </Route>
     </Routes>
   );

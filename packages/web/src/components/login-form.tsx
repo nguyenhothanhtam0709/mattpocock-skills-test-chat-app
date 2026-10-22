@@ -77,7 +77,10 @@ export function LoginForm({ ...props }: React.ComponentProps<typeof Card>) {
                 Login
               </Button>
               <FieldDescription className="text-center">
-                Don&apos;t have an account? <Link to="/signup">Sign up</Link>
+                Don&apos;t have an account?{' '}
+                <Link to="/signup" replace>
+                  Sign up
+                </Link>
               </FieldDescription>
             </Field>
           </FieldGroup>
