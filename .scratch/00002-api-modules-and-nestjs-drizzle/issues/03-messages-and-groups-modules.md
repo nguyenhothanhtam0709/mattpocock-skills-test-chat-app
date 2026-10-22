@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] The messages and groups modules own their controllers and providers, with the imports described above
-- [ ] `AppModule` lists no controllers or providers of its own, only modules
-- [ ] The whole module graph has no cycles and no `forwardRef`
-- [ ] All existing tests pass without edits
-- [ ] No new package or dependency
+- [x] The messages and groups modules own their controllers and providers, with the imports described above
+- [x] `AppModule` lists no controllers or providers of its own, only modules
+- [x] The whole module graph has no cycles and no `forwardRef`
+- [x] All existing tests pass without edits
+- [x] No new package or dependency
 
 ## Comments
