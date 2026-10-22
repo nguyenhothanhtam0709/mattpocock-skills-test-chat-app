@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { InjectDrizzle } from '@nestjs/drizzle';
 import {
   ErrorCode,
   GROUP_MEMBERS_MAX,
@@ -13,7 +14,6 @@ import {
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { DomainException } from '../common/all-exceptions.filter.js';
-import { InjectDrizzle } from '@nestjs/drizzle';
 import type { Database } from '../db/database.module.js';
 import {
   conversationMembers,
