@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The messages and groups modules own their controllers and providers, with the imports described above
 - [x] `AppModule` lists no controllers or providers of its own, only modules

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The auth service, messages service, groups service, group memberships, conversation queries and the token deny list receive the database with `@InjectDrizzle()` typed as the shared `Database` type
 - [x] The token deny list can be built from the injected database

@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The auth module does not import the realtime module, directly or indirectly
 - [x] The auth and users controllers are in their own module that imports auth and realtime

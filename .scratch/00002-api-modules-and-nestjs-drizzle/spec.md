@@ -1,6 +1,6 @@
 # Spec: API feature modules and `@nestjs/drizzle`
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -64,3 +64,7 @@ Split the API into feature modules with explicit imports and exports and no cycl
 
 - `@nestjs/drizzle` is at 0.0.x, so its API may change.
 - Cycles found while tracing: Auth ↔ Realtime, Realtime ↔ Groups, and Realtime/Messages/Groups. The module split in this spec removes all of them.
+
+## Outcome
+
+Delivered in PRs #78-#83 (tickets 04, 01, 02, 03, 05 and review fixes) and #86-#87 (follow-up tickets 07, 08). Smoke-tested against the built API: auth, user search, direct and group messages, leaving a group, logout and clean SIGTERM shutdown. Follow-up ticket 06 (type `Tx` without `any`) is still open (`needs-info`: it needs `seed.ts` to build its database with `{ schema }`).
