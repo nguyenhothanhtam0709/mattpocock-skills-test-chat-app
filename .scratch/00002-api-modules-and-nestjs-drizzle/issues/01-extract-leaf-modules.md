@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A global clock module, a throttling module (config and the global throttler guard, limits and route rules moved unchanged), a health module and a memberships module exist and own what they should
 - [x] `AppModule.register(rawConfig, clock, logger)` keeps its signature; `createApp` and the test harness are unchanged

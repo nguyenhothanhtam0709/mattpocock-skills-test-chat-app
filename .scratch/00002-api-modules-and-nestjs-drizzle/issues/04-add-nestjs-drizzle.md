@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `@nestjs/drizzle` is added to the API (this ticket and the spec authorise adding that one package)
 - [x] Before building on it, confirm it works with Nest 12 and the installed `drizzle-orm`; if it does not, stop and ask
