@@ -47,6 +47,9 @@ importers:
       '@nestjs/core':
         specifier: ^12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/drizzle':
+        specifier: ^0.0.2
+        version: 0.0.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(drizzle-orm@0.45.4(@types/pg@8.23.1)(pg@8.23.1))(reflect-metadata@0.2.2)
       '@nestjs/platform-fastify':
         specifier: ^12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
@@ -1196,6 +1199,15 @@ packages:
         optional: true
       '@nestjs/websockets':
         optional: true
+
+  '@nestjs/drizzle@0.0.2':
+    resolution: {integrity: sha512-9jBMBcqxPLV7BNuqoOQ/6boSH7z1cA6psKKiArHgJgDefBqniQExYjVNhE/GrqJd3vBEwCXkWXwpEvCi8qRIZg==}
+    engines: {node: '>=20.19.0'}
+    peerDependencies:
+      '@nestjs/common': ^11.0.0 || ^12.0.0
+      '@nestjs/core': ^11.0.0 || ^12.0.0
+      drizzle-orm: '>=0.35.0 || >=1.0.0-0'
+      reflect-metadata: ^0.1.13 || ^0.2.0
 
   '@nestjs/platform-fastify@12.2.0':
     resolution: {integrity: sha512-jy9+4c29VER0d0/FfNzCP/ZiuhRME7pvAGEzrUoHkP4ZxP4N0EFpZwsLEtj7BCb786i5HkbAY8duHujfzNYPTA==}
@@ -5593,6 +5605,13 @@ snapshots:
       uid: 2.0.2
     optionalDependencies:
       '@nestjs/websockets': 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(@nestjs/platform-socket.io@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+
+  '@nestjs/drizzle@0.0.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(drizzle-orm@0.45.4(@types/pg@8.23.1)(pg@8.23.1))(reflect-metadata@0.2.2)':
+    dependencies:
+      '@nestjs/common': 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      drizzle-orm: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
+      reflect-metadata: 0.2.2
 
   '@nestjs/platform-fastify@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)':
     dependencies:
