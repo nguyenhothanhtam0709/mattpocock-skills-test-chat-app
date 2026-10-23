@@ -131,5 +131,5 @@ Lay a documentation foundation that the factory can rely on and that stays corre
 
 ## Further Notes
 
-- Each Ticket is one PR on its own `agent/00004-NN-<slug>` branch. Package changes and doc changes are never mixed.
+- Implementation runs on the feature branch `feat/00004-agent-docs-foundation` (see the git workflow). Each Ticket is one PR from its own `agent/00004-NN-<slug>` branch to the feature branch. Package changes and doc changes are never mixed.
 - Tickets whose content is the human's decisions (conventions, testing policy, definition of done, factory docs) start with a grilling session; the agent writes up what was decided.
