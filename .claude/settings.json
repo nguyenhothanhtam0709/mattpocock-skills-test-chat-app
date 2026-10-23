@@ -2,5 +2,15 @@
   "enabledPlugins": {
     "mattpocock-skills@mattpocock": true,
     "chrome-devtools-mcp@chrome-devtools-plugins": true
+  },
+  "permissions": {
+    "ask": [
+      "Edit(/AGENTS.md)",
+      "Edit(/docs/agents/**)",
+      "Edit(/docs/workflow/git-workflow.md)",
+      "Edit(/.agents/**)",
+      "Edit(/.claude/skills/**)",
+      "Edit(/skills-lock.json)"
+    ]
   }
 }

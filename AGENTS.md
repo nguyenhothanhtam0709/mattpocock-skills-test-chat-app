@@ -27,3 +27,9 @@ Avoid nullable columns and prefer DB-generated values (defaults, built-ins like 
 ### No assumptions
 
 Don't assume; ask. Never add, remove or change a package without the ticket saying so. See `docs/workflow/no-assumptions.md`.
+
+## Skill-generated files
+
+The mattpocock skills generate the `## Agent skills` block above, `docs/agents/`, `docs/workflow/git-workflow.md`, `.agents/`, `.claude/skills/` and `skills-lock.json`. Ask the human before changing any of them, even in auto mode. If an edit prompts, wait for the answer. Never work around the prompt by writing the file through the shell (`sed`, `echo >`, `tee` and the like).
+
+Known gaps in the enforcement (`permissions.ask` in `.claude/settings.json`): `bypassPermissions` mode skips prompts, and shell writes are not covered. Only the "never via the shell" rule above covers those. A rule can't target part of a file, so the whole root `AGENTS.md` prompts.
