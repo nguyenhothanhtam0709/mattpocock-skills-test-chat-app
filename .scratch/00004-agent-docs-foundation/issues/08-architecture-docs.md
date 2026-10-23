@@ -13,7 +13,9 @@
 
 ## Comments
 
-Agent: drafted `docs/architecture/overview.md` and `runtime-flows.md`. Each claim was checked against the code; links and `pnpm lint` verified. Left unticked ("Every claim matches the current code") and Status set to `needs-info` until the human reviews. Open questions, not guessed:
+Agent: drafted `docs/architecture/overview.md` and `runtime-flows.md`. Each claim was checked against the code; links and `pnpm lint` verified. Left unticked ("Every claim matches the current code") and Status set to `needs-info` until the human reviews the drafts.
 
-1. Production topology: only the Vite dev proxy is documented. What serves the SPA and routes `/api` and `/socket.io` in production (`serve:web` is `vite preview`)?
-2. Sign-up shows "Account created" but does not sign the User in. Is that intended for MVP1, or a gap to omit from the flow?
+Human answers, recorded in the docs:
+
+1. Production serving and routing is not decided yet; the human will choose when deploying. The overview states this and documents only the dev proxy.
+2. Sign-up not signing the User in is intended MVP1 behaviour; the runtime flows say so.

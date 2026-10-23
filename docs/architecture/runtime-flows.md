@@ -8,7 +8,7 @@ How the main paths run today. Hand-written from the code; if this page and the c
 
 ## Sign-up, login and session refresh
 
-Sign-up only creates the User; it does not sign them in. Login returns a short-lived access token in the body and sets the refresh token as a cookie. The web app keeps the access token only in memory (`AuthProvider`), so on every page load it first trades the cookie for an access token.
+Sign-up only creates the User; it does not sign them in. This is intended MVP1 behaviour. Login returns a short-lived access token in the body and sets the refresh token as a cookie. The web app keeps the access token only in memory (`AuthProvider`), so on every page load it first trades the cookie for an access token.
 
 ```mermaid
 sequenceDiagram

@@ -26,6 +26,7 @@ graph LR
 
 - The browser runs the web app. The web app talks to the API over HTTP under `/api/v1` and holds one Socket.IO connection that only receives pushes ([ADR 0001](../adr/0001-websocket-is-server-push-only.md)).
 - In development the Vite server proxies `/api` and `/socket.io` to the API on port 3000 (`packages/web/vite.config.ts`), so the web app always calls its own origin. The API's CORS allows only the configured `SPA_ORIGIN` (`packages/api/src/app.ts`).
+- How the web app is served and how `/api` and `/socket.io` are routed in production is not decided yet; the human will choose when deploying. The dev proxy is the only documented topology.
 - Postgres is reached only by the API. The web app never touches it.
 - Contracts is the shared seam: the request, response and push-event shapes both sides validate against. Neither side defines these shapes on its own.
 
