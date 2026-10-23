@@ -4,13 +4,16 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The shared settings have `ask` rules covering exactly the files above; existing settings are kept
+- [x] The shared settings have `ask` rules covering exactly the files above; existing settings are kept
 - [ ] An `Edit` to `docs/agents/issue-tracker.md` prompts in auto mode (checked manually; note the result in `## Comments`)
-- [ ] The new `AGENTS.md` section sits below the `## Agent skills` block, whose text is unchanged
-- [ ] The section names the known gaps (`bypassPermissions`, shell writes)
-- [ ] Root `AGENTS.md` stays at or under about 40 lines
-- [ ] No package change; `pnpm lint` passes
+- [x] The new `AGENTS.md` section sits below the `## Agent skills` block, whose text is unchanged
+- [x] The section names the known gaps (`bypassPermissions`, shell writes)
+- [x] Root `AGENTS.md` stays at or under about 40 lines
+- [x] No package change; `pnpm lint` passes
 
 ## Comments
+
+- The in-auto-mode prompt check is unchecked: an agent cannot run it, so a human needs to confirm that an `Edit` to `docs/agents/issue-tracker.md` prompts.
+- Assumption: the rules use the `Edit(/path)` form (root-anchored, `**` for directories), which also covers Write. The ticket did not name the syntax; it is not exercised here, so the human check above also validates the syntax.
