@@ -4,12 +4,12 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] No package is added, removed or upgraded
-- [ ] Each generator has tests that feed it real source and assert on the Markdown (API and contracts with their existing test setup; root with Node's built-in runner)
-- [ ] Running `pnpm docs:generate` twice in a row leaves no diff
-- [ ] The five docs are committed and match the current code
-- [ ] `pnpm typecheck`, `pnpm test` and `pnpm lint` pass
+- [x] No package is added, removed or upgraded
+- [x] Each generator has tests that feed it real source and assert on the Markdown (API and contracts with their existing test setup; root with Node's built-in runner)
+- [x] Running `pnpm docs:generate` twice in a row leaves no diff
+- [x] The five docs are committed and match the current code
+- [x] `pnpm typecheck`, `pnpm test` and `pnpm lint` pass
 
 ## Comments
