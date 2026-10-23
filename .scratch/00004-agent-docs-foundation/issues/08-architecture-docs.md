@@ -4,10 +4,10 @@
 
 **Blocked by:** 07
 
-**Status:** needs-info
+**Status:** resolved
 
 - [x] Both docs use Mermaid diagrams and Chat glossary terms
-- [ ] Every claim matches the current code; anything unsure is asked, not guessed
+- [x] Every claim matches the current code; anything unsure is asked, not guessed
 - [x] No content duplicated from Generated Docs or ADRs; they are linked
 - [x] Every link resolves; `pnpm lint` passes
 
@@ -19,3 +19,5 @@ Human answers, recorded in the docs:
 
 1. Production serving and routing is not decided yet; the human will choose when deploying. The overview states this and documents only the dev proxy.
 2. Sign-up not signing the User in is intended MVP1 behaviour; the runtime flows say so.
+
+Human reviewed both drafts and confirmed them. Resolved.
