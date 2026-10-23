@@ -4,11 +4,16 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** needs-info
 
-- [ ] Both docs use Mermaid diagrams and Chat glossary terms
+- [x] Both docs use Mermaid diagrams and Chat glossary terms
 - [ ] Every claim matches the current code; anything unsure is asked, not guessed
-- [ ] No content duplicated from Generated Docs or ADRs; they are linked
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] No content duplicated from Generated Docs or ADRs; they are linked
+- [x] Every link resolves; `pnpm lint` passes
 
 ## Comments
+
+Agent: drafted `docs/architecture/overview.md` and `runtime-flows.md`. Each claim was checked against the code; links and `pnpm lint` verified. Left unticked ("Every claim matches the current code") and Status set to `needs-info` until the human reviews. Open questions, not guessed:
+
+1. Production topology: only the Vite dev proxy is documented. What serves the SPA and routes `/api` and `/socket.io` in production (`serve:web` is `vite preview`)?
+2. Sign-up shows "Account created" but does not sign the User in. Is that intended for MVP1, or a gap to omit from the flow?
