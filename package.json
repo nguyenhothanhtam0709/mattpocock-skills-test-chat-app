@@ -16,10 +16,12 @@
     "db:generate": "pnpm --filter @chat/api db:generate",
     "db:migrate": "pnpm --filter @chat/api db:migrate",
     "db:seed": "pnpm --filter @chat/api db:seed",
-    "test": "pnpm build:contracts && pnpm -r --workspace-concurrency=1 test",
+    "test": "pnpm build:contracts && pnpm -r --workspace-concurrency=1 test && pnpm test:scripts",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "pnpm build:contracts && pnpm -r typecheck"
+    "docs:generate": "pnpm build:contracts && pnpm --filter @chat/api build && node scripts/docs/generate.ts",
+    "typecheck": "pnpm build:contracts && pnpm -r typecheck",
+    "test:scripts": "node --test scripts/docs/*.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

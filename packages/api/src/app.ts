@@ -12,6 +12,9 @@ import { createLogger, type LogDestination } from './logging/logger.js';
 import { PinoLoggerService } from './logging/pino-logger.service.js';
 import { RealtimeIoAdapter } from './realtime/realtime.adapter.js';
 
+/** Prefix of every HTTP route. */
+export const API_PREFIX = 'api/v1';
+
 /** The only things app tests may swap out (see the spec's test-time overrides). */
 export interface AppOverrides {
   clock?: Clock;
@@ -50,7 +53,7 @@ export async function createApp(
   }
   app.useLogger(new PinoLoggerService(logger));
   app.useWebSocketAdapter(new RealtimeIoAdapter(app));
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix(API_PREFIX);
   // The API serves JSON only, so the CSP forbids loading or framing anything.
   await app.register(helmet, {
     contentSecurityPolicy: {
