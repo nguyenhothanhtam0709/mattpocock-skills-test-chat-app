@@ -4,12 +4,14 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `GLOSSARY-MAP.md` follows the domain-modeling map format and links both glossaries
-- [ ] The Factory glossary follows the glossary format, with no implementation details
-- [ ] The Chat glossary is unchanged
-- [ ] ADR 0008 follows the ADR format and the numbering in `docs/adr/`
-- [ ] `pnpm lint` passes
+- [x] `GLOSSARY-MAP.md` follows the domain-modeling map format and links both glossaries
+- [x] The Factory glossary follows the glossary format, with no implementation details
+- [x] The Chat glossary is unchanged
+- [x] ADR 0008 follows the ADR format and the numbering in `docs/adr/`
+- [x] `pnpm lint` passes
 
 ## Comments
+
+- Note: `docs/architecture/adr-index.md` (Generated Doc) does not list ADR 0008 yet; there is no `docs:generate` command until a later ticket, which will regenerate it.
