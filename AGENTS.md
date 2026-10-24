@@ -14,7 +14,7 @@ Never push directly to `main`; every commit goes through a PR. See `docs/workflo
 
 ### Domain docs
 
-Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Multi-context: a root `GLOSSARY-MAP.md` lists the Chat (`GLOSSARY.md`) and Factory (`docs/factory/GLOSSARY.md`) glossaries; all ADRs live in `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Database
 

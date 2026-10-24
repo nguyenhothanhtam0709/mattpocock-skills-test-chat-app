@@ -4,10 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] The `## Agent skills` block says multi-context and points to `docs/agents/domain.md`
-- [ ] The issue tracker and triage label config are unchanged
-- [ ] Only files the skill wrote are in the PR
+- [x] The `## Agent skills` block says multi-context and points to `docs/agents/domain.md`
+- [x] The issue tracker and triage label config are unchanged
+- [x] Only files the skill wrote are in the PR
 
 ## Comments
+Human ran `/setup-matt-pocock-skills` (multi-context). Agent verified the diff: only `AGENTS.md` and `docs/agents/domain.md` changed; issue tracker and triage label docs untouched.
