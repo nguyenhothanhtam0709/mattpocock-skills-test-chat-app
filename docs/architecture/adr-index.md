@@ -15,3 +15,4 @@ source: docs/adr/*.md
 - [0005: Avoid nullable columns; prefer database-generated values](../adr/0005-avoid-nullable-columns-prefer-db-generated-values.md): Columns are `NOT NULL` unless absence is a real state in the domain.
 - [0006: The API runs as a single instance](../adr/0006-api-runs-as-a-single-instance.md): The API is deployed as exactly one process.
 - [0007: The API is split into feature modules and injects the database through `@nestjs/drizzle`](../adr/0007-api-feature-modules-and-nestjs-drizzle.md): `AppModule` used to list every controller and provider in one flat list, and each service built its own `drizzle(pool)` from the raw `pg` pool.
+- [0008: Documents are classed by how they are maintained](../adr/0008-documents-are-classed-by-how-they-are-maintained.md): Agents only know what is written down, and nothing said which doc wins when a doc and the code disagree, or which docs may be hand-edited.

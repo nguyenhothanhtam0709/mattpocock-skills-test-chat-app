@@ -14,4 +14,4 @@
 
 ## Comments
 
-- Note: `docs/architecture/adr-index.md` (Generated Doc) does not list ADR 0008 yet; there is no `docs:generate` command until a later ticket, which will regenerate it.
+- Regenerated `docs/architecture/adr-index.md` with `pnpm docs:generate` so it lists ADR 0008.
