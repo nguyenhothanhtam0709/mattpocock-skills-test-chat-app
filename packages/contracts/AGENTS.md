@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # Contracts package
 
 The Zod schemas and types that api and web share: HTTP bodies, error codes and realtime events. Both import it from `dist`. How it fits with api and web: [architecture overview](../../docs/architecture/overview.md).

@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # Factory
 
 The process that turns Tickets into pull requests on the Chat product, and the documents agents rely on while doing it.

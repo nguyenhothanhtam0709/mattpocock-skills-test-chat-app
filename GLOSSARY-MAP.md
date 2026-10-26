@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # Glossary Map
 
 ## Contexts
