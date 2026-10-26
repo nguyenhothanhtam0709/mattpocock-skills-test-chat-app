@@ -15,19 +15,21 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The four object shapes are `interface`s
-- [ ] ADR 0008 uses "Laters", not "backlog"; its two lists render separately; the root `AGENTS.md` reason is true
-- [ ] The README links ADR 0008 for the exemptions instead of listing them
-- [ ] `escalation.md` says Task Branch
-- [ ] `routes.ts` has a comment on the `'__guards__'` key
-- [ ] The ADR index line for ADR 0007 states the decision
-- [ ] `pnpm docs:generate` leaves no diff after the change is committed; every link resolves
-- [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
+- [x] The four object shapes are `interface`s
+- [x] ADR 0008 uses "Laters", not "backlog"; its two lists render separately; the root `AGENTS.md` reason is true
+- [x] The README links ADR 0008 for the exemptions instead of listing them
+- [x] `escalation.md` says Task Branch
+- [x] `routes.ts` has a comment on the `'__guards__'` key
+- [x] The ADR index line for ADR 0007 states the decision
+- [x] `pnpm docs:generate` leaves no diff after the change is committed; every link resolves
+- [x] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
 
 **Verification:** run `pnpm docs:generate` and confirm `git status` is clean. Existing generator tests keep passing.
 
 **Out of scope:** The duplicated Generated Doc header helper (ticket 16 kept it per package to avoid a cross-package dependency). The `docs:generate` and merge-check duplicates (ticket 19).
 
 ## Comments
+
+Resolved: the four shapes are interfaces, `'__guards__'` is commented, ADR 0008 lists kinds then exemptions with true reasons, the README links ADR 0008, escalation uses Task Branch and Feature Branch, and ADR 0007 now opens with its decision (generator unchanged).
