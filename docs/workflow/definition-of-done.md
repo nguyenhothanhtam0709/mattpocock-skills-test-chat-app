@@ -20,7 +20,7 @@ Every PR passes this one checklist.
 - [ ] Tests follow the testing policy: the right kind, written first, nothing weakened without approval.
 - [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass locally on the final commit.
 - [ ] Docs affected by the change are updated in this PR; `pnpm docs:generate` was run and committed if the schema, routes or realtime events changed.
-- [ ] Migrations come from `pnpm db:generate`, never hand-edited.
+- [ ] Migrations follow ADR 0003 (never hand-edited).
 - [ ] Nothing outside the Ticket changed; anything noticed is appended to `docs/laters.md` or raised.
 - [ ] Every assumption is listed in the PR body and under the Ticket's `## Comments`.
 - [ ] The latest feature branch is merged in; the PR targets the feature branch, links the Ticket and says how the change was verified (including the browser check when the testing policy requires one).

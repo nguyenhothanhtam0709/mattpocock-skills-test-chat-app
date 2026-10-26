@@ -28,7 +28,7 @@ Lint and the compiler already enforce some conventions: Zod-only validation, no 
 
 ## Generated values
 
-IDs and created timestamps come from the database ([ADR 0003](../adr/0003-drizzle-schema-is-source-of-truth.md), [ADR 0004](../adr/0004-db-generates-ids-and-created-timestamps.md), [ADR 0005](../adr/0005-avoid-nullable-columns-prefer-db-generated-values.md)). The only values app code generates are request ids and JWT `jti`/`iat`, and those timestamps go through the injected `Clock`. Example: [token.service.ts](../../packages/api/src/auth/token.service.ts).
+The exceptions to [ADR 0004](../adr/0004-db-generates-ids-and-created-timestamps.md) and [ADR 0005](../adr/0005-avoid-nullable-columns-prefer-db-generated-values.md): app code generates request ids and JWT `jti`/`iat`, and those timestamps go through the injected `Clock`. Example: [token.service.ts](../../packages/api/src/auth/token.service.ts).
 
 ## Tests
 
