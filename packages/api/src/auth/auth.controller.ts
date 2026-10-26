@@ -46,7 +46,7 @@ export class AuthController {
     return this.auth.register(body);
   }
 
-  /** 10 attempts per 15 minutes per IP here, plus 5 per identifier (see AppModule). */
+  /** 10 attempts per 15 minutes per IP here, plus 5 per identifier (see ThrottlingModule). */
   @Post('login')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: FIFTEEN_MINUTES_MS } })

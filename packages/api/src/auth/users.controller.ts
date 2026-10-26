@@ -22,7 +22,7 @@ export class UsersController {
     return { user: await this.auth.getUser(auth.userId) };
   }
 
-  /** Username-prefix search; rate limited to 30 per minute per User (see `AppModule`). */
+  /** Username-prefix search; rate limited to 30 per minute per User (see `ThrottlingModule`). */
   @Get('search')
   @UseGuards(AuthGuard, SearchThrottlerGuard)
   async search(
