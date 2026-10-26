@@ -1,17 +1,14 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import type { Logger } from 'pino';
-import { AuthApiModule } from './auth/auth-api.module.js';
 import type { Clock } from './clock/clock.js';
 import { ThrottlingModule } from './throttling/throttling.module.js';
 import { ClockModule } from './clock/clock.module.js';
 import { ErrorsModule } from './common/errors.module.js';
 import { loadConfig } from './config/config.js';
 import { DatabaseModule } from './db/database.module.js';
-import { GroupsModule } from './groups/groups.module.js';
-import { HealthModule } from './health/health.module.js';
+import { FEATURE_MODULES } from './feature-modules.js';
 import { LoggingModule } from './logging/logging.module.js';
-import { MessagesModule } from './messages/messages.module.js';
 
 @Module({})
 export class AppModule {
@@ -32,10 +29,7 @@ export class AppModule {
         DatabaseModule,
         ErrorsModule,
         ClockModule.register(clock),
-        HealthModule,
-        AuthApiModule,
-        MessagesModule,
-        GroupsModule,
+        ...FEATURE_MODULES,
       ],
     };
   }

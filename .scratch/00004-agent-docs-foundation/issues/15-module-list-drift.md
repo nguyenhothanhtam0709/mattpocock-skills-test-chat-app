@@ -6,14 +6,16 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The feature-module list exists once; `AppModule` and `generate-docs.ts` both use it
-- [ ] `pnpm docs:generate` produces no diff in `docs/architecture/`
-- [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
+- [x] The feature-module list exists once; `AppModule` and `generate-docs.ts` both use it
+- [x] `pnpm docs:generate` produces no diff in `docs/architecture/`
+- [x] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
 
 **Verification:** run `pnpm docs:generate` and confirm `git status` shows no change under `docs/architecture/`.
 
 **Out of scope:** The duplicated throttler route strings (their own Laters entry). Any behaviour change in the API.
 
 ## Comments
+
+- Resolved: `FEATURE_MODULES` in `packages/api/src/feature-modules.ts` is spread into `AppModule` imports and passed to `renderRoutes` in `generate-docs.ts`; a pure refactor, so no new test (testing policy), and the regenerated docs are unchanged.
