@@ -10,15 +10,17 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `packages/api/AGENTS.md` cites only ADR 0003 for migrations
-- [ ] The Laters entry points to `docs/workflow/testing-policy.md#mocking`
-- [ ] `packages/contracts/AGENTS.md` names only realtime events as the trigger for `pnpm docs:generate`
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] `packages/api/AGENTS.md` cites only ADR 0003 for migrations
+- [x] The Laters entry points to `docs/workflow/testing-policy.md#mocking`
+- [x] `packages/contracts/AGENTS.md` names only realtime events as the trigger for `pnpm docs:generate`
+- [x] Every link resolves; `pnpm lint` passes
 
 **Verification:** None beyond the definition of done.
 
 **Out of scope:** Other wording in these files.
 
 ## Comments
+
+Resolved: made the three fixes; a relative-link and anchor check on the changed files and `pnpm lint` pass. No follow-ups.

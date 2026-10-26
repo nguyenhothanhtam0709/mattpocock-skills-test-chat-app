@@ -19,7 +19,7 @@ Run from the repo root. Setup, `.env` and what each test run needs: [setup](../.
 
 ## Never
 
-- Never hand-edit a migration in `drizzle/`. Change the schema and generate one ([ADR 0003](../../docs/adr/0003-drizzle-schema-is-source-of-truth.md), [ADR 0005](../../docs/adr/0005-avoid-nullable-columns-prefer-db-generated-values.md)).
+- Never hand-edit a migration in `drizzle/`. Change the schema and generate one ([ADR 0003](../../docs/adr/0003-drizzle-schema-is-source-of-truth.md)).
 - Never pass IDs or created timestamps from app code. The database generates them ([ADR 0004](../../docs/adr/0004-db-generates-ids-and-created-timestamps.md)).
 
 ## Reference files

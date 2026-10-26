@@ -8,7 +8,7 @@ Run from the repo root. Setup and what each test run needs: [setup](../../docs/w
 
 - `pnpm build:contracts`: rebuilds `dist`. Run it after a change so api and web see it.
 - `pnpm --filter @chat/contracts test`: needs nothing. No database, no Docker.
-- `pnpm docs:generate`: run it after changing the schema, routes or realtime events, and commit the result.
+- `pnpm docs:generate`: run it after changing the realtime events, and commit the result.
 
 ## Rules
 

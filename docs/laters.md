@@ -53,7 +53,7 @@ The doc and convention rules are not enforced yet; agents follow them by reading
 
 ## Review the mocks in tests
 
-- **Seen:** while extracting conventions (spec 00004, ticket 05). `docs/conventions/general.md` says to test through public seams and to mock only where no seam exists. Four files use `vi.mock` or `vi.spyOn`: `api/src/groups/group-rooms.test.ts`, `api/src/db/database.module.test.ts`, `web/src/realtime/socket-realtime.test.ts` and `web/src/history-pagination.test.tsx`.
+- **Seen:** while extracting conventions (spec 00004, ticket 05). The [testing policy](workflow/testing-policy.md#mocking) says to test through public seams and to mock only where no seam exists. Four files use `vi.mock` or `vi.spyOn`: `api/src/groups/group-rooms.test.ts`, `api/src/db/database.module.test.ts`, `web/src/realtime/socket-realtime.test.ts` and `web/src/history-pagination.test.tsx`.
 - **Not done:** nobody checked whether each mock is needed.
 - **Idea:** for each file, switch to a public seam or note why there is none.
 
