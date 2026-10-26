@@ -12,7 +12,7 @@ Run from the repo root. Setup and what each test run needs: [setup](../../docs/w
 
 - `pnpm build:contracts`: rebuilds `dist`. Run it after a change so api and web see it.
 - `pnpm --filter @chat/contracts test`: needs nothing. No database, no Docker.
-- `pnpm docs:generate`: run it after changing the realtime events, and commit the result.
+- `pnpm docs:generate`: rewrites the Generated Docs. When to run it: [definition of done](../../docs/workflow/definition-of-done.md).
 
 ## Rules
 

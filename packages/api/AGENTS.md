@@ -13,7 +13,7 @@ Run from the repo root. Setup, `.env` and what each test run needs: [setup](../.
 - `pnpm dev:api`: needs the database up (`pnpm db:up`, `pnpm db:migrate`) and `packages/api/.env`.
 - `pnpm build:contracts`, then `pnpm --filter @chat/api test`: needs Docker running. The tests start their own Postgres.
 - `pnpm db:generate`: writes a migration after a change to [schema.ts](src/db/schema.ts).
-- `pnpm docs:generate`: run it after changing the schema, routes or realtime events, and commit the result.
+- `pnpm docs:generate`: rewrites the Generated Docs. When to run it: [definition of done](../../docs/workflow/definition-of-done.md).
 
 ## Rules
 
