@@ -34,12 +34,8 @@ Before changing a package, read its `AGENTS.md`: [api](packages/api/AGENTS.md), 
 
 ## Workflow
 
-Per-Ticket rules: [definition of done](docs/workflow/definition-of-done.md), [ticket template](docs/workflow/ticket-template.md), [escalation](docs/workflow/escalation.md), [testing policy](docs/workflow/testing-policy.md) and [setup](docs/workflow/setup.md).
-
-The pipeline from idea to merge (Stages, Agent Roles, Gates): [factory overview](docs/factory/overview.md).
+Per-Ticket rules: [definition of done](docs/workflow/definition-of-done.md), [ticket template](docs/workflow/ticket-template.md), [escalation](docs/workflow/escalation.md), [testing policy](docs/workflow/testing-policy.md) and [setup](docs/workflow/setup.md). The pipeline from idea to merge (Stages, Agent Roles, Gates): [factory overview](docs/factory/overview.md).
 
 ## Skill-generated files
 
-The mattpocock skills generate the `## Agent skills` block above, `docs/agents/`, `docs/workflow/git-workflow.md`, `.agents/`, `.claude/skills/` and `skills-lock.json`. Ask the human before changing any of them, even in auto mode. If an edit prompts, wait for the answer. Never work around the prompt by writing the file through the shell (`sed`, `echo >`, `tee` and the like).
-
-Known gaps in the enforcement (`permissions.ask` in `.claude/settings.json`): `bypassPermissions` mode skips prompts, and shell writes are not covered. Only the "never via the shell" rule above covers those. A rule can't target part of a file, so the whole root `AGENTS.md` prompts.
+The mattpocock skills generate the `## Agent skills` block above, `docs/agents/`, `docs/workflow/git-workflow.md`, `.agents/`, `.claude/skills/` and `skills-lock.json`. Ask the human before changing any of them, even in auto mode. If an edit prompts, wait for the answer. Never work around the prompt by writing the file through the shell (`sed`, `echo >`, `tee` and the like). Known gaps in the enforcement (`permissions.ask` in `.claude/settings.json`): `bypassPermissions` mode skips prompts, and shell writes are not covered. Only the "never via the shell" rule above covers those. A rule can't target part of a file, so the whole root `AGENTS.md` prompts.
