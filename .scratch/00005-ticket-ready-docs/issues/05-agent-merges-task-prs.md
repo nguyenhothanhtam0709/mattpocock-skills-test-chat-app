@@ -6,13 +6,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `git-workflow.md` gives an agent standing permission to squash-merge a task PR into its feature branch, with the two conditions above
-- [ ] It still forbids an agent from merging a spec PR or a feature PR into `main`
-- [ ] The `## Rules` list and step 7 of "Implementing a Ticket" agree
-- [ ] No other file changed
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] `git-workflow.md` gives an agent standing permission to squash-merge a task PR into its feature branch, with the two conditions above
+- [x] It still forbids an agent from merging a spec PR or a feature PR into `main`
+- [x] The `## Rules` list and step 7 of "Implementing a Ticket" agree
+- [x] No other file changed, except the three Factory docs that restated the old rule, which now link the git workflow (scope widened by the human, see `## Comments`)
+- [x] Every link resolves; `pnpm lint` passes
 
 **Verification:** None beyond the definition of done.
 
@@ -21,3 +21,5 @@
 ## Comments
 
 - 2026-10-27: The human confirmed the conditions and asked for this change, as a Ticket in spec 00005, in the session that implements the spec. They declined a `docs/laters.md` note about the setup skill regenerating the file.
+- 2026-10-27: `git grep -i "explicitly allow"` found the old rule in `docs/factory/agent-roles.md` (The Merger), `docs/factory/gates.md` (Where the human must approve) and `docs/factory/overview.md` (Stage 9). The human chose to fix them in this Ticket. Each now links [git workflow](../../../docs/workflow/git-workflow.md#rules) instead of restating the rule.
+- 2026-10-27: Closing summary. The rule in `## Rules` and step 7 now give an agent standing permission to squash-merge a task PR into its feature branch once it is out of draft and has the latest feature branch merged in. Merging any spec or feature PR into `main` stays the human's. The edits were made with the Edit tool, never through the shell. Verified: `git grep -i "explicitly allow"` over docs and the `AGENTS.md` files finds nothing, `pnpm lint` passes, `pnpm docs:generate` leaves no diff. No follow-ups.
