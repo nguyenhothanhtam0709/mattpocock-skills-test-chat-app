@@ -10,15 +10,24 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `setup.md` has a worktree section, a dependency section and a browser-check section with the contents above
-- [ ] Every command and script name was checked against the root and package `package.json` files
-- [ ] `setup.md` stays a Descriptive Doc and no rule from another doc is restated; each mention links the doc that owns it
-- [ ] Every link resolves; `pnpm lint` passes; `pnpm docs:generate` leaves no diff
+- [x] `setup.md` has a worktree section, a dependency section and a browser-check section with the contents above
+- [x] Every command and script name was checked against the root and package `package.json` files
+- [x] `setup.md` stays a Descriptive Doc and no rule from another doc is restated; each mention links the doc that owns it
+- [x] Every link resolves; `pnpm lint` passes; `pnpm docs:generate` leaves no diff
 
 **Verification:** Run the browser-check commands once if Docker is available and say in the Ticket's `## Comments` whether you did. Otherwise say which you only read.
 
 **Out of scope:** Whether agents should use a worktree by default (ticket 02). CI. Changing any script.
 
 ## Comments
+
+Resolved. `docs/workflow/setup.md` gains three sections: A second worktree, Adding a dependency, Browser check. Rules are linked, not restated ([no assumptions](../../../docs/workflow/no-assumptions.md), [testing policy](../../../docs/workflow/testing-policy.md)).
+
+Verification, all run (none only read): Docker was up and ports 3000/5173/5432 were free, so in this worktree I ran the copy of `packages/api/.env` from the main checkout, `pnpm db:up`, `pnpm build:contracts`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm dev:api`, `pnpm dev:web`, then opened http://localhost:5173 with the Chrome DevTools MCP and logged in as `alice` / `password123`; the seeded Conversations showed. Then I stopped both dev servers and ran `pnpm db:down`. `pnpm lint`, `pnpm typecheck` and `pnpm test` pass; `pnpm docs:generate` leaves no diff. Every script name was checked against the root and package `package.json` files.
+
+Assumptions:
+
+- The browser-check block adds `pnpm build:contracts` and `pnpm db:seed`, which the Ticket's list leaves out: `db:migrate` needs the built contracts, and the seeded Users exist only after `db:seed`.
+- The worktree section adds a gotcha found during the run: Docker Compose names the project after the folder, so each worktree's `db:up` gets its own `pgdata` volume and needs migrating and seeding again.
