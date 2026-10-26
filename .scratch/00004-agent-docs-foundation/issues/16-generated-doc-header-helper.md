@@ -6,14 +6,16 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] scripts and api each build the Generated Doc header in one helper
-- [ ] `pnpm docs:generate` produces no diff in `docs/architecture/`
-- [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
+- [x] scripts and api each build the Generated Doc header in one helper
+- [x] `pnpm docs:generate` produces no diff in `docs/architecture/`
+- [x] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass
 
 **Verification:** run `pnpm docs:generate` and confirm `git status` shows no change under `docs/architecture/`. Existing generator tests keep passing.
 
 **Out of scope:** Changing any generated output. A cross-package shared module.
 
 ## Comments
+
+- Resolved: `generatedDocHeader()` in `scripts/docs/generated-doc-header.ts` and `packages/api/src/docs/generated-doc-header.ts` builds the header; contracts keeps its own (one generator, no shared home without a new dependency); generated output unchanged.
