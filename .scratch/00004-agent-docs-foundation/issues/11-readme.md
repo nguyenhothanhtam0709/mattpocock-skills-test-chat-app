@@ -4,10 +4,10 @@
 
 **Blocked by:** 06, 08, 09, 10
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Every `docs/` folder is listed with one line
-- [ ] Quick start links setup instead of repeating it
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] Every `docs/` folder is listed with one line
+- [x] Quick start links setup instead of repeating it
+- [x] Every link resolves; `pnpm lint` passes
 
 ## Comments

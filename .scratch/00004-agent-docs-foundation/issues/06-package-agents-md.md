@@ -4,12 +4,12 @@
 
 **Blocked by:** 01, 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Three package `AGENTS.md` files, each at or under about 40 lines
-- [ ] No rule is restated; each links to the one doc that holds it
-- [ ] Root `AGENTS.md` links every package file and general conventions, stays at or under about 40 lines, and the `## Agent skills` block is unchanged
-- [ ] Every link resolves
-- [ ] `pnpm lint` passes
+- [x] Three package `AGENTS.md` files, each at or under about 40 lines
+- [x] No rule is restated; each links to the one doc that holds it
+- [x] Root `AGENTS.md` links every package file and general conventions, stays at or under about 40 lines, and the `## Agent skills` block is unchanged
+- [x] Every link resolves
+- [x] `pnpm lint` passes
 
 ## Comments

@@ -4,12 +4,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] Four files, each approved by the human in a grilling session
-- [ ] Every convention points to an existing reference file; no code snippets
-- [ ] Every flagged inconsistency is a Ticket or a `docs/laters.md` entry
-- [ ] Existing lint rules that encode conventions (Zod-only validation, no `dangerouslySetInnerHTML`) are referenced, not restated
-- [ ] `pnpm lint` passes
+- [x] Four files, each approved by the human in a grilling session
+- [x] Every convention points to an existing reference file; no code snippets
+- [x] Every flagged inconsistency is a Ticket or a `docs/laters.md` entry
+- [x] Existing lint rules that encode conventions (Zod-only validation, no `dangerouslySetInnerHTML`) are referenced, not restated
+- [x] `pnpm lint` passes
 
 ## Comments
+Human approved `general`, `api`, `web` and `contracts` in a grilling session. Agent reviewed: every link resolves, no code snippets, `kind: intent` on all four, `pnpm lint` passes. Inconsistencies: ticket 12 (stale throttling comments) and eight new entries in `docs/laters.md` (mocks, the one `any`, uuid pipe, API `signUp` copies, web cleanups, web request helper, web test people, contracts cleanups).

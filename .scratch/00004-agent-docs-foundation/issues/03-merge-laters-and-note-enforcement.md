@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Every entry from both files is in `docs/laters.md`, text unchanged
-- [ ] The root `laters.md` is gone and nothing links to it
-- [ ] The enforcement entry lists all six items above
-- [ ] `pnpm lint` passes
+- [x] Every entry from both files is in `docs/laters.md`, text unchanged
+- [x] The root `laters.md` is gone and nothing links to it
+- [x] The enforcement entry lists all six items above
+- [x] `pnpm lint` passes
 
 ## Comments

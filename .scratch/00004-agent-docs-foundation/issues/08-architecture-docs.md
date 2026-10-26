@@ -4,11 +4,20 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Both docs use Mermaid diagrams and Chat glossary terms
-- [ ] Every claim matches the current code; anything unsure is asked, not guessed
-- [ ] No content duplicated from Generated Docs or ADRs; they are linked
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] Both docs use Mermaid diagrams and Chat glossary terms
+- [x] Every claim matches the current code; anything unsure is asked, not guessed
+- [x] No content duplicated from Generated Docs or ADRs; they are linked
+- [x] Every link resolves; `pnpm lint` passes
 
 ## Comments
+
+Agent: drafted `docs/architecture/overview.md` and `runtime-flows.md`. Each claim was checked against the code; links and `pnpm lint` verified. Left unticked ("Every claim matches the current code") and Status set to `needs-info` until the human reviews the drafts.
+
+Human answers, recorded in the docs:
+
+1. Production serving and routing is not decided yet; the human will choose when deploying. The overview states this and documents only the dev proxy.
+2. Sign-up not signing the User in is intended MVP1 behaviour; the runtime flows say so.
+
+Human reviewed both drafts and confirmed them. Resolved.

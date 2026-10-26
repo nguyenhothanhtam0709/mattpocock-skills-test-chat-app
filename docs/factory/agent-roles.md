@@ -1,0 +1,23 @@
+---
+kind: intent
+---
+
+# Agent roles
+
+What each agent session is for. Every Role follows the [no assumptions](../workflow/no-assumptions.md) rule, asks before editing skill-generated files (root `AGENTS.md`), and stops through [escalation](../workflow/escalation.md) when stuck. The Stages each Role works in are in the [overview](overview.md).
+
+| Role          | Inputs                                                             | Outputs                                                                                                                    | Tools and skills                                                                                      | Stops when                                                                |
+| ------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Spec Writer   | An idea or a [Laters](../laters.md) entry, and the human's answers | `.scratch/NNNNN-<slug>/spec.md` in a PR to `main`                                                                          | `grill-with-docs` or `grilling`, `domain-modeling`, `to-spec`                                         | The Spec PR is open.                                                      |
+| Ticket Writer | A Spec on `main`                                                   | `issues/NN-<slug>.md` files from the [ticket template](../workflow/ticket-template.md), in a PR to `main`                  | `to-tickets`                                                                                          | The Ticket PR is open.                                                    |
+| Orchestrator  | A Spec and its Tickets                                             | A Feature Branch, dispatched Roles, the feature PR to `main`                                                               | `implement-spec`; sub-agents, given context pointers rather than copied text. Writes no product code. | The feature PR is open, or every frontier Ticket is waiting on the human. |
+| Explorer      | A question from a Ticket or the Orchestrator                       | Notes outside the repo, or a research file when a Ticket asks for one                                                      | `research`, `prototype`, read-only search. Edits no product code.                                     | The notes are written.                                                    |
+| Implementer   | One Ticket                                                         | A Task Branch and a task PR to the Feature Branch, with the [definition of done](../workflow/definition-of-done.md) ticked | Its own worktree, `tdd`. Edits only what the Ticket covers.                                           | The task PR is open, or on Escalation.                                    |
+| Reviewer      | A PR or a branch                                                   | Findings reported to the Orchestrator or the human                                                                         | `code-review`. Read-only; fixes go to an Implementer.                                                 | The findings are reported.                                                |
+| Merger        | A task PR ready to merge                                           | The task PR squash-merged into the Feature Branch, conflicts resolved                                                      | git, the GitHub tools                                                                                 | The PR is merged, or a conflict needs the human.                          |
+
+## The Merger
+
+The Merger exists only when the human has explicitly allowed an agent to merge task PRs for that Spec, in that session. Otherwise the Orchestrator stops at "task PR open, waiting on the human". An agent never merges a feature PR into `main` ([git workflow](../workflow/git-workflow.md)).
+
+_Not enforced yet:_ the agent's GitHub merge permission is still pre-approved in the local Claude Code settings. See [Laters](../laters.md#enforce-the-doc-and-convention-rules).
