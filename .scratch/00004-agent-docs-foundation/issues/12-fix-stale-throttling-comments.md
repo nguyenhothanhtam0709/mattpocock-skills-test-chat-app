@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Neither comment mentions `AppModule`; both name `ThrottlingModule`
-- [ ] No code other than the two comments changes
-- [ ] `pnpm lint` passes
+- [x] Neither comment mentions `AppModule`; both name `ThrottlingModule`
+- [x] No code other than the two comments changes
+- [x] `pnpm lint` passes
 
 ## Comments
