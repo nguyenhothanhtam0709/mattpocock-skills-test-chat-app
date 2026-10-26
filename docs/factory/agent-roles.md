@@ -18,6 +18,6 @@ What each agent session is for. Every Role follows the [no assumptions](../workf
 
 ## The Merger
 
-The Merger exists only when the human has explicitly allowed an agent to merge task PRs for that Spec, in that session. Otherwise the Orchestrator stops at "task PR open, waiting on the human". An agent never merges a feature PR into `main` ([git workflow](../workflow/git-workflow.md)).
+The Merger merges a task PR only when the [git workflow](../workflow/git-workflow.md#rules) allows it. Otherwise the Orchestrator stops at "task PR open, waiting on the human".
 
 _Not enforced yet:_ the agent's GitHub merge permission is still pre-approved in the local Claude Code settings. See [Laters](../laters.md#enforce-the-doc-and-convention-rules).
