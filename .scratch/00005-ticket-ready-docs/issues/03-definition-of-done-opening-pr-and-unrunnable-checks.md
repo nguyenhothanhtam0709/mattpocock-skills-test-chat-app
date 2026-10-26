@@ -24,3 +24,11 @@ The checklist is a fenced block copied into PR bodies, so keep it self-contained
 **Out of scope:** CI, branch protection or authenticating `gh` (all in `docs/laters.md`). Editing the PR flow in `git-workflow.md`, which is skill-generated.
 
 ## Comments
+
+**2026-10-27, grilling session (confirmed by the human):**
+
+1. Opening the PR: always the GitHub MCP tools (`mcp__github__create_pull_request`; `mcp__github__update_pull_request` to mark it ready). Not `gh`, which may not be logged in (authenticating it is in `docs/laters.md`).
+2. PR body: written with the `pr` skill; the definition-of-done checklist is copied in verbatim.
+3. Open as a draft only when a checklist item is unticked; otherwise open it ready for review.
+4. "A check you cannot run" means something the check needs is missing from the environment (e.g. Docker for the API tests). A check that runs and fails never counts: fix it or escalate (`docs/workflow/escalation.md`).
+5. Record it in both places: in the PR body under the unticked item (which check, why), with the PR left in draft; and one line in the Ticket's closing summary under `## Comments`.
