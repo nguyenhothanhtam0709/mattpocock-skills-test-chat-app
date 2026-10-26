@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # Chat
 
 A chat application where users exchange text messages, either one-to-one or within groups.

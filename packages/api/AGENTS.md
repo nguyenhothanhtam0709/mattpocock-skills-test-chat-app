@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # API package
 
 The NestJS server on Fastify. It serves the HTTP API, pushes realtime events over Socket.IO and owns the Postgres schema through Drizzle. How it fits with web and contracts: [architecture overview](../../docs/architecture/overview.md).

@@ -35,6 +35,6 @@ Repeated logins during local work can hit `429 RATE_LIMITED`: set `THROTTLE_DISA
 - [docs/agents/](docs/agents/): config for the mattpocock skills. Ask the human before changing it.
 - [docs/laters.md](docs/laters.md): notes for a later MVP.
 
-Every doc declares its kind (Intent, Generated or Descriptive) in front matter, which decides who maintains it and whether it or the code wins a conflict ([ADR 0008](docs/adr/0008-documents-are-classed-by-how-they-are-maintained.md)).
+Every doc declares its kind (Intent, Generated or Descriptive) in front matter, which decides who maintains it and whether it or the code wins a conflict. Specs, Tickets, ADRs, `docs/laters.md` and the files the mattpocock skills generate are exempt ([ADR 0008](docs/adr/0008-documents-are-classed-by-how-they-are-maintained.md)).
 
 Specs and Tickets live in [.scratch/](.scratch/): one `NNNNN-<feature>/` folder per spec, with `spec.md` and its Tickets under `issues/`.

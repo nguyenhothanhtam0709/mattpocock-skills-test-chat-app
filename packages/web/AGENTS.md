@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # Web package
 
 The React single-page app, built with Vite, React Router and shadcn/ui. It calls the API over HTTP and listens for pushed realtime events. How it fits with api and contracts: [architecture overview](../../docs/architecture/overview.md).

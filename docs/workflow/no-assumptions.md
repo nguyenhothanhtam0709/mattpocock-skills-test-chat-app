@@ -1,3 +1,7 @@
+---
+kind: intent
+---
+
 # No assumptions
 
 ## Rules
