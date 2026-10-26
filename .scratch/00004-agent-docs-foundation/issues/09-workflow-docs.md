@@ -4,11 +4,13 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] Definition of done, ticket template, escalation and testing policy each approved in a grilling session
-- [ ] Setup is verified by following it from a clean checkout to passing `pnpm test`
-- [ ] Root `AGENTS.md` stays at or under about 40 lines and the `## Agent skills` block is unchanged
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] Definition of done, ticket template, escalation and testing policy each approved in a grilling session
+- [x] Setup is verified by following it from a clean checkout to passing `pnpm test`
+- [x] Root `AGENTS.md` stays at or under about 40 lines and the `## Agent skills` block is unchanged
+- [x] Every link resolves; `pnpm lint` passes
 
 ## Comments
+
+Human approved the testing policy, definition of done, ticket template and escalation in a grilling session. Decisions beyond the ticket text: the testing policy owns the mocking rule (behaviour tests: no mocks of our own code without human approval; unit tests may mock collaborators through existing seams) and `docs/conventions/general.md` now links to it; "Allowed packages" means npm dependency changes only. Setup was drafted by an agent and verified from a fresh clone: `pnpm install`, `.env`, `db:up`, `build:contracts`, `db:migrate`, `db:seed`, then `pnpm test` green (contracts 142, api 261, web 124, scripts), plus `pnpm lint`, `typecheck` and `docs:generate` with no diff. Agent reviewed: every link resolves, `kind` front matter on all five, root `AGENTS.md` is 39 lines with `## Agent skills` unchanged, `pnpm lint` passes. Found while verifying: the README's setup steps also miss `pnpm build:contracts` before `db:migrate`; left for ticket 11 (README).
