@@ -11,16 +11,26 @@ The checklist is a fenced block copied into PR bodies, so keep it self-contained
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The definition of done has a short "Opening the PR" part and a short "A check you cannot run" part
-- [ ] Neither rule is stated in any other doc; any mention links the definition of done
-- [ ] The human confirmed the tool choice in a grilling session, recorded under `## Comments`
-- [ ] The root `AGENTS.md` and skill-generated files are unchanged
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] The definition of done has a short "Opening the PR" part and a short "A check you cannot run" part
+- [x] Neither rule is stated in any other doc; any mention links the definition of done
+- [x] The human confirmed the tool choice in a grilling session, recorded under `## Comments`
+- [x] The root `AGENTS.md` and skill-generated files are unchanged
+- [x] Every link resolves; `pnpm lint` passes
 
 **Verification:** None beyond the definition of done.
 
 **Out of scope:** CI, branch protection or authenticating `gh` (all in `docs/laters.md`). Editing the PR flow in `git-workflow.md`, which is skill-generated.
 
 ## Comments
+
+**2026-10-27, grilling session (confirmed by the human):**
+
+1. Opening the PR: always the GitHub MCP tools (`mcp__github__create_pull_request`; `mcp__github__update_pull_request` to mark it ready). Not `gh`, which may not be logged in (authenticating it is in `docs/laters.md`).
+2. PR body: written with the `pr` skill; the definition-of-done checklist is copied in verbatim.
+3. Open as a draft only when a checklist item is unticked; otherwise open it ready for review.
+4. "A check you cannot run" means something the check needs is missing from the environment (e.g. Docker for the API tests). A check that runs and fails never counts: fix it or escalate (`docs/workflow/escalation.md`).
+5. Record it in both places: in the PR body under the unticked item (which check, why), with the PR left in draft; and one line in the Ticket's closing summary under `## Comments`.
+
+**2026-10-27, closing summary:** Added "Opening the PR" and "A check you cannot run" to `docs/workflow/definition-of-done.md`, outside the checklist block, from the grilling answers above. `git grep` found one other doc on opening a PR, `docs/workflow/escalation.md` (step 4, draft PR); it now links the definition of done instead of naming a tool. No other doc states either rule; `git-workflow.md` was left alone (skill-generated, Ticket 05 edits it). Verified: links resolve, `pnpm lint`, `pnpm typecheck` and `pnpm test` (Docker available) pass, `pnpm docs:generate` leaves no diff. No checks skipped. No follow-ups.
