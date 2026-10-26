@@ -21,7 +21,7 @@ _Not enforced yet:_ CI, branch protection and a required human approval. Today t
 - Merging a Spec PR or a Ticket PR to `main`.
 - Triage: setting a Ticket's Status from `needs-triage`.
 - Answering a `needs-info` Ticket and setting it back to ready ([escalation](../workflow/escalation.md)).
-- Every task PR merge, unless the human explicitly allowed the Merger ([agent roles](agent-roles.md#the-merger)).
+- A task PR merge the [git workflow](../workflow/git-workflow.md#rules) does not let the Merger make.
 - Merging the feature PR to `main`.
 
 _Not enforced yet:_ the agent's GitHub merge permission is still pre-approved in the local Claude Code settings. See [Laters](../laters.md#enforce-the-doc-and-convention-rules).

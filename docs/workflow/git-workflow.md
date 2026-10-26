@@ -7,7 +7,7 @@
 - Specs and Tickets (everything under `.scratch/`) go straight to `main`: one branch from `main`, one PR to `main`.
 - Implementing a spec happens on a **feature branch** named `feat/<NNNNN>-<feature-slug>`, exactly matching the spec's `.scratch/NNNNN-<feature-slug>/` folder (e.g. `feat/00004-agent-docs-foundation`). It is cut from `main` once the spec is on `main`.
 - Each Ticket gets a **task branch** `agent/<NNNNN>-<NN>-<ticket-slug>` (e.g. `agent/00004-01-ask-before-editing-skill-files`), cut from the feature branch, with a PR targeting the feature branch.
-- You MUST NOT merge your own PR, except a task PR into its feature branch when the human has explicitly allowed it. You MUST NOT merge a feature PR into `main`.
+- You MAY squash-merge a task PR into its feature branch, and delete the task branch, once the PR is out of draft (every [definition of done](definition-of-done.md) item ticked) and the latest feature branch is merged into it. You MUST NOT merge any other PR: never a spec PR or a feature PR into `main`.
 
 ## Flow
 
@@ -25,7 +25,7 @@
 4. Run lint, typecheck and tests locally before opening the PR.
 5. Push the task branch and open a PR to the feature branch that links the Ticket and states how the change was verified.
 6. Address review feedback with further commits on the same branch.
-7. A human squash-merges the PR into the feature branch (or the AI does, only if the human explicitly allowed it) and deletes the task branch.
+7. Once the PR is out of draft and has the latest feature branch merged in, the AI or a human squash-merges it into the feature branch and deletes the task branch.
 
 ### Finishing the feature
 
