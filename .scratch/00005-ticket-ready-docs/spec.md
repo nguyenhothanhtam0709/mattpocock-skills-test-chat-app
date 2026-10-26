@@ -25,6 +25,7 @@ Close those gaps with small edits to existing docs, each rule in exactly one pla
 6. As an agent that cannot run a check, I want a rule for what to do, so that I neither skip it silently nor guess.
 7. As an agent starting a Ticket, I want the root `AGENTS.md` to give the order to read, so that I do not depend on following every link.
 8. As an agent, I want each rule in exactly one doc, so that I never meet two versions of it.
+9. As the human, I want an agent to merge a finished task PR into its feature branch without asking each time, so that implementing a spec does not stop on every Ticket.
 
 ## Implementation Decisions
 
@@ -33,7 +34,8 @@ Close those gaps with small edits to existing docs, each rule in exactly one pla
 - `docs/factory/agent-roles.md` states the worktree default once: a separate worktree when several Implementers run at once, otherwise the main checkout. Any other doc that says the old default links there. The human confirms this in a grilling session first.
 - `docs/workflow/definition-of-done.md` gets a short "Opening the PR" part (the GitHub MCP tools when `gh` is not logged in, and the `pr` skill for the body) and a short "A check you cannot run" part. An unrunnable check is not ticked, is named in the PR body and leaves the PR in draft, which the document already requires for any unticked item. No new exception is written. The human confirms the tool choice in a grilling session first.
 - The root `AGENTS.md` `## Workflow` section is rewritten as an ordered list of links, below the `## Agent skills` block and never inside it. It prompts the human before the edit, and is never written through the shell.
-- Every edited doc keeps its `kind`. Skill-generated files, including `docs/workflow/git-workflow.md`, are not touched.
+- `docs/workflow/git-workflow.md` gives an agent standing permission to squash-merge a task PR into its feature branch once the PR is out of draft and has the latest feature branch merged in. Merging into `main` stays the human's. The human asked for this; the file is skill-generated, so the edit prompts and is never written through the shell (ticket 05).
+- Every edited doc keeps its `kind`. Skill-generated files are not touched, except `docs/workflow/git-workflow.md` in ticket 05.
 
 ## Testing Decisions
 
