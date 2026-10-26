@@ -1,6 +1,6 @@
 # Spec: Ticket-ready docs
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
