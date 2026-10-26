@@ -28,6 +28,10 @@ Avoid nullable columns and prefer DB-generated values (defaults, built-ins like 
 
 Don't assume; ask. Never add, remove or change a package without the ticket saying so. See `docs/workflow/no-assumptions.md`.
 
+## Packages
+
+Before changing a package, read its `AGENTS.md`: [api](packages/api/AGENTS.md), [web](packages/web/AGENTS.md), [contracts](packages/contracts/AGENTS.md). [General conventions](docs/conventions/general.md) apply to every package.
+
 ## Workflow
 
 Per-Ticket rules: [definition of done](docs/workflow/definition-of-done.md), [ticket template](docs/workflow/ticket-template.md), [escalation](docs/workflow/escalation.md), [testing policy](docs/workflow/testing-policy.md) and [setup](docs/workflow/setup.md).
