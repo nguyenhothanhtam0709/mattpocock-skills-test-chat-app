@@ -21,8 +21,8 @@ What to do when stuck on a Ticket: ask, then stop. Never guess.
 
 1. Set `**Status:** needs-info` in the Ticket file.
 2. Under `## Comments`, write what you tried, the question, the options with your recommendation, and what is blocked.
-3. Commit the Ticket file with any work in progress on the task branch, and push it.
-4. Open a draft PR to the feature branch, or update the existing one, with the question in the body.
+3. Commit the Ticket file with any work in progress on the Task Branch, and push it.
+4. Open a draft PR to the Feature Branch, or update the existing one, with the question in the body.
 5. Stop.
 
 Stop means no further work on that Ticket and no proceeding on a guess. Other unblocked Tickets may continue.

@@ -38,10 +38,16 @@ const joinPath = (...parts: string[]) =>
     .filter(Boolean)
     .join('/');
 
-type Route = { method: string; path: string; auth: boolean; handler: string };
+interface Route {
+  method: string;
+  path: string;
+  auth: boolean;
+  handler: string;
+}
 
 function routesOf(controller: Type<unknown>, globalPrefix: string): Route[] {
   const basePath = (read('path', controller) as string | string[] | undefined) ?? '';
+  // '__guards__' is a Nest internal (the metadata key `@UseGuards` writes), not a public API.
   const classGuards = (read('__guards__', controller) as unknown[] | undefined) ?? [];
 
   return Object.getOwnPropertyNames(controller.prototype).flatMap((name) => {
