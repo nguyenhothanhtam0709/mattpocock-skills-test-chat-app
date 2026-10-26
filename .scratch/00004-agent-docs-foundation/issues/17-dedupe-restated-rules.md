@@ -11,15 +11,17 @@ Keep each rule in its ADR. Other docs state it in at most a few words as a link 
 
 **Blocked by:** 14
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Neither rule is explained outside its ADR; every other mention links the ADR
-- [ ] `general.md#generated-values` keeps only the app-generated exceptions
-- [ ] The root `AGENTS.md` is unchanged
-- [ ] Every link resolves; `pnpm lint` passes
+- [x] Neither rule is explained outside its ADR; every other mention links the ADR
+- [x] `general.md#generated-values` keeps only the app-generated exceptions
+- [x] The root `AGENTS.md` is unchanged
+- [x] Every link resolves; `pnpm lint` passes
 
 **Verification:** None beyond the definition of done.
 
 **Out of scope:** Other rules; a repo-wide restated-rule audit.
 
 ## Comments
+
+Resolved: the migration and DB-generated-values rules now live only in ADRs 0003/0004; `packages/api/AGENTS.md` and the definition of done name them with a link, `general.md#generated-values` keeps only the app-generated exceptions. Verified with a link check and `pnpm lint`; root `AGENTS.md` unchanged.
