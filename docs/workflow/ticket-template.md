@@ -34,7 +34,7 @@ Every new Ticket has these fields, in this order. Where Tickets live and how the
 - **Blocked by**: the numbers of the Tickets that must be `resolved` first (`NN, NN`), or `None`.
 - **Status**: one of the five labels in [triage labels](../agents/triage-labels.md), or `resolved`.
 - **Acceptance criteria**: one checkbox per result someone can check (a behaviour, a file, a command that passes), never a step in how to build it.
-- **Verification**: only checks specific to this Ticket: which tests to add, `pnpm docs:generate` when the schema, routes or realtime events change, a browser check, a manual command. The checks every PR runs are in the [definition of done](definition-of-done.md).
+- **Verification**: only checks specific to this Ticket: which tests to add, a browser check, a manual command. The checks every PR runs, `pnpm docs:generate` among them, are in the [definition of done](definition-of-done.md).
 - **Out of scope**: things a reader might reasonably expect but that this Ticket does not do, or `None`.
 - **Comments**: questions, answers and the closing summary, appended over time. See [escalation](escalation.md).
 

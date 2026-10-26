@@ -18,7 +18,7 @@ Every PR passes this one checklist.
 - [ ] Every acceptance criterion in the Ticket is met and ticked in the Ticket file.
 - [ ] No dependency changed beyond the Ticket's Allowed packages.
 - [ ] Tests follow the testing policy: the right kind, written first, nothing weakened without approval.
-- [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass locally on the final commit.
+- [ ] `pnpm lint`, `pnpm typecheck` and `pnpm test` pass locally on the final commit, and `pnpm docs:generate` leaves no diff.
 - [ ] Docs affected by the change are updated in this PR; `pnpm docs:generate` was run and committed if the schema, routes or realtime events changed.
 - [ ] Migrations follow ADR 0003 (never hand-edited).
 - [ ] Nothing outside the Ticket changed; anything noticed is appended to `docs/laters.md` or raised.
