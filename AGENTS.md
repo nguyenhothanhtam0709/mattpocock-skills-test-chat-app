@@ -34,7 +34,16 @@ Before changing a package, read its `AGENTS.md`: [api](packages/api/AGENTS.md), 
 
 ## Workflow
 
-Per-Ticket rules: [definition of done](docs/workflow/definition-of-done.md), [ticket template](docs/workflow/ticket-template.md), [escalation](docs/workflow/escalation.md), [testing policy](docs/workflow/testing-policy.md) and [setup](docs/workflow/setup.md). The pipeline from idea to merge (Stages, Agent Roles, Gates): [factory overview](docs/factory/overview.md).
+When doing a Ticket, read in this order:
+
+1. The Ticket itself; its fields are in the [ticket template](docs/workflow/ticket-template.md).
+2. The `AGENTS.md` of each package it touches ([Packages](#packages)).
+3. [Git workflow](docs/workflow/git-workflow.md).
+4. [Testing policy](docs/workflow/testing-policy.md), with [setup](docs/workflow/setup.md) for commands, a worktree and the browser check.
+5. [Definition of done](docs/workflow/definition-of-done.md), including [opening the PR](docs/workflow/definition-of-done.md#opening-the-pr) and [a check you cannot run](docs/workflow/definition-of-done.md#a-check-you-cannot-run).
+6. [Escalation](docs/workflow/escalation.md), when stuck.
+
+The pipeline from idea to merge (Stages, Agent Roles, Gates): [factory overview](docs/factory/overview.md).
 
 ## Skill-generated files
 
