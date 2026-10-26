@@ -11,7 +11,7 @@ What must be true before work leaves a Stage. The Stages are in the [overview](o
 - **Spec → Tickets**: the human has merged the Spec PR to `main`.
 - **Tickets → Implement**: the human has merged the Ticket PR. Each Ticket is `ready-for-agent` or `ready-for-human`, with every [ticket template](../workflow/ticket-template.md) field filled.
 - **Implement starts**: the Ticket is `ready-for-agent` (or `ready-for-human`, for the human), every Ticket in its `Blocked by` is `resolved`, and the Feature Branch is up to date with `main`.
-- **Task PR → merge**: the machine checks pass locally on the final commit (`pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm docs:generate` leaves no diff), the [definition of done](../workflow/definition-of-done.md) is ticked, the Reviewer has run, and the human approves.
+- **Task PR → merge**: the [definition of done](../workflow/definition-of-done.md) is ticked, machine checks included, the Reviewer has run, and the human approves.
 - **Feature Branch → `main`**: every Ticket is `resolved`, the Spec is `resolved`, `code-review` has run on the whole Feature Branch and its findings are fixed, and the human merges with a merge commit.
 
 _Not enforced yet:_ CI, branch protection and a required human approval. Today the agent runs the checks itself and the human checks the PR. See [Laters](../laters.md#enforce-the-doc-and-convention-rules).
