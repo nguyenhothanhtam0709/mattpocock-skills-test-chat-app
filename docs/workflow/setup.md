@@ -52,7 +52,7 @@ Gotcha: `db:up` fails if something else already listens on port 5432. Stop that 
 
 ```sh
 pnpm install
-cp "$(git worktree list | head -1 | cut -d' ' -f1)/packages/api/.env" packages/api/.env   # the first entry is the main checkout
+cp "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/packages/api/.env" packages/api/.env   # from the main checkout
 ```
 
 If the main checkout has no `.env` either, create one as in [Environment](#environment).
@@ -80,7 +80,7 @@ pnpm build:contracts
 pnpm db:migrate
 pnpm db:seed    # the seeded Users to log in as
 pnpm dev:api    # http://localhost:3000/api/v1
-pnpm dev:web    # http://localhost:5173, proxies /api and /socket.io to the API
+pnpm dev:web    # http://localhost:5173
 ```
 
 Then open http://localhost:5173 with the Chrome DevTools MCP. The seeded Users are `alice`, `bob`, `carol`, `dave` and `erin`, all with the password `password123` ([seed.ts](../../packages/api/src/db/seed.ts)). When done, stop `dev:api` and `dev:web`, then `pnpm db:down`.

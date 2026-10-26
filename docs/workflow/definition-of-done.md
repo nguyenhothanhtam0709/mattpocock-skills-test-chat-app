@@ -30,13 +30,13 @@ Every PR passes this one checklist.
 
 - Open and update the PR with the GitHub MCP tools: `mcp__github__create_pull_request` to open it, `mcp__github__update_pull_request` to mark it ready. Not `gh`, which may not be logged in.
 - Write the body with the `pr` skill, with the checklist above copied in verbatim.
-- Open it as a draft only when an item is unticked. Otherwise open it ready for review.
+- Open it ready for review, unless [How to use it](#how-to-use-it) keeps it in draft.
 
 ## A check you cannot run
 
 A check cannot run when something it needs is missing from the environment, such as Docker for the API tests in `pnpm test` ([setup](setup.md)). A check that runs and fails never counts: fix it or [escalate](escalation.md).
 
-- Leave its item unticked, and under it in the PR body say which check did not run and why. The PR stays in draft.
+- Leave its item unticked, and under it in the PR body say which check did not run and why.
 - Add one line saying the same to the Ticket's closing summary under `## Comments`.
 
 ## Where each rule lives
