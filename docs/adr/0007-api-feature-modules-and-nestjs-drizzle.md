@@ -1,6 +1,6 @@
 # The API is split into feature modules and injects the database through `@nestjs/drizzle`
 
-`AppModule` used to list every controller and provider in one flat list, and each service built its own `drizzle(pool)` from the raw `pg` pool. Two rules replace that.
+Every controller and provider lives in its feature's module, and providers receive the database through `@nestjs/drizzle`. These two rules replace a flat `AppModule` that listed every controller and provider, and services that each built their own `drizzle(pool)` from the raw `pg` pool.
 
 ## Feature modules
 
