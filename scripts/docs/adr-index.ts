@@ -1,6 +1,9 @@
 import { generatedDocHeader } from './generated-doc-header.ts';
 
-export type AdrSource = { file: string; content: string };
+export interface AdrSource {
+  file: string;
+  content: string;
+}
 
 const GENERATOR = 'scripts/docs/adr-index.ts';
 const SOURCE = 'docs/adr/*.md';

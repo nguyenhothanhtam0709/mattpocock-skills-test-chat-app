@@ -4,7 +4,7 @@ import { RealtimeEvent, RealtimeEventSchemas } from './realtime.js';
 const GENERATOR = 'packages/contracts/src/realtime-events-doc.ts';
 const SOURCE = 'packages/contracts/src/realtime.ts';
 
-type JsonSchema = {
+interface JsonSchema {
   type?: string | string[];
   format?: string;
   enum?: unknown[];
@@ -13,7 +13,7 @@ type JsonSchema = {
   required?: string[];
   items?: JsonSchema;
   anyOf?: JsonSchema[];
-};
+}
 
 const literal = (value: unknown) => (typeof value === 'string' ? `'${value}'` : String(value));
 

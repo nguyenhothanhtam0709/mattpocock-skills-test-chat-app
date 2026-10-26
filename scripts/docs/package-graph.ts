@@ -1,10 +1,10 @@
 import { generatedDocHeader } from './generated-doc-header.ts';
 
-export type PackageManifest = {
+export interface PackageManifest {
   name: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
-};
+}
 
 const GENERATOR = 'scripts/docs/package-graph.ts';
 const SOURCE = 'packages/*/package.json';
