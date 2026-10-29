@@ -66,6 +66,15 @@ Socket.IO events pushed from server to client (the socket is push-only, ADR 0001
 }
 ```
 
+## `conversation.receipt`
+
+```ts
+{
+  conversationId: string; // uuid
+  upToSequence: number; // integer
+}
+```
+
 ## `group.member_added`
 
 ```ts

@@ -67,6 +67,8 @@ interface Row {
   outgoing?: Outgoing;
   /** Set for a stored membership systemMessage ("Bob was added"): rendered as a `Marker`, not a bubble. */
   systemMessage?: string;
+  /** The Read Receipt sits under this Message: "Seen". */
+  seen?: true;
 }
 
 const SYSTEM_MESSAGE_VERBS: Record<SystemMessageKind, string> = {
@@ -225,7 +227,8 @@ export function ConversationView({
    */
   reading?: boolean;
 }) {
-  const { sendDirectMessage, sendMessage, messagesPage, getGroup, markRead } = useAuth();
+  const { sendDirectMessage, sendMessage, messagesPage, getGroup, markRead, readReceipt } =
+    useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
   // just the first send reporting the Conversation it created.
   const [openedWith] = useState(initialConversationId);
@@ -319,12 +322,48 @@ export function ConversationView({
     refreshGroup();
   }, [refreshGroup]);
 
+  // The other User's Read Marker in a Direct Conversation, known only while both share read
+  // receipts: from the Conversation on open (and on reconnect, for a missed push), then from
+  // `conversation.receipt`. It only moves forward. Only the newest request counts.
+  const isDirect = target.kind === 'direct';
+  const [otherMarker, setOtherMarker] = useState<number | undefined>(undefined);
+  const receiptRequests = useRef(0);
+  const refreshReceipt = useCallback(() => {
+    if (!conversationId || !isDirect) return;
+    const mine = ++receiptRequests.current;
+    void (async () => {
+      const result = await readReceipt(conversationId);
+      if (!result.ok || mine !== receiptRequests.current) return;
+      const fetched = result.readUpToSequence;
+      setOtherMarker((current) =>
+        fetched === undefined ? undefined : Math.max(current ?? 0, fetched),
+      );
+    })();
+  }, [conversationId, isDirect, readReceipt]);
+
+  useEffect(() => {
+    refreshReceipt();
+  }, [refreshReceipt]);
+
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        if (event.type !== 'conversation.receipt' || event.conversationId !== conversationId) {
+          return;
+        }
+        setOtherMarker((current) => Math.max(current ?? 0, event.upToSequence));
+      },
+      [conversationId],
+    ),
+  );
+
   // Messages pushed while the connection was down are gone for good: fetch what came after the
   // last one seen, page by page. Duplicates with pushes are merged by ID.
   useReconnected(() => {
     const id = conversationId;
     if (!id) return;
     refreshGroup();
+    refreshReceipt();
     void (async () => {
       // Resume from the page's own newest Message, not the newest seen: a push that lands
       // meanwhile must not make the fetch skip the Messages before it.
@@ -476,6 +515,15 @@ export function ConversationView({
   const memberCount = info?.memberCount ?? 0;
   const canPost = target.kind !== 'group' || (!!info?.isMember && !closed);
 
+  // "Seen" goes under the newest of the User's own Messages the other User has read.
+  const seenId =
+    otherMarker === undefined
+      ? undefined
+      : [...messages]
+          .reverse()
+          .find((m) => m.kind === 'text' && m.senderId === user.id && m.sequence <= otherMarker)
+          ?.id;
+
   const rows: Row[] = [
     ...messages.map((m) => {
       const systemMessage = systemMessageText(m);
@@ -485,6 +533,7 @@ export function ConversationView({
         createdAt: m.createdAt,
         body: m.body,
         ...(systemMessage === undefined ? {} : { systemMessage }),
+        ...(m.id === seenId ? { seen: true as const } : {}),
       };
     }),
     ...outgoing.map((o) => ({
@@ -615,6 +664,7 @@ export function ConversationView({
                               </Button>
                             </MessageFooter>
                           )}
+                          {m.seen && <MessageFooter>Seen</MessageFooter>}
                         </Message>
                       )}
                     </MessageScrollerItem>
