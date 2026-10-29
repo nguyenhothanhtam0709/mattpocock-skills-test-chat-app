@@ -450,7 +450,6 @@ export class MessagesService {
       .returning();
     if (!row) throw new DuplicateClientMessage();
     // Sending reads everything up to it: the sender's own Read Marker moves to the Message.
-    // Sending reads everything up to it: the sender's own Read Marker moves to the Message.
     const moved = await tx
       .update(conversationMembers)
       .set({ readMarker: row.sequence })
