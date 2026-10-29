@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 
 function fakeAccessToken() {

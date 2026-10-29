@@ -59,12 +59,19 @@ export const NicknameSchema = nameText(true).refine(
 );
 
 /**
- * Update the caller's profile. Only the Nickname is editable (`null` clears it); the schema is
- * strict so a Username, email or anything else is rejected rather than silently ignored.
+ * `PATCH /users/me`: update the caller's profile. The Nickname (`null` clears it) and whether
+ * to share read receipts are editable, alone or together; at least one must be given. The
+ * schema is strict so a Username, email or anything else is rejected rather than silently
+ * ignored.
  */
-export const UpdateProfileRequestSchema = z.strictObject({
-  nickname: NicknameSchema.nullable(),
-});
+export const UpdateProfileRequestSchema = z
+  .strictObject({
+    nickname: NicknameSchema.nullable().optional(),
+    shareReadReceipts: z.boolean().optional(),
+  })
+  .refine((body) => body.nickname !== undefined || body.shareReadReceipts !== undefined, {
+    message: 'must contain nickname or shareReadReceipts',
+  });
 
 export type UpdateProfileRequest = z.input<typeof UpdateProfileRequestSchema>;
 
@@ -83,6 +90,8 @@ export const RegisterResponseSchema = z.object({
     username: z.string(),
     email: z.string(),
     nickname: z.string().nullable(),
+    /** Whether this User shares read receipts (on by default); only ever sent to its owner. */
+    shareReadReceipts: z.boolean(),
   }),
 });
 
@@ -114,6 +123,7 @@ export const RefreshResponseSchema = z.object({
 
 export type RefreshResponse = z.infer<typeof RefreshResponseSchema>;
 
+/** `GET /users/me` and `PATCH /users/me`: the caller's own profile. */
 export const MeResponseSchema = z.object({ user: UserSchema });
 
 export type MeResponse = z.infer<typeof MeResponseSchema>;

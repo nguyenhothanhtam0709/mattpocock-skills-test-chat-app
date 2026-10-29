@@ -2,6 +2,7 @@ import type {
   CreateGroupRequest,
   SendDirectMessageRequest,
   SendMessageRequest,
+  UpdateProfileRequest,
   User,
 } from '@chat/contracts';
 import {
@@ -40,7 +41,7 @@ import {
   type GroupResult,
 } from '@/api/groups';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
-import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
+import { updateProfile as patchProfile, type UpdateProfileResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
 
 export type AuthState =
@@ -49,8 +50,8 @@ export type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn(identifier: string, password: string): Promise<LoginResult>;
-  /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
-  setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
+  /** Changes the Nickname (`null` clears it) and/or sharing read receipts; updates the User. */
+  updateProfile(changes: UpdateProfileRequest): Promise<UpdateProfileResult>;
   /** Server-side Username-prefix search with the current access token. */
   searchUsers(q: string, signal?: AbortSignal): Promise<SearchUsersResult>;
   /** Sends to a User, creating the Direct Conversation if it does not exist yet. */
@@ -154,10 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
-  const setNickname = useCallback(async (nickname: string | null) => {
+  const updateProfile = useCallback(async (changes: UpdateProfileRequest) => {
     const accessToken = accessTokenRef.current;
     if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
-    const result = await updateNickname(accessToken, nickname);
+    const result = await patchProfile(accessToken, changes);
     if (result.ok) setState({ status: 'signedIn', user: result.user });
     return result;
   }, []);
@@ -240,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       signIn,
-      setNickname,
+      updateProfile,
       searchUsers: searchUsersByPrefix,
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
@@ -258,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       state,
       signIn,
-      setNickname,
+      updateProfile,
       searchUsersByPrefix,
       sendDirect,
       sendToConversation,

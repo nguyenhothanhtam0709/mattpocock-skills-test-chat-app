@@ -32,13 +32,13 @@ export class UsersController {
     return { users: await this.auth.searchUsers(auth.userId, query.q) };
   }
 
-  /** Sets or clears the Nickname; the only profile field that can change. */
+  /** Sets or clears the Nickname and/or turns sharing read receipts on or off. */
   @Patch('me')
   @UseGuards(AuthGuard)
   async updateMe(
     @Auth() auth: AuthContext,
     @Body(new ZodValidationPipe(UpdateProfileRequestSchema)) body: UpdateProfileRequest,
   ): Promise<MeResponse> {
-    return { user: await this.auth.updateNickname(auth.userId, body.nickname) };
+    return { user: await this.auth.updateProfile(auth.userId, body) };
   }
 }

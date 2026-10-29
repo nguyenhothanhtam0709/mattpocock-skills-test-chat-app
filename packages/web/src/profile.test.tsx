@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: 'Ali' as string | null,
+  shareReadReceipts: true,
 };
 
 /** A token shaped like the API's; the SPA only reads `exp`. */
@@ -24,19 +25,27 @@ interface PatchCall {
   body: unknown;
 }
 
+interface PatchBody {
+  nickname?: string | null;
+  shareReadReceipts?: boolean;
+}
+
 /** Signed in as Alice; PATCH /users/me is recorded and answered by `respond`. */
 async function openShell(
   nickname: string | null = 'Ali',
-  respond: (body: { nickname: string | null }) => Response = (body) =>
-    HttpResponse.json({ user: { ...alice, nickname: body.nickname } }),
+  respond: (body: PatchBody) => Response = (body) =>
+    HttpResponse.json({ user: { ...alice, ...body } }),
+  shareReadReceipts = true,
 ) {
   const token = fakeAccessToken();
   const patches: PatchCall[] = [];
   server.use(
     http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: token })),
-    http.get('*/api/v1/users/me', () => HttpResponse.json({ user: { ...alice, nickname } })),
+    http.get('*/api/v1/users/me', () =>
+      HttpResponse.json({ user: { ...alice, nickname, shareReadReceipts } }),
+    ),
     http.patch('*/api/v1/users/me', async ({ request }) => {
-      const body = (await request.json()) as { nickname: string | null };
+      const body = (await request.json()) as PatchBody;
       patches.push({ authorization: request.headers.get('authorization'), body });
       return respond(body);
     }),
@@ -160,6 +169,55 @@ describe('profile', () => {
     dialog = await openProfile(user, /ali\b/i);
 
     expect(within(dialog).getByLabelText(/nickname/i)).toHaveValue('Ali');
+    expect(patches).toEqual([]);
+  });
+
+  it.each([
+    ['on', true],
+    ['off', false],
+  ])('shows the Share read receipts switch %s when the setting is %s', async (_label, on) => {
+    const { user } = await openShell('Ali', undefined, on);
+
+    const dialog = await openProfile(user, /ali\b/i);
+
+    const toggle = within(dialog).getByRole('switch', { name: /share read receipts/i });
+    if (on) expect(toggle).toBeChecked();
+    else expect(toggle).not.toBeChecked();
+  });
+
+  it('saves turning Share read receipts off, keeps the Nickname and remembers the new value', async () => {
+    const { user, patches } = await openShell();
+    let dialog = await openProfile(user, /ali\b/i);
+
+    await user.click(within(dialog).getByRole('switch', { name: /share read receipts/i }));
+    await user.click(within(dialog).getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(patches.map((p) => p.body)).toEqual([{ nickname: 'Ali', shareReadReceipts: false }]);
+    dialog = await openProfile(user, /ali\b/i);
+    expect(within(dialog).getByRole('switch', { name: /share read receipts/i })).not.toBeChecked();
+  });
+
+  it('saves turning Share read receipts back on', async () => {
+    const { user, patches } = await openShell('Ali', undefined, false);
+    const dialog = await openProfile(user, /ali\b/i);
+
+    await user.click(within(dialog).getByRole('switch', { name: /share read receipts/i }));
+    await user.click(within(dialog).getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(patches.map((p) => p.body)).toEqual([{ nickname: 'Ali', shareReadReceipts: true }]);
+  });
+
+  it('discards an unsaved switch change when the dialog is closed', async () => {
+    const { user, patches } = await openShell();
+    let dialog = await openProfile(user, /ali\b/i);
+    await user.click(within(dialog).getByRole('switch', { name: /share read receipts/i }));
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+
+    dialog = await openProfile(user, /ali\b/i);
+
+    expect(within(dialog).getByRole('switch', { name: /share read receipts/i })).toBeChecked();
     expect(patches).toEqual([]);
   });
 });

@@ -51,6 +51,7 @@ describe('signup page', () => {
             username: body.username,
             email: body.email,
             nickname: body.nickname ?? null,
+            shareReadReceipts: true,
           },
         },
         { status: 201 },
@@ -81,7 +82,15 @@ describe('signup page', () => {
   it('omits an empty Nickname from the request', async () => {
     const captured = mockRegister((body) =>
       HttpResponse.json(
-        { user: { id: USER_ID, username: body.username, email: body.email, nickname: null } },
+        {
+          user: {
+            id: USER_ID,
+            username: body.username,
+            email: body.email,
+            nickname: null,
+            shareReadReceipts: true,
+          },
+        },
         { status: 201 },
       ),
     );
