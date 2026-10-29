@@ -52,6 +52,7 @@ Socket.IO events pushed from server to client (the socket is push-only, ADR 0001
       preview: string;
       createdAt: string; // date-time
     } | null;
+    unreadCount: number; // integer
   };
 }
 ```

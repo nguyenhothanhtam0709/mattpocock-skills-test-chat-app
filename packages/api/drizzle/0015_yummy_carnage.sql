@@ -1,0 +1,1 @@
+ALTER TABLE "conversation_members" ADD COLUMN "read_marker" integer DEFAULT 0 NOT NULL;

@@ -37,6 +37,7 @@ const summary = (
   members: [aliceMember, { id: peer.id, username: peer.username, nickname: peer.nickname }],
   isMember: true,
   closed: false,
+  unreadCount: 0,
   lastMessage: { senderId: peer.id, preview, createdAt },
 });
 

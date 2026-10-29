@@ -43,7 +43,9 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>) {
     http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: fakeAccessToken() })),
     http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
     http.get('*/api/v1/conversations', () =>
-      HttpResponse.json({ conversations: [{ ...current, isMember: true, lastMessage: null }] }),
+      HttpResponse.json({
+        conversations: [{ ...current, isMember: true, unreadCount: 0, lastMessage: null }],
+      }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
       HttpResponse.json({
@@ -251,6 +253,7 @@ describe('System Messages', () => {
             {
               ...groupOwnedBy(bob.id, [aliceMember, bob]),
               isMember: true,
+              unreadCount: 0,
               lastMessage: {
                 senderId: bob.id,
                 preview: 'hello everyone',

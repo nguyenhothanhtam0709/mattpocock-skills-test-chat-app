@@ -1,5 +1,5 @@
 {
-  "id": "ae0b55a2-2f91-4a59-9859-8fb9c5651749",
+  "id": "4a38077c-0821-4079-8525-569805d9a504",
   "prevId": "d6176ea7-f619-4024-8bd4-600c31a35e14",
   "version": "7",
   "dialect": "postgresql",
@@ -19,6 +19,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "read_marker": {
+          "name": "read_marker",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -823,13 +830,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "share_read_receipts": {
-          "name": "share_read_receipts",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "created_at": {
           "name": "created_at",

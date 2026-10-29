@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ConversationSummarySchema,
   GetMessagesQuerySchema,
+  UNREAD_COUNT_MAX,
   MessageBodySchema,
   SendDirectMessageRequestSchema,
   SendMessageRequestSchema,
@@ -66,5 +68,30 @@ describe('GetMessagesQuerySchema', () => {
     { before: '1', after: '2' },
   ])('rejects %j', (query) => {
     expect(GetMessagesQuerySchema.safeParse(query).success).toBe(false);
+  });
+});
+
+describe('ConversationSummarySchema', () => {
+  const summary = {
+    id,
+    kind: 'direct',
+    name: 'Bob',
+    members: [],
+    isMember: true,
+    closed: false,
+    lastMessage: null,
+  };
+
+  it('carries an Unread Count from 0 up to the cap of 100', () => {
+    expect(UNREAD_COUNT_MAX).toBe(100);
+    for (const unreadCount of [0, 1, 100]) {
+      expect(ConversationSummarySchema.parse({ ...summary, unreadCount }).unreadCount).toBe(
+        unreadCount,
+      );
+    }
+  });
+
+  it.each([[-1], [101], [1.5], [undefined]])('rejects an Unread Count of %j', (unreadCount) => {
+    expect(ConversationSummarySchema.safeParse({ ...summary, unreadCount }).success).toBe(false);
   });
 });
