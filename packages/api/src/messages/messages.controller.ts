@@ -1,11 +1,25 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import {
   GetMessagesQuerySchema,
+  MarkReadRequestSchema,
   SendDirectMessageRequestSchema,
   SendMessageRequestSchema,
   type GetConversationResponse,
   type GetMessagesQuery,
   type ListConversationsResponse,
+  type MarkReadRequest,
+  type MarkReadResponse,
   type GetMessagesResponse,
   type SendDirectMessageRequest,
   type SendDirectMessageResponse,
@@ -77,5 +91,17 @@ export class MessagesController {
     @Query(new ZodValidationPipe(GetMessagesQuerySchema)) query: GetMessagesQuery,
   ): Promise<GetMessagesResponse> {
     return this.messages.history(auth.userId, conversationId, query);
+  }
+
+  /** Forward-only and idempotent: returns the caller's Read Marker after the request. */
+  @Put('conversations/:id/read')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  markRead(
+    @Auth() auth: AuthContext,
+    @Param('id', ConversationIdPipe) conversationId: string,
+    @Body(new ZodValidationPipe(MarkReadRequestSchema)) body: MarkReadRequest,
+  ): Promise<MarkReadResponse> {
+    return this.messages.markRead(auth.userId, conversationId, body.upToSequence);
   }
 }
