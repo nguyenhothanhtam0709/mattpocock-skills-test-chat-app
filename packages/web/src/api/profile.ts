@@ -1,18 +1,24 @@
-import { ErrorCode, ErrorResponseSchema, MeResponseSchema, type User } from '@chat/contracts';
+import {
+  ErrorCode,
+  ErrorResponseSchema,
+  MeResponseSchema,
+  type UpdateProfileRequest,
+  type User,
+} from '@chat/contracts';
 
-export type UpdateNicknameResult = { ok: true; user: User } | { ok: false; error: string };
+export type UpdateProfileResult = { ok: true; user: User } | { ok: false; error: string };
 
-/** Calls `PATCH /api/v1/users/me`; `null` clears the Nickname. */
-export async function updateNickname(
+/** Calls `PATCH /api/v1/users/me`; a `null` Nickname clears it, an absent field is left as is. */
+export async function updateProfile(
   accessToken: string,
-  nickname: string | null,
-): Promise<UpdateNicknameResult> {
+  changes: UpdateProfileRequest,
+): Promise<UpdateProfileResult> {
   let res: Response;
   try {
     res = await fetch(new URL('/api/v1/users/me', window.location.origin), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ nickname }),
+      body: JSON.stringify(changes),
     });
   } catch {
     return { ok: false, error: 'Could not reach the server. Try again.' };

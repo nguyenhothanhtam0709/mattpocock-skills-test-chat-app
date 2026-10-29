@@ -1,6 +1,7 @@
 import { CONVERSATION_KINDS, MESSAGE_KINDS } from '@chat/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -30,6 +31,8 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     nickname: text('nickname'),
+    /** Share read receipts: on by default, reciprocal (off also hides the other User's). */
+    shareReadReceipts: boolean('share_read_receipts').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

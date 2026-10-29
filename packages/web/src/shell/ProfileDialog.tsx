@@ -12,10 +12,12 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 
 function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
-  const { setNickname } = useAuth();
+  const { updateProfile } = useAuth();
   const [value, setValue] = useState(user.nickname ?? '');
+  const [shareReadReceipts, setShareReadReceipts] = useState(user.shareReadReceipts);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,8 +25,10 @@ function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
     e.preventDefault();
     // An empty (or all-whitespace) field clears the Nickname.
     const trimmed = value.trim();
+    // The setting is sent only when it changed, so a Nickname edit alone stays a Nickname edit.
     const parsed = UpdateProfileRequestSchema.safeParse({
       nickname: trimmed === '' ? null : value,
+      ...(shareReadReceipts !== user.shareReadReceipts && { shareReadReceipts }),
     });
     if (!parsed.success) {
       setError('Nickname must be 1-50 characters, without control characters.');
@@ -33,7 +37,7 @@ function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
     setError(undefined);
     setSubmitting(true);
     try {
-      const result = await setNickname(parsed.data.nickname);
+      const result = await updateProfile(parsed.data);
       if (result.ok) onSaved();
       else setError(result.error);
     } finally {
@@ -61,6 +65,14 @@ function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
           />
           {error && <FieldError>{error}</FieldError>}
         </Field>
+        <Field orientation="horizontal">
+          <Switch
+            id="share-read-receipts"
+            checked={shareReadReceipts}
+            onCheckedChange={setShareReadReceipts}
+          />
+          <FieldLabel htmlFor="share-read-receipts">Share read receipts</FieldLabel>
+        </Field>
       </FieldGroup>
       <DialogFooter>
         <Button type="submit" disabled={submitting}>
@@ -71,7 +83,10 @@ function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
   );
 }
 
-/** Shows the User's Username and email and lets them set, change or clear their Nickname. */
+/**
+ * Shows the User's Username and email and lets them set, change or clear their Nickname and
+ * turn sharing read receipts on or off.
+ */
 export function ProfileDialog({
   user,
   open,

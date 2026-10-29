@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: 'Ali',
+  shareReadReceipts: true,
 };
 
 /** A token shaped like the API's; the SPA only reads `exp`. */
