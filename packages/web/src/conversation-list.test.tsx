@@ -31,6 +31,7 @@ const summaries = [
     members: [aliceMember, bob],
     isMember: true,
     closed: false,
+    unreadCount: 0,
     lastMessage: {
       senderId: bob.id,
       preview: 'see you at noon',
@@ -44,6 +45,7 @@ const summaries = [
     members: [aliceMember, carol],
     isMember: true,
     closed: false,
+    unreadCount: 0,
     lastMessage: { senderId: alice.id, preview: 'thanks!', createdAt: '2020-03-03T10:00:00Z' },
   },
 ];

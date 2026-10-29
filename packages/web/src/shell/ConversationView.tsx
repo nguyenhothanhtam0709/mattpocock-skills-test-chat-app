@@ -37,6 +37,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScrollerScrollable,
 } from '@/components/ui/message-scroller';
 
 /** Show the counter once the text is within this many characters of the limit. */
@@ -174,6 +175,16 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
   );
 }
 
+/**
+ * Reports whether the view is at its live edge: the latest Message is in view, so nothing is
+ * left to scroll towards the end (also true while there is nothing to scroll at all).
+ */
+function LiveEdge({ onChange }: { onChange: ((atLatest: boolean) => void) | undefined }) {
+  const { end } = useMessageScrollerScrollable();
+  useEffect(() => onChange?.(!end), [end, onChange]);
+  return null;
+}
+
 /** What the server last told us about the Group; events and refetches keep it current. */
 interface GroupInfo {
   memberCount: number;
@@ -192,6 +203,7 @@ export function ConversationView({
   conversationId: initialConversationId,
   onSent,
   onLeft,
+  onAtLatestChange,
 }: {
   user: User;
   target: ConversationTarget;
@@ -201,6 +213,8 @@ export function ConversationView({
   onSent?: (conversationId: string) => void;
   /** Called after the User left the Group, so the Conversation list can follow. */
   onLeft?: () => void;
+  /** Called whenever the view reaches or leaves the latest Message. */
+  onAtLatestChange?: (atLatest: boolean) => void;
 }) {
   const { sendDirectMessage, sendMessage, messagesPage, getGroup } = useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
@@ -509,15 +523,16 @@ export function ConversationView({
         )}
       </header>
       <div className="relative min-h-0 flex-1">
-        {rows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            No messages yet.{' '}
-            {target.kind === 'group'
-              ? 'Say hello to the Group.'
-              : `Say hello to ${displayName(target.peer)}.`}
-          </p>
-        ) : (
-          <MessageScrollerProvider>
+        <MessageScrollerProvider>
+          <LiveEdge onChange={onAtLatestChange} />
+          {rows.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">
+              No messages yet.{' '}
+              {target.kind === 'group'
+                ? 'Say hello to the Group.'
+                : `Say hello to ${displayName(target.peer)}.`}
+            </p>
+          ) : (
             <MessageScroller>
               <MessageScrollerViewport ref={viewportRef} onScroll={onScroll}>
                 <MessageScrollerContent className="p-4">
@@ -583,8 +598,8 @@ export function ConversationView({
                 <span className="sr-only">Jump to latest</span>
               </MessageScrollerButton>
             </MessageScroller>
-          </MessageScrollerProvider>
-        )}
+          )}
+        </MessageScrollerProvider>
       </div>
       {canPost ? (
         <Composer onSend={send} />

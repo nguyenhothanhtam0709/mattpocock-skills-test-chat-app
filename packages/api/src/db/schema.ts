@@ -97,6 +97,12 @@ export const conversationMembers = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * The Member's Read Marker: the sequence up to which they have read. Only moves forward.
+     * Starts at their membership period's start; the row (and so the marker) is deleted on
+     * leave or removal, so a re-added Member starts fresh.
+     */
+    readMarker: integer('read_marker').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

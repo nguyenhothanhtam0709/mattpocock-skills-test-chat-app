@@ -33,6 +33,47 @@ describe('migrations', () => {
       ]);
     });
   });
+
+  it('the Read Marker migration starts every existing Member at their Conversation’s last sequence', async () => {
+    const carol = '00000000-0000-7000-8000-000000000003';
+    const busy = '00000000-0000-7000-8000-0000000000c2';
+    const empty = '00000000-0000-7000-8000-0000000000c3';
+    await withDatabaseMigratedUpTo('0014_wealthy_the_santerians', async ({ pool, migrateRest }) => {
+      await pool.query(`
+        insert into users (id, username, email, password_hash) values
+          ('${alice}', 'alice', 'alice@example.com', 'x'),
+          ('${bob}', 'bob', 'bob@example.com', 'x'),
+          ('${carol}', 'carol', 'carol@example.com', 'x');
+        insert into conversations (id, kind, last_sequence) values
+          ('${conversation}', 'direct', 2),
+          ('${busy}', 'group', 7),
+          ('${empty}', 'group', 0);
+        insert into conversation_members (conversation_id, user_id) values
+          ('${conversation}', '${alice}'),
+          ('${conversation}', '${bob}'),
+          ('${busy}', '${alice}'),
+          ('${busy}', '${carol}'),
+          ('${empty}', '${bob}');
+      `);
+
+      await migrateRest();
+
+      const { rows } = await pool.query<{
+        conversation_id: string;
+        user_id: string;
+        read_marker: number;
+      }>(
+        `select conversation_id, user_id, read_marker from conversation_members order by conversation_id, user_id`,
+      );
+      expect(rows).toEqual([
+        { conversation_id: conversation, user_id: alice, read_marker: 2 },
+        { conversation_id: conversation, user_id: bob, read_marker: 2 },
+        { conversation_id: busy, user_id: alice, read_marker: 7 },
+        { conversation_id: busy, user_id: carol, read_marker: 7 },
+        { conversation_id: empty, user_id: bob, read_marker: 0 },
+      ]);
+    });
+  });
 });
 
 describe('migration test database', () => {

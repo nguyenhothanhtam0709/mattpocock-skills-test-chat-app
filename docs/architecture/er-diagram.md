@@ -13,6 +13,7 @@ erDiagram
   conversation_members {
     uuid conversation_id PK, FK
     uuid user_id PK, FK
+    integer read_marker
     timestamptz created_at
   }
   conversations {

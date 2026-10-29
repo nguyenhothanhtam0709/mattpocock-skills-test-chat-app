@@ -170,6 +170,9 @@ export type GetConversationResponse = z.infer<typeof GetConversationResponseSche
 
 export const LAST_MESSAGE_PREVIEW_MAX = 100;
 
+/** The Unread Count stops counting here; the SPA shows it as "99+". */
+export const UNREAD_COUNT_MAX = 100;
+
 export const ConversationSummarySchema = z.object({
   id: z.uuid(),
   kind: ConversationKindSchema,
@@ -189,6 +192,11 @@ export const ConversationSummarySchema = z.object({
       createdAt: z.iso.datetime(),
     })
     .nullable(),
+  /**
+   * Other Members' `text` Messages after the caller's Read Marker, capped at 100. Always 0 for
+   * a Former Member and a Closed Group.
+   */
+  unreadCount: z.int().min(0).max(UNREAD_COUNT_MAX),
 });
 
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
