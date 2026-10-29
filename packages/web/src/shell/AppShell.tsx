@@ -203,6 +203,7 @@ export function AppShell({ user }: { user: User }) {
               conversationId={open.conversationId}
               onLeft={() => setRefreshKey((k) => k + 1)}
               onAtLatestChange={setAtLatest}
+              reading={tabVisible && atLatest}
               onSent={(conversationId) => {
                 setOpen((current) => current && { ...current, conversationId });
                 setRefreshKey((k) => k + 1);

@@ -25,7 +25,9 @@ import {
 } from '@/api/auth';
 import {
   listConversations,
+  markRead,
   messagesPage,
+  type MarkReadResult,
   type MessagesCursor,
   type MessagesPageResult,
   type ListConversationsResult,
@@ -79,6 +81,8 @@ interface AuthContextValue {
     cursor?: MessagesCursor,
     signal?: AbortSignal,
   ): Promise<MessagesPageResult>;
+  /** Marks the Conversation read up to `upToSequence` (forward only). */
+  markRead(conversationId: string, upToSequence: number): Promise<MarkReadResult>;
   /** The current access token (renewed in the background), if signed in. */
   getAccessToken(): string | undefined;
   /** Signs out here only, because the server already ended the session. */
@@ -229,6 +233,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const read = useCallback(async (conversationId: string, upToSequence: number) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return markRead(accessToken, conversationId, upToSequence);
+  }, []);
+
   const getAccessToken = useCallback(() => accessTokenRef.current, []);
 
   const logOut = useCallback(async () => {
@@ -252,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       leaveGroup: leave,
       listConversations: conversationList,
       messagesPage: page,
+      markRead: read,
       getAccessToken,
       endSession: signOut,
       logOut,
@@ -270,6 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       leave,
       conversationList,
       page,
+      read,
       getAccessToken,
       signOut,
       logOut,
