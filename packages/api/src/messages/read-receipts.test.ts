@@ -74,9 +74,7 @@ async function open(app: NestFastifyApplication, as: Person, conversationId: str
 const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
 
 const receipts = (client: TestSocket) =>
-  client.received
-    .filter(([name]) => name === 'conversation.receipt')
-    .map(([, payload]) => payload);
+  client.received.filter(([name]) => name === 'conversation.receipt').map(([, payload]) => payload);
 
 afterEach(() => closeAllSockets());
 

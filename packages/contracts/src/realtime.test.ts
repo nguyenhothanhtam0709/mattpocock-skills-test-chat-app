@@ -96,7 +96,7 @@ describe('realtime event contracts', () => {
     ).toBe(false);
   });
 
-  it('conversation.receipt carries the Conversation and the other User\'s Read Marker, no User', () => {
+  it("conversation.receipt carries the Conversation and the other User's Read Marker, no User", () => {
     expect(ConversationReceiptEventSchema.parse({ conversationId: id, upToSequence: 4 })).toEqual({
       conversationId: id,
       upToSequence: 4,

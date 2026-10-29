@@ -1,4 +1,5 @@
 import {
+  GetConversationResponseSchema,
   GetMessagesResponseSchema,
   ListConversationsResponseSchema,
   MarkReadResponseSchema,
@@ -8,6 +9,9 @@ import {
 
 export type ListConversationsResult =
   { ok: true; conversations: ConversationSummary[] } | { ok: false; error: string };
+
+export type ReadReceiptResult =
+  { ok: true; readUpToSequence: number | undefined } | { ok: false; error: string };
 
 export type MarkReadResult = { ok: true; upToSequence: number } | { ok: false; error: string };
 
@@ -38,6 +42,24 @@ export async function listConversations(
   const res = await get(accessToken, '/api/v1/conversations', signal);
   if (!res.ok) return res;
   return { ok: true, ...ListConversationsResponseSchema.parse(res.payload) };
+}
+
+/**
+ * `GET /api/v1/conversations/:id`, for its Read Receipt: the other User's Read Marker in a
+ * Direct Conversation when both Users share read receipts, else `undefined`.
+ */
+export async function readReceipt(
+  accessToken: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<ReadReceiptResult> {
+  const res = await get(accessToken, `/api/v1/conversations/${conversationId}`, signal);
+  if (!res.ok) return res;
+  const { conversation } = GetConversationResponseSchema.parse(res.payload);
+  return {
+    ok: true,
+    readUpToSequence: conversation.kind === 'direct' ? conversation.readUpToSequence : undefined,
+  };
 }
 
 /**
