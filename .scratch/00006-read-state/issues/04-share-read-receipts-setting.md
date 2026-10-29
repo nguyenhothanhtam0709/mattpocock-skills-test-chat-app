@@ -43,3 +43,8 @@ Recommendation: option 2. It needs no new package and matches the other 25 ui fi
 
 **Blocked:** the fourth acceptance criterion (the Profile dialog switch) and the browser check.
 
+**Assumptions (also in PR #129):**
+
+- `shareReadReceipts` is on `UserSchema`, so the register and login responses carry it as well as `/users/me`. The SPA gets the signed-in User from login.
+- `PATCH /users/me` with an empty body is still `400 VALIDATION_FAILED`: at least one field is required.
+- Planned dialog behaviour (in the red web tests): the switch is part of the form, Save sends `nickname` plus `shareReadReceipts` only when it changed, and closing discards an unsaved toggle.
