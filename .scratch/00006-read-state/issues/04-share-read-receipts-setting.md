@@ -11,12 +11,12 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A newly registered User and every existing User has `shareReadReceipts: true`
 - [x] `PATCH /users/me` with `shareReadReceipts` changes it and returns the updated profile. Updating only the Nickname leaves it unchanged.
 - [x] A non-boolean value gets `400 VALIDATION_FAILED`
-- [ ] The Profile dialog shows the switch with the current value and saves a change
+- [x] The Profile dialog shows the switch with the current value and saves a change
 - [x] The contract change has a contracts test
 
 **Verification:**
@@ -52,4 +52,12 @@ Recommendation: option 2. It needs no new package and matches the other 25 ui fi
 ### Decision (human, 2026-10-29, relayed by the coordinating agent)
 
 Option 1: allow `cn` as a web dependency, and keep `switch.tsx` as the shadcn CLI generates it. Only `switch` is added. The CLI is not re-run over existing ui files.
+
+### Resolved (agent, 2026-10-29)
+
+- `users.share_read_receipts` (non-null, default `true`) comes in migration `0017_long_wild_pack`, generated with `pnpm db:generate` after taking ticket 02's `0015`/`0016`. `shareReadReceipts` is on the current-User profile. `PATCH /users/me` takes it alone or with the Nickname, and pushes nothing.
+- The shadcn Switch was added with `pnpm exec shadcn add switch`. It brings `cn@^0.5.0` into `packages/web` (the decision above). The file is as generated, Prettier-formatted. The Profile dialog has a "Share read receipts" switch: Save sends it only when it changed, and closing discards an unsaved toggle.
+- Verified by contracts, API behaviour and web behaviour tests. `pnpm lint`, `pnpm typecheck` and `pnpm test` pass, and `pnpm docs:generate` leaves no diff (ER diagram and ADR index regenerated).
+- Browser check: as `alice`, the dialog shows the switch on. Turning it off and saving sent `{"nickname":null,"shareReadReceipts":false}` and got 200. After a reload the switch was off. It was turned back on afterwards.
+- Assumptions: as listed above. No follow-ups.
 
