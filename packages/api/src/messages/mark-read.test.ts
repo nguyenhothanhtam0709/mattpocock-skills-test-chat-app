@@ -231,11 +231,12 @@ describe('conversation.read', () => {
       const tab2 = await connectSocket(url, aliceElsewhere.token);
       const bobSocket = await connectSocket(url, bob.token);
       const carolSocket = await connectSocket(url, carol.token);
+      const readByTab1 = tab1.next('conversation.read');
 
       const direct = await sendDirect(app, alice, bob, 'first');
 
       const first = { conversationId: direct.id, upToSequence: 1 };
-      expect(await tab1.next('conversation.read')).toEqual(first);
+      expect(await readByTab1).toEqual(first);
 
       const group = await createGroup(app, alice, [bob.id, carol.id]);
       await post(app, alice, group.id, 'hello club');

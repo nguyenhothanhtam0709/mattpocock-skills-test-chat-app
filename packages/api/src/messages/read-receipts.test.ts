@@ -131,3 +131,97 @@ describe('readUpToSequence on a Direct Conversation', () => {
     });
   });
 });
+
+describe('conversation.receipt', () => {
+  it("reaches every socket of the other User when a Member's marker moves, and not the reader", async () => {
+    await withApp({}, async (app, logs) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const direct = await sendDirect(app, alice, bob, 'one');
+      await post(app, alice, direct.id, 'two');
+      const url = await listenOnRandomPort(app);
+      const aliceSocket = await connectSocket(url, alice.token);
+      const bobSocket = await connectSocket(url, bob.token);
+      const toAlice = aliceSocket.next('conversation.receipt');
+      const readByBob = bobSocket.next('conversation.read');
+      const logsBefore = logs.lines.length;
+
+      await markRead(app, bob, direct.id, 2);
+
+      const expected = { conversationId: direct.id, upToSequence: 2 };
+      expect(ConversationReceiptEventSchema.parse(await toAlice)).toEqual(expected);
+      expect(await readByBob).toEqual(expected);
+
+      await markRead(app, bob, direct.id, 2);
+      await settle();
+
+      expect(receipts(aliceSocket)).toEqual([expected]);
+      expect(receipts(bobSocket)).toEqual([]);
+      const pushes = logs.lines
+        .slice(logsBefore)
+        .filter((l) => l.msg === 'socket push' && l.event === 'conversation.receipt');
+      expect(pushes).toEqual([
+        expect.objectContaining({ targetUsers: 1, conversationId: direct.id }),
+      ]);
+      expect(pushes[0]).not.toHaveProperty('upToSequence');
+    });
+  });
+
+  it("reaches the other User when a send moves the sender's marker", async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const direct = await sendDirect(app, alice, bob, 'one');
+      const url = await listenOnRandomPort(app);
+      const aliceSocket = await connectSocket(url, alice.token);
+      const bobSocket = await connectSocket(url, bob.token);
+
+      await post(app, bob, direct.id, 'reply');
+      await settle();
+
+      expect(receipts(aliceSocket)).toEqual([{ conversationId: direct.id, upToSequence: 2 }]);
+      expect(receipts(bobSocket)).toEqual([]);
+    });
+  });
+
+  it.each([['the reader'], ['the other User']])(
+    'reaches nobody when %s does not share read receipts',
+    async (who) => {
+      await withApp({}, async (app) => {
+        const alice = await signUp(app, 'Alice');
+        const bob = await signUp(app, 'Bob');
+        const direct = await sendDirect(app, alice, bob, 'one');
+        await shareReadReceipts(app, who === 'the reader' ? bob : alice, false);
+        const url = await listenOnRandomPort(app);
+        const aliceSocket = await connectSocket(url, alice.token);
+        const bobSocket = await connectSocket(url, bob.token);
+
+        await markRead(app, bob, direct.id, 1);
+        await post(app, bob, direct.id, 'reply');
+        await settle();
+
+        expect(receipts(aliceSocket)).toEqual([]);
+        expect(receipts(bobSocket)).toEqual([]);
+      });
+    },
+  );
+
+  it('is never pushed in a Group', async () => {
+    await withApp({}, async (app) => {
+      const alice = await signUp(app, 'Alice');
+      const bob = await signUp(app, 'Bob');
+      const group = await createGroup(app, alice, [bob.id]);
+      await post(app, alice, group.id, 'hello');
+      const url = await listenOnRandomPort(app);
+      const aliceSocket = await connectSocket(url, alice.token);
+      const bobSocket = await connectSocket(url, bob.token);
+
+      await markRead(app, bob, group.id, 1);
+      await post(app, bob, group.id, 'hi back');
+      await settle();
+
+      expect(receipts(aliceSocket)).toEqual([]);
+      expect(receipts(bobSocket)).toEqual([]);
+    });
+  });
+});

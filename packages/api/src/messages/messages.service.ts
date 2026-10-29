@@ -197,7 +197,8 @@ export class MessagesService {
    * sequence, in one conditional update of their membership row: no Conversation lock and no
    * commit-order serializer, since no Message and no other Member is touched. A concurrent
    * removal that commits first leaves no row to match. Pushes `conversation.read` to the
-   * caller's own sockets only when the marker moved.
+   * caller's own sockets (and `conversation.receipt` to the other User of a Direct Conversation
+   * when both share read receipts) only when the marker moved.
    */
   async markRead(
     userId: string,
@@ -215,7 +216,7 @@ export class MessagesService {
       .where(and(member, lt(conversationMembers.readMarker, target)))
       .returning({ upToSequence: conversationMembers.readMarker });
     if (moved) {
-      this.pushRead(userId, conversationId, moved.upToSequence);
+      await this.pushMarkerMoved(userId, conversationId, moved.upToSequence);
       return moved;
     }
     const [unchanged] = await this.db
@@ -232,13 +233,26 @@ export class MessagesService {
     );
   }
 
-  /** Syncs the reader's other tabs and devices. Best-effort (ADR-0001), like every push. */
-  private pushRead(userId: string, conversationId: string, upToSequence: number): void {
+  /**
+   * After `userId`'s Read Marker moved: `conversation.read` syncs their other tabs and devices,
+   * and in a Direct Conversation where both Users share read receipts, `conversation.receipt`
+   * tells the other User. The setting is read now, after the commit. Best-effort (ADR-0001),
+   * like every push.
+   */
+  private async pushMarkerMoved(
+    userId: string,
+    conversationId: string,
+    upToSequence: number,
+  ): Promise<void> {
+    const payload = { conversationId, upToSequence };
     try {
+      this.realtime.push(RealtimeEvent.CONVERSATION_READ, [userId], payload, conversationId);
+      const receipt = await this.sharedReceipt(userId, conversationId);
+      if (!receipt) return;
       this.realtime.push(
-        RealtimeEvent.CONVERSATION_READ,
-        [userId],
-        { conversationId, upToSequence },
+        RealtimeEvent.CONVERSATION_RECEIPT,
+        [receipt.otherId],
+        payload,
         conversationId,
       );
     } catch (error) {
@@ -254,7 +268,8 @@ export class MessagesService {
   /**
    * Pushes a saved Message to every Member (the sender's other tabs too). When the Direct
    * Conversation was just created, its recipient first gets the Conversation itself. Then, when
-   * the send moved the sender's Read Marker, the sender gets `conversation.read`. Push is
+   * the send moved the sender's Read Marker, the sender gets `conversation.read` (and the other
+   * User of a Direct Conversation `conversation.receipt`, when both share read receipts). Push is
    * best-effort (ADR-0001): a failure is logged and never fails the send.
    */
   private async pushCreated(
@@ -262,7 +277,9 @@ export class MessagesService {
     newConversationRecipient: string | undefined,
   ) {
     await this.pushMessage(message, newConversationRecipient);
-    if (readMoved) this.pushRead(message.senderId, message.conversationId, message.sequence);
+    if (readMoved) {
+      await this.pushMarkerMoved(message.senderId, message.conversationId, message.sequence);
+    }
   }
 
   private async pushMessage(message: Message, newConversationRecipient: string | undefined) {
