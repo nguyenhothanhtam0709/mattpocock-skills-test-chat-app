@@ -314,7 +314,17 @@ export class MessagesService {
       .select({ name: groups.name, ownerId: groups.ownerId })
       .from(groups)
       .where(eq(groups.conversationId, conversationId));
-    if (!group) return { conversation: { id: conversationId, kind: 'direct', members } };
+    if (!group) {
+      const receipt = await this.sharedReceipt(userId, conversationId);
+      return {
+        conversation: {
+          id: conversationId,
+          kind: 'direct',
+          members,
+          ...(receipt && { readUpToSequence: receipt.readMarker }),
+        },
+      };
+    }
     const closed = members.length === 0;
     // A Former Member sees no Members and no Owner (who joined later is not theirs to know).
     if (!members.some((m) => m.id === userId)) {
@@ -339,6 +349,32 @@ export class MessagesService {
         isMember: true,
       },
     };
+  }
+
+  /**
+   * The other User of a Direct Conversation and their Read Marker, when both Users share read
+   * receipts; undefined otherwise, and always for a Group.
+   */
+  private async sharedReceipt(
+    userId: string,
+    conversationId: string,
+  ): Promise<{ otherId: string; readMarker: number } | undefined> {
+    const both = await this.db
+      .select({
+        userId: conversationMembers.userId,
+        readMarker: conversationMembers.readMarker,
+        shares: users.shareReadReceipts,
+      })
+      .from(conversationMembers)
+      .innerJoin(
+        directConversations,
+        eq(directConversations.conversationId, conversationMembers.conversationId),
+      )
+      .innerJoin(users, eq(users.id, conversationMembers.userId))
+      .where(eq(conversationMembers.conversationId, conversationId));
+    const other = both.find((m) => m.userId !== userId);
+    if (!other || !both.every((m) => m.shares)) return undefined;
+    return { otherId: other.userId, readMarker: other.readMarker };
   }
 
   /** The Group as `userId` sees it now; 404 when the Conversation is not a Group. */
