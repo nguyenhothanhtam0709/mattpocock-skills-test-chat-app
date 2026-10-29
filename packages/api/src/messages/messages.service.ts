@@ -379,6 +379,16 @@ export class MessagesService {
       .onConflictDoNothing({ target: [messages.senderId, messages.clientMessageId] })
       .returning();
     if (!row) throw new DuplicateClientMessage();
+    // Sending reads everything up to it: the sender's own Read Marker moves to the Message.
+    await tx
+      .update(conversationMembers)
+      .set({ readMarker: sql`greatest(${conversationMembers.readMarker}, ${row.sequence})` })
+      .where(
+        and(
+          eq(conversationMembers.conversationId, conversationId),
+          eq(conversationMembers.userId, senderId),
+        ),
+      );
     return toMessage(row);
   }
 }
