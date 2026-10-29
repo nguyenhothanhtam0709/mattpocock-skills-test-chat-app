@@ -46,6 +46,7 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>, isMember = true) {
             ...current,
             isMember:
               isMember && current.members.some((m) => (m as { id: string }).id === alice.id),
+            unreadCount: 0,
             lastMessage: null,
           },
         ],
@@ -207,6 +208,7 @@ describe('Members leaving, seen by the others', () => {
               ...groupOwnedBy(bob.id, stillMember ? [aliceMember, bob] : [bob]),
               isMember: stillMember,
               closed: false,
+              unreadCount: 0,
               lastMessage: null,
             },
           ],

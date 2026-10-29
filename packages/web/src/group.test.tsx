@@ -46,7 +46,7 @@ function signedIn() {
     }),
     http.post('*/api/v1/groups', async ({ request }) => {
       created.push(await request.json());
-      listed = [{ ...group, isMember: true, lastMessage: null }];
+      listed = [{ ...group, isMember: true, unreadCount: 0, lastMessage: null }];
       return HttpResponse.json({ conversation: group }, { status: 201 });
     }),
     http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
@@ -147,7 +147,9 @@ describe('a Group in the sidebar', () => {
     server.use(
       http.get('*/api/v1/conversations', () =>
         HttpResponse.json({
-          conversations: [{ ...group, isMember: true, closed: false, lastMessage: null }],
+          conversations: [
+            { ...group, isMember: true, closed: false, unreadCount: 0, lastMessage: null },
+          ],
         }),
       ),
       http.get(`*/api/v1/conversations/${groupId}/messages`, () =>
