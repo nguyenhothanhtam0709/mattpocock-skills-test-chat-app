@@ -4,7 +4,9 @@ import {
   NicknameSchema,
   PasswordSchema,
   RegisterRequestSchema,
+  MeResponseSchema,
   RegisterResponseSchema,
+  UpdateProfileRequestSchema,
   UsernameSchema,
 } from './user.js';
 
@@ -180,8 +182,49 @@ describe('RegisterResponseSchema', () => {
       username: 'Alice',
       email: 'alice@example.com',
       nickname: null,
+      shareReadReceipts: true,
     };
     expect(RegisterResponseSchema.parse({ user })).toEqual({ user });
     expect(Object.keys(RegisterResponseSchema.shape.user.shape)).not.toContain('password');
+  });
+});
+
+describe('MeResponseSchema', () => {
+  const user = {
+    id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b60',
+    username: 'Alice',
+    email: 'alice@example.com',
+    nickname: null,
+  };
+
+  it.each([true, false])('carries shareReadReceipts %j', (shareReadReceipts) => {
+    expect(MeResponseSchema.parse({ user: { ...user, shareReadReceipts } })).toEqual({
+      user: { ...user, shareReadReceipts },
+    });
+  });
+
+  it('requires shareReadReceipts', () => {
+    expect(MeResponseSchema.safeParse({ user }).success).toBe(false);
+  });
+});
+
+describe('UpdateProfileRequestSchema', () => {
+  it.each([
+    ['the Nickname alone', { nickname: 'Ali' }],
+    ['a cleared Nickname', { nickname: null }],
+    ['shareReadReceipts alone', { shareReadReceipts: false }],
+    ['both together', { nickname: 'Ali', shareReadReceipts: true }],
+  ])('accepts %s', (_label, body) => {
+    expect(UpdateProfileRequestSchema.parse(body)).toEqual(body);
+  });
+
+  it.each([
+    ['an empty body', {}],
+    ['a string shareReadReceipts', { shareReadReceipts: 'false' }],
+    ['a numeric shareReadReceipts', { shareReadReceipts: 0 }],
+    ['a null shareReadReceipts', { shareReadReceipts: null }],
+    ['an unknown field', { nickname: 'Ali', username: 'Mallory' }],
+  ])('rejects %s', (_label, body) => {
+    expect(UpdateProfileRequestSchema.safeParse(body).success).toBe(false);
   });
 });

@@ -73,6 +73,7 @@ erDiagram
     text email
     text password_hash
     text nickname "nullable"
+    boolean share_read_receipts
     timestamptz created_at
   }
   conversations ||--o{ conversation_members : "conversation_id"

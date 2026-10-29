@@ -3,6 +3,7 @@ import {
   ErrorResponseSchema,
   LoginResponseSchema,
   MeResponseSchema,
+  RegisterResponseSchema,
 } from '@chat/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { describe, expect, it } from 'vitest';
@@ -134,6 +135,93 @@ describe('PATCH /users/me (Nickname)', () => {
 
       expect(res.statusCode).toBe(401);
       expect(ErrorResponseSchema.parse(res.json()).error.code).toBe(ErrorCode.UNAUTHENTICATED);
+    });
+  });
+});
+
+describe('PATCH /users/me (share read receipts)', () => {
+  it('is on for a newly registered User', async () => {
+    await withApp({}, async (app) => {
+      const registered = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/register',
+        payload: alice,
+      });
+      expect(RegisterResponseSchema.parse(registered.json()).user.shareReadReceipts).toBe(true);
+      const login = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: { identifier: 'alice', password: alice.password },
+      });
+      const { accessToken, user } = LoginResponseSchema.parse(login.json());
+      expect(user.shareReadReceipts).toBe(true);
+
+      expect((await currentUser(app, accessToken)).shareReadReceipts).toBe(true);
+    });
+  });
+
+  it('turns it off and on alone and returns the updated profile', async () => {
+    await withApp({}, async (app) => {
+      const token = await signIn(app);
+      await patchMe(app, token, { nickname: 'Ali' });
+
+      const res = await patchMe(app, token, { shareReadReceipts: false });
+
+      expect(res.statusCode).toBe(200);
+      expect(MeResponseSchema.parse(res.json()).user).toMatchObject({
+        nickname: 'Ali',
+        shareReadReceipts: false,
+      });
+      expect(await currentUser(app, token)).toMatchObject({
+        nickname: 'Ali',
+        shareReadReceipts: false,
+      });
+
+      await patchMe(app, token, { shareReadReceipts: true });
+
+      expect((await currentUser(app, token)).shareReadReceipts).toBe(true);
+    });
+  });
+
+  it('changes it together with the Nickname', async () => {
+    await withApp({}, async (app) => {
+      const token = await signIn(app);
+
+      const res = await patchMe(app, token, { nickname: 'Ali', shareReadReceipts: false });
+
+      expect(res.statusCode).toBe(200);
+      expect(await currentUser(app, token)).toMatchObject({
+        nickname: 'Ali',
+        shareReadReceipts: false,
+      });
+    });
+  });
+
+  it('leaves it unchanged when only the Nickname is updated', async () => {
+    await withApp({}, async (app) => {
+      const token = await signIn(app);
+      await patchMe(app, token, { shareReadReceipts: false });
+
+      const res = await patchMe(app, token, { nickname: 'Ali' });
+
+      expect(MeResponseSchema.parse(res.json()).user.shareReadReceipts).toBe(false);
+      expect((await currentUser(app, token)).shareReadReceipts).toBe(false);
+    });
+  });
+
+  it.each([
+    ['a string', 'false'],
+    ['a number', 0],
+    ['null', null],
+  ])('answers a value that is %s with VALIDATION_FAILED', async (_name, shareReadReceipts) => {
+    await withApp({}, async (app) => {
+      const token = await signIn(app);
+
+      const res = await patchMe(app, token, { shareReadReceipts });
+
+      expect(res.statusCode).toBe(400);
+      expect(ErrorResponseSchema.parse(res.json()).error.code).toBe(ErrorCode.VALIDATION_FAILED);
+      expect((await currentUser(app, token)).shareReadReceipts).toBe(true);
     });
   });
 });

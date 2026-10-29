@@ -33,7 +33,7 @@ function ProfileForm({ user, onSaved }: { user: User; onSaved: () => void }) {
     setError(undefined);
     setSubmitting(true);
     try {
-      const result = await setNickname(parsed.data.nickname);
+      const result = await setNickname(parsed.data.nickname ?? null);
       if (result.ok) onSaved();
       else setError(result.error);
     } finally {
