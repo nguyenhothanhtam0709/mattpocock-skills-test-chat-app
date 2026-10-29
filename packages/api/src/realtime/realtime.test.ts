@@ -204,7 +204,11 @@ describe('real-time push', () => {
       expect(await seen1).toEqual({ message });
       expect(await seen2).toEqual({ message });
       await settle();
-      expect(tab1.received.map(([event]) => event)).toEqual(['message.created']);
+      // Sending also moved the sender's Read Marker: that syncs their tabs too (spec 00006).
+      expect(tab1.received.map(([event]) => event)).toEqual([
+        'message.created',
+        'conversation.read',
+      ]);
     });
   });
 
@@ -371,6 +375,11 @@ describe('real-time push', () => {
         expect.objectContaining({
           event: 'message.created',
           targetUsers: 2,
+          conversationId: conversation.id,
+        }),
+        expect.objectContaining({
+          event: 'conversation.read',
+          targetUsers: 1,
           conversationId: conversation.id,
         }),
       ]);

@@ -7,6 +7,7 @@ import {
   type GetMessagesQuery,
   type GetMessagesResponse,
   type ListConversationsResponse,
+  type MarkReadResponse,
   type Message,
   type SendDirectMessageRequest,
   type SendMessageRequest,
@@ -38,6 +39,12 @@ export interface SentMessage {
   message: Message;
   /** False when the client message ID had been used before and the original is returned. */
   created: boolean;
+}
+
+interface InsertedMessage {
+  message: Message;
+  /** Whether the send moved the sender's own Read Marker (it is pushed as `conversation.read`). */
+  readMoved: boolean;
 }
 
 /** Thrown inside a transaction to undo it (including its sequence bump) on a resend. */
@@ -79,16 +86,16 @@ export class MessagesService {
     if (original) return this.asDirectResult(original);
 
     try {
-      const { message, newConversation } = await this.db.transaction(async (tx) => {
+      const { inserted, newConversation } = await this.db.transaction(async (tx) => {
         const direct = await this.findOrCreateDirect(tx, senderId, recipientId);
         const inserted = await this.insertMessage(tx, direct.id, senderId, {
           clientMessageId,
           body,
         });
-        return { message: inserted, newConversation: direct.created };
+        return { inserted, newConversation: direct.created };
       });
-      await this.pushCreated(message, newConversation ? recipientId : undefined);
-      return this.asDirectResult({ message, created: true });
+      await this.pushCreated(inserted, newConversation ? recipientId : undefined);
+      return this.asDirectResult({ message: inserted.message, created: true });
     } catch (error) {
       if (!(error instanceof DuplicateClientMessage)) throw error;
       const raced = await this.findByClientMessageId(senderId, clientMessageId);
@@ -114,9 +121,9 @@ export class MessagesService {
             return this.insertMessage(tx, conversationId, senderId, request);
           });
         },
-        async (message) => {
-          await this.pushCreated(message, undefined);
-          return { message, created: true };
+        async (inserted) => {
+          await this.pushCreated(inserted, undefined);
+          return { message: inserted.message, created: true };
         },
       );
     } catch (error) {
@@ -185,6 +192,60 @@ export class MessagesService {
     };
   }
 
+  /**
+   * Moves the caller's Read Marker forward to `upToSequence`, clamped to the Conversation's last
+   * sequence, in one conditional update of their membership row: no Conversation lock and no
+   * commit-order serializer, since no Message and no other Member is touched. A concurrent
+   * removal that commits first leaves no row to match. Pushes `conversation.read` to the
+   * caller's own sockets only when the marker moved.
+   */
+  async markRead(
+    userId: string,
+    conversationId: string,
+    upToSequence: number,
+  ): Promise<MarkReadResponse> {
+    const target = sql`least(${upToSequence}::integer, (select ${conversations.lastSequence} from ${conversations} where ${conversations.id} = ${conversationId}))`;
+    const member = and(
+      eq(conversationMembers.conversationId, conversationId),
+      eq(conversationMembers.userId, userId),
+    );
+    const [moved] = await this.db
+      .update(conversationMembers)
+      .set({ readMarker: target })
+      .where(and(member, lt(conversationMembers.readMarker, target)))
+      .returning({ upToSequence: conversationMembers.readMarker });
+    if (moved) {
+      this.pushRead(userId, conversationId, moved.upToSequence);
+      return moved;
+    }
+    const [unchanged] = await this.db
+      .select({ upToSequence: conversationMembers.readMarker })
+      .from(conversationMembers)
+      .where(member);
+    if (unchanged) return unchanged;
+    // A Former Member, or a reader of a Closed Group: they read, but have no Read Marker.
+    await requireReader(this.db, conversationId, userId);
+    throw new DomainException(
+      ErrorCode.NOT_A_MEMBER,
+      HttpStatus.FORBIDDEN,
+      'You are no longer a Member of this Conversation',
+    );
+  }
+
+  /** Syncs the reader's other tabs and devices. Best-effort (ADR-0001), like every push. */
+  private pushRead(userId: string, conversationId: string, upToSequence: number): void {
+    try {
+      this.realtime.push(
+        RealtimeEvent.CONVERSATION_READ,
+        [userId],
+        { conversationId, upToSequence },
+        conversationId,
+      );
+    } catch (error) {
+      this.logger.error({ err: error, conversationId }, 'socket push failed');
+    }
+  }
+
   /** The caller's Conversations, newest last Message first. */
   async list(userId: string): Promise<ListConversationsResponse> {
     return { conversations: await this.queries.summaries(userId) };
@@ -192,10 +253,19 @@ export class MessagesService {
 
   /**
    * Pushes a saved Message to every Member (the sender's other tabs too). When the Direct
-   * Conversation was just created, its recipient first gets the Conversation itself. Push is
+   * Conversation was just created, its recipient first gets the Conversation itself. Then, when
+   * the send moved the sender's Read Marker, the sender gets `conversation.read`. Push is
    * best-effort (ADR-0001): a failure is logged and never fails the send.
    */
-  private async pushCreated(message: Message, newConversationRecipient: string | undefined) {
+  private async pushCreated(
+    { message, readMoved }: InsertedMessage,
+    newConversationRecipient: string | undefined,
+  ) {
+    await this.pushMessage(message, newConversationRecipient);
+    if (readMoved) this.pushRead(message.senderId, message.conversationId, message.sequence);
+  }
+
+  private async pushMessage(message: Message, newConversationRecipient: string | undefined) {
     try {
       const members = await this.db
         .select({ userId: conversationMembers.userId })
@@ -366,7 +436,7 @@ export class MessagesService {
     conversationId: string,
     senderId: string,
     request: SendMessageRequest,
-  ): Promise<Message> {
+  ): Promise<InsertedMessage> {
     const [row] = await tx
       .insert(messages)
       .values({
@@ -380,15 +450,17 @@ export class MessagesService {
       .returning();
     if (!row) throw new DuplicateClientMessage();
     // Sending reads everything up to it: the sender's own Read Marker moves to the Message.
-    await tx
+    const moved = await tx
       .update(conversationMembers)
-      .set({ readMarker: sql`greatest(${conversationMembers.readMarker}, ${row.sequence})` })
+      .set({ readMarker: row.sequence })
       .where(
         and(
           eq(conversationMembers.conversationId, conversationId),
           eq(conversationMembers.userId, senderId),
+          lt(conversationMembers.readMarker, row.sequence),
         ),
-      );
-    return toMessage(row);
+      )
+      .returning({ userId: conversationMembers.userId });
+    return { message: toMessage(row), readMoved: moved.length > 0 };
   }
 }

@@ -1,12 +1,15 @@
 import {
   GetMessagesResponseSchema,
   ListConversationsResponseSchema,
+  MarkReadResponseSchema,
   type ConversationSummary,
   type Message,
 } from '@chat/contracts';
 
 export type ListConversationsResult =
   { ok: true; conversations: ConversationSummary[] } | { ok: false; error: string };
+
+export type MarkReadResult = { ok: true; upToSequence: number } | { ok: false; error: string };
 
 export type MessagesCursor = { before?: number; after?: number };
 
@@ -67,4 +70,33 @@ export async function messagesPage(
     messages: cursor.after === undefined ? [...messages].reverse() : messages,
     hasMore,
   };
+}
+
+/**
+ * `PUT /api/v1/conversations/:id/read`: moves the User's Read Marker forward (never back) and
+ * answers with where it is now.
+ */
+export async function markRead(
+  accessToken: string,
+  conversationId: string,
+  upToSequence: number,
+): Promise<MarkReadResult> {
+  let res: Response;
+  try {
+    res = await fetch(
+      new URL(`/api/v1/conversations/${conversationId}/read`, window.location.origin),
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ upToSequence }),
+      },
+    );
+  } catch {
+    return { ok: false, error: 'Could not reach the server. Try again.' };
+  }
+  if (!res.ok) return { ok: false, error: 'Something went wrong. Try again.' };
+  const parsed = MarkReadResponseSchema.safeParse(await res.json().catch(() => undefined));
+  return parsed.success
+    ? { ok: true, upToSequence: parsed.data.upToSequence }
+    : { ok: false, error: 'Something went wrong. Try again.' };
 }

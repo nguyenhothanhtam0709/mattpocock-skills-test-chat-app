@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ConversationSummarySchema,
   GetMessagesQuerySchema,
+  MarkReadRequestSchema,
+  MarkReadResponseSchema,
   UNREAD_COUNT_MAX,
   MessageBodySchema,
   SendDirectMessageRequestSchema,
@@ -94,4 +96,19 @@ describe('ConversationSummarySchema', () => {
   it.each([[-1], [101], [1.5], [undefined]])('rejects an Unread Count of %j', (unreadCount) => {
     expect(ConversationSummarySchema.safeParse({ ...summary, unreadCount }).success).toBe(false);
   });
+});
+
+describe('mark-read schemas', () => {
+  it.each([[0], [1], [2_147_483_647]])('accepts upToSequence %j', (upToSequence) => {
+    expect(MarkReadRequestSchema.parse({ upToSequence })).toEqual({ upToSequence });
+    expect(MarkReadResponseSchema.parse({ upToSequence })).toEqual({ upToSequence });
+  });
+
+  it.each([[-1], [1.5], ['3'], [2_147_483_648], [undefined], [null]])(
+    'rejects upToSequence %j',
+    (upToSequence) => {
+      expect(MarkReadRequestSchema.safeParse({ upToSequence }).success).toBe(false);
+      expect(MarkReadResponseSchema.safeParse({ upToSequence }).success).toBe(false);
+    },
+  );
 });

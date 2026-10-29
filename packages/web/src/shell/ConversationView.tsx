@@ -82,6 +82,9 @@ const systemMessageText = (m: ChatMessage): string | undefined =>
     ? undefined
     : `${displayName(m.subject)} ${SYSTEM_MESSAGE_VERBS[m.kind]}`;
 
+/** Mark-read waits this long for the view to settle, so a burst of changes sends one call. */
+const MARK_READ_DEBOUNCE_MS = 300;
+
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
 
@@ -204,6 +207,7 @@ export function ConversationView({
   onSent,
   onLeft,
   onAtLatestChange,
+  reading = false,
 }: {
   user: User;
   target: ConversationTarget;
@@ -215,8 +219,13 @@ export function ConversationView({
   onLeft?: () => void;
   /** Called whenever the view reaches or leaves the latest Message. */
   onAtLatestChange?: (atLatest: boolean) => void;
+  /**
+   * The User is reading this view right now: the tab is visible and the view is at its latest
+   * Message. Then everything on screen is marked read.
+   */
+  reading?: boolean;
 }) {
-  const { sendDirectMessage, sendMessage, messagesPage, getGroup } = useAuth();
+  const { sendDirectMessage, sendMessage, messagesPage, getGroup, markRead } = useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
   // just the first send reporting the Conversation it created.
   const [openedWith] = useState(initialConversationId);
@@ -331,6 +340,24 @@ export function ConversationView({
     })();
   });
 
+  // While the User is reading, the newest Message on screen is read: tell the server (debounced,
+  // and only past what it already acknowledged; sending moved the marker by itself).
+  const newestSequence = messages.at(-1)?.sequence;
+  const acknowledged = useRef(0);
+  useEffect(() => {
+    if (!reading || !conversationId || newestSequence === undefined) return;
+    if (newestSequence <= acknowledged.current) return;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const result = await markRead(conversationId, newestSequence);
+        if (result.ok) {
+          acknowledged.current = Math.max(acknowledged.current, result.upToSequence);
+        }
+      })();
+    }, MARK_READ_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [reading, conversationId, newestSequence, markRead]);
+
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -407,6 +434,7 @@ export function ConversationView({
       return;
     }
     const id = result.conversation?.id ?? result.message.conversationId;
+    acknowledged.current = Math.max(acknowledged.current, result.message.sequence);
     setConversationId(id);
     onSent?.(id);
     setOutgoing((current) => current.filter((o) => o.clientMessageId !== clientMessageId));
