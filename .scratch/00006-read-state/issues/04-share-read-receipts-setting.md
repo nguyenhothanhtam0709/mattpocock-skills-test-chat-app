@@ -7,11 +7,11 @@
 - Changing it pushes nothing.
 - The Profile dialog gains a "Share read receipts" switch.
 
-**Allowed packages:** None
+**Allowed packages:** `cn` in `packages/web` (human decision on 2026-10-29, under Comments: the shadcn CLI adds it with the Switch)
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-info
+**Status:** ready-for-agent
 
 - [x] A newly registered User and every existing User has `shareReadReceipts: true`
 - [x] `PATCH /users/me` with `shareReadReceipts` changes it and returns the updated profile. Updating only the Nickname leaves it unchanged.
@@ -48,3 +48,8 @@ Recommendation: option 2. It needs no new package and matches the other 25 ui fi
 - `shareReadReceipts` is on `UserSchema`, so the register and login responses carry it as well as `/users/me`. The SPA gets the signed-in User from login.
 - `PATCH /users/me` with an empty body is still `400 VALIDATION_FAILED`: at least one field is required.
 - Planned dialog behaviour (in the red web tests): the switch is part of the form, Save sends `nickname` plus `shareReadReceipts` only when it changed, and closing discards an unsaved toggle.
+
+### Decision (human, 2026-10-29, relayed by the coordinating agent)
+
+Option 1: allow `cn` as a web dependency, and keep `switch.tsx` as the shadcn CLI generates it. Only `switch` is added. The CLI is not re-run over existing ui files.
+
