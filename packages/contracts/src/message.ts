@@ -131,6 +131,22 @@ export const GetMessagesResponseSchema = z.object({
 
 export type GetMessagesResponse = z.infer<typeof GetMessagesResponseSchema>;
 
+/** A Read Marker: the sequence up to which a Member has read (0 before the first Message). */
+export const ReadMarkerSchema = z.int().min(0).max(SEQUENCE_MAX);
+
+/**
+ * `PUT /conversations/:id/read`. Forward-only: the marker becomes the larger of the current
+ * one and `upToSequence`, clamped to the Conversation's last sequence.
+ */
+export const MarkReadRequestSchema = z.object({ upToSequence: ReadMarkerSchema });
+
+export type MarkReadRequest = z.input<typeof MarkReadRequestSchema>;
+
+/** `PUT /conversations/:id/read`: the caller's Read Marker after the request. */
+export const MarkReadResponseSchema = z.object({ upToSequence: ReadMarkerSchema });
+
+export type MarkReadResponse = z.infer<typeof MarkReadResponseSchema>;
+
 /** A Member as other Members see them: never an email. */
 export const ConversationMemberSchema = UserSearchResultSchema;
 

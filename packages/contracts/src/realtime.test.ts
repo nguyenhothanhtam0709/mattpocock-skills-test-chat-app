@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConversationCreatedEventSchema,
+  ConversationReadEventSchema,
   GroupMemberAddedEventSchema,
   GroupMemberRemovedEventSchema,
   SessionRevokedEventSchema,
@@ -25,6 +26,7 @@ describe('realtime event contracts', () => {
     expect(RealtimeEvent).toEqual({
       MESSAGE_CREATED: 'message.created',
       CONVERSATION_CREATED: 'conversation.created',
+      CONVERSATION_READ: 'conversation.read',
       GROUP_MEMBER_ADDED: 'group.member_added',
       GROUP_MEMBER_REMOVED: 'group.member_removed',
       GROUP_MEMBER_LEFT: 'group.member_left',
@@ -35,6 +37,7 @@ describe('realtime event contracts', () => {
     });
     expect(Object.keys(RealtimeEventSchemas).sort()).toEqual([
       'conversation.created',
+      'conversation.read',
       'group.closed',
       'group.member_added',
       'group.member_left',
@@ -76,6 +79,18 @@ describe('realtime event contracts', () => {
     };
     expect(ConversationCreatedEventSchema.safeParse({ conversation }).success).toBe(true);
     expect(ConversationCreatedEventSchema.safeParse({ conversation: { id } }).success).toBe(false);
+  });
+
+  it('conversation.read carries the Conversation and the Read Marker, no User', () => {
+    expect(ConversationReadEventSchema.parse({ conversationId: id, upToSequence: 0 })).toEqual({
+      conversationId: id,
+      upToSequence: 0,
+    });
+    expect(ConversationReadEventSchema.safeParse({ conversationId: id }).success).toBe(false);
+    expect(ConversationReadEventSchema.safeParse({ upToSequence: 3 }).success).toBe(false);
+    expect(
+      ConversationReadEventSchema.safeParse({ conversationId: id, upToSequence: -1 }).success,
+    ).toBe(false);
   });
 
   it('session.revoked carries nothing', () => {

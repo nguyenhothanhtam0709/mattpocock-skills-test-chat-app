@@ -1,10 +1,16 @@
 import { z } from 'zod';
-import { ConversationMemberSchema, ConversationSummarySchema, MessageSchema } from './message.js';
+import {
+  ConversationMemberSchema,
+  ConversationSummarySchema,
+  MessageSchema,
+  ReadMarkerSchema,
+} from './message.js';
 
 /** Server-to-client Socket.IO events. The socket is push-only (ADR-0001). */
 export const RealtimeEvent = {
   MESSAGE_CREATED: 'message.created',
   CONVERSATION_CREATED: 'conversation.created',
+  CONVERSATION_READ: 'conversation.read',
   GROUP_MEMBER_ADDED: 'group.member_added',
   GROUP_MEMBER_REMOVED: 'group.member_removed',
   GROUP_MEMBER_LEFT: 'group.member_left',
@@ -25,6 +31,17 @@ export type MessageCreatedEvent = z.infer<typeof MessageCreatedEventSchema>;
 export const ConversationCreatedEventSchema = z.object({ conversation: ConversationSummarySchema });
 
 export type ConversationCreatedEvent = z.infer<typeof ConversationCreatedEventSchema>;
+
+/**
+ * Pushed to every socket of the reader (their own User room) after their Read Marker moved,
+ * by a mark-read or by sending. Syncs their other tabs and devices.
+ */
+export const ConversationReadEventSchema = z.object({
+  conversationId: z.uuid(),
+  upToSequence: ReadMarkerSchema,
+});
+
+export type ConversationReadEvent = z.infer<typeof ConversationReadEventSchema>;
 
 /** Pushed to every current Member of a Group (the added User included) when a User is added. */
 export const GroupMemberAddedEventSchema = z.object({
@@ -78,6 +95,7 @@ export const SessionRevokedEventSchema = z.object({});
 export const RealtimeEventSchemas = {
   [RealtimeEvent.MESSAGE_CREATED]: MessageCreatedEventSchema,
   [RealtimeEvent.CONVERSATION_CREATED]: ConversationCreatedEventSchema,
+  [RealtimeEvent.CONVERSATION_READ]: ConversationReadEventSchema,
   [RealtimeEvent.GROUP_MEMBER_ADDED]: GroupMemberAddedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_REMOVED]: GroupMemberRemovedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_LEFT]: GroupMemberLeftEventSchema,
