@@ -1,5 +1,6 @@
 import type {
   ConversationCreatedEvent,
+  ConversationReadEvent,
   GroupMemberAddedEvent,
   GroupMemberRemovedEvent,
   GroupMemberLeftEvent,
@@ -13,6 +14,7 @@ import type {
 export type RealtimeEvent =
   | ({ type: 'message.created' } & MessageCreatedEvent)
   | ({ type: 'conversation.created' } & ConversationCreatedEvent)
+  | ({ type: 'conversation.read' } & ConversationReadEvent)
   | ({ type: 'group.member_added' } & GroupMemberAddedEvent)
   | ({ type: 'group.member_removed' } & GroupMemberRemovedEvent)
   | ({ type: 'group.member_left' } & GroupMemberLeftEvent)

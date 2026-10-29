@@ -81,6 +81,9 @@ export function ConversationList({
   const { listConversations } = useAuth();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [pushedReloads, setPushedReloads] = useState(0);
+  // The newest sequence pushed since the list was last loaded, per Conversation: what a
+  // `conversation.read` must cover to clear the count without asking the server.
+  const newestPushed = useRef(new Map<string, number>());
   const onLoadedRef = useRef(onLoaded);
   useLayoutEffect(() => {
     onLoadedRef.current = onLoaded;
@@ -91,7 +94,10 @@ export function ConversationList({
     void (async () => {
       const result = await listConversations(controller.signal);
       if (controller.signal.aborted) return;
-      if (result.ok) onLoadedRef.current?.(result.conversations);
+      if (result.ok) {
+        newestPushed.current.clear();
+        onLoadedRef.current?.(result.conversations);
+      }
       setState(
         result.ok
           ? { status: 'ready', list: result.conversations }
@@ -123,8 +129,28 @@ export function ConversationList({
           setPushedReloads((n) => n + 1);
           return;
         }
+        if (event.type === 'conversation.read') {
+          // The User read on another tab or device (or this one). The event carries a
+          // position, not a count: only one that covers everything known here clears it.
+          const known = listed.find((c) => c.id === event.conversationId);
+          if (!known || known.unreadCount === 0) return;
+          const newest = newestPushed.current.get(event.conversationId);
+          if (newest === undefined || event.upToSequence < newest) {
+            setPushedReloads((n) => n + 1);
+            return;
+          }
+          setState({
+            status: 'ready',
+            list: listed.map((c) => (c === known ? { ...c, unreadCount: 0 } : c)),
+          });
+          return;
+        }
         if (event.type !== 'message.created') return;
         const { message } = event;
+        newestPushed.current.set(
+          message.conversationId,
+          Math.max(newestPushed.current.get(message.conversationId) ?? 0, message.sequence),
+        );
         // Membership notes do not touch the preview or the order (spec: only Messages do).
         if (message.kind !== 'text') return;
         const known = listed.find((c) => c.id === message.conversationId);

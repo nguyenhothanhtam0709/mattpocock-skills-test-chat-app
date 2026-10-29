@@ -176,3 +176,65 @@ describe('Marking a Conversation as read', () => {
     }
   });
 });
+
+describe('conversation.read from another tab or device', () => {
+  it('clears the badge when it covers the newest Message this tab knows of', async () => {
+    const { fetches } = signedIn({ current: [summary('message', 2)] });
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await row(/2 unread/);
+    const arrived = message();
+    act(() => fake.emit({ type: 'message.created', message: arrived }));
+    await row(/3 unread/);
+    const fetched = fetches.count;
+
+    act(() =>
+      fake.emit({
+        type: 'conversation.read',
+        conversationId: withBob,
+        upToSequence: arrived.sequence,
+      }),
+    );
+
+    await waitFor(async () => expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/));
+    expect(fetches.count).toBe(fetched);
+  });
+
+  it('takes the count from the server when it does not cover the newest Message this tab knows of', async () => {
+    const list = { current: [summary('message', 2)] };
+    signedIn(list);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await row(/2 unread/);
+    const first = message();
+    const second = message();
+    act(() => fake.emit({ type: 'message.created', message: first }));
+    act(() => fake.emit({ type: 'message.created', message: second }));
+    await row(/4 unread/);
+    // Another tab read up to the first of them.
+    list.current = [summary('message', 1)];
+
+    act(() =>
+      fake.emit({
+        type: 'conversation.read',
+        conversationId: withBob,
+        upToSequence: first.sequence,
+      }),
+    );
+
+    expect(await row(/1 unread/)).toBeInTheDocument();
+  });
+
+  it('takes the count from the server when this tab knows no newer Message than the list it loaded', async () => {
+    const list = { current: [summary('message', 3)] };
+    signedIn(list);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await row(/3 unread/);
+    list.current = [summary('message', 0)];
+
+    act(() => fake.emit({ type: 'conversation.read', conversationId: withBob, upToSequence: 1 }));
+
+    await waitFor(async () => expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/));
+  });
+});
