@@ -102,3 +102,39 @@ The doc and convention rules are not enforced yet; agents follow them by reading
   - `contracts/src/search.test.ts` tests schemas from `user.ts`, with no `search.ts` beside it. `contracts/src/code-point.ts` has no test of its own.
 - **Not done:** small and outside ticket 05.
 - **Idea:** switch the type to `z.infer`, merge `search.test.ts` into `user.test.ts`, and test `code-point.ts` directly or through the schemas that use it.
+
+## Password reset and password change
+
+Out of scope for MVP1 along with email verification, account deletion and Username change. Reset needs email delivery, a new external dependency, so the ticket must name the provider. Decide whether reset invalidates existing sessions (the `sessions` table and deny-list already exist).
+
+## Message edit and delete
+
+A Message is defined as immutable in `GLOSSARY.md`, so this changes the domain: update the glossary and add an ADR first. Delete could be a soft delete shown as a tombstone. Decide what Former Members see and whether edits need an `edited` marker and a realtime event.
+
+## Message search
+
+Out of scope for MVP1 (User search exists, see issue 07). Postgres full-text search is the simplest start. Results must respect Former Member history boundaries and the `404` for never-Members.
+
+## Replies and reactions
+
+Replies (and threads) need a reference from a Message to another Message in the same Conversation. Reactions need a new entity and realtime events. Both are blocked by the Message immutability rule if reactions are stored on the Message.
+
+## Attachments
+
+The largest item: storage, upload validation, size limits, and a new look at ADR [0002](adr/0002-validate-input-encode-output-no-sanitizer.md). Rich text and markdown are out of scope for MVP1 too and would need the same output-encoding review.
+
+## Block and report Users
+
+Contacts, friend requests, blocking and reporting were all out of scope for MVP1. Decide how blocking interacts with Direct Conversations (at most one per pair) and with Groups.
+
+## Group renaming, ownership transfer and invitations
+
+MVP1 has only the Owner role and no renaming, deletion or invitations needing acceptance. Admin and moderator roles are a further step. Each changes the Owner and Member rules in `GLOSSARY.md`.
+
+## Real-time Nickname updates
+
+`user.updated` was left out of MVP1; Nickname changes only show after a refetch. Small: one realtime event, pushed to the rooms of the User's Conversations. Respect ADR [0001](adr/0001-websocket-is-server-push-only.md).
+
+## CI pipeline and deployment
+
+CI, deployment and OpenAPI docs were out of scope for MVP1. The required CI checks are already listed under "Enforce the doc and convention rules" and OpenAPI under "Contract-first development"; this entry is the rest: a hosting target, environment config and a deploy pipeline.
