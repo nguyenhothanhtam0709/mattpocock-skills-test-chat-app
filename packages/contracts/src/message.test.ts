@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConversationSummarySchema,
+  GetConversationResponseSchema,
   GetMessagesQuerySchema,
   MarkReadRequestSchema,
   MarkReadResponseSchema,
@@ -111,4 +112,43 @@ describe('mark-read schemas', () => {
       expect(MarkReadResponseSchema.safeParse({ upToSequence }).success).toBe(false);
     },
   );
+});
+
+describe('GetConversationResponseSchema', () => {
+  const member = { id, username: 'Bob', nickname: null };
+  const direct = { id, kind: 'direct', members: [member] };
+
+  it("lets a Direct Conversation carry the other User's Read Marker, or omit it", () => {
+    expect(
+      GetConversationResponseSchema.parse({ conversation: { ...direct, readUpToSequence: 3 } }),
+    ).toEqual({ conversation: { ...direct, readUpToSequence: 3 } });
+    expect(GetConversationResponseSchema.parse({ conversation: direct })).toEqual({
+      conversation: direct,
+    });
+  });
+
+  it.each([[-1], [1.5], ['3'], [null]])('rejects readUpToSequence %j', (readUpToSequence) => {
+    expect(
+      GetConversationResponseSchema.safeParse({ conversation: { ...direct, readUpToSequence } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('never gives a Group a readUpToSequence', () => {
+    const group = {
+      id,
+      kind: 'group',
+      name: 'Team',
+      ownerId: id,
+      members: [member],
+      closed: false,
+      isMember: true,
+    };
+    expect(GetConversationResponseSchema.parse({ conversation: group })).toEqual({
+      conversation: group,
+    });
+    expect(
+      GetConversationResponseSchema.parse({ conversation: { ...group, readUpToSequence: 3 } }),
+    ).not.toHaveProperty('conversation.readUpToSequence');
+  });
 });

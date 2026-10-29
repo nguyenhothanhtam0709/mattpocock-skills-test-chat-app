@@ -174,6 +174,11 @@ export const GetConversationResponseSchema = z.object({
       id: z.uuid(),
       kind: z.literal('direct'),
       members: z.array(ConversationMemberSchema),
+      /**
+       * The other User's Read Marker (their Read Receipt). Present only when both Users share
+       * read receipts. Groups never carry it.
+       */
+      readUpToSequence: ReadMarkerSchema.optional(),
     }),
     GroupSchema.extend({
       /** Derived for the caller: false for a Former Member (and for a Closed Group). */

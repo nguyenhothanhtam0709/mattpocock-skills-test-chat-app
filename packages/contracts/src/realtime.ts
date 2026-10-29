@@ -11,6 +11,7 @@ export const RealtimeEvent = {
   MESSAGE_CREATED: 'message.created',
   CONVERSATION_CREATED: 'conversation.created',
   CONVERSATION_READ: 'conversation.read',
+  CONVERSATION_RECEIPT: 'conversation.receipt',
   GROUP_MEMBER_ADDED: 'group.member_added',
   GROUP_MEMBER_REMOVED: 'group.member_removed',
   GROUP_MEMBER_LEFT: 'group.member_left',
@@ -42,6 +43,17 @@ export const ConversationReadEventSchema = z.object({
 });
 
 export type ConversationReadEvent = z.infer<typeof ConversationReadEventSchema>;
+
+/**
+ * Pushed to the other User's sockets (their own User room) in a Direct Conversation after a
+ * Member's Read Marker moved, only when both Users share read receipts. Their Read Receipt.
+ */
+export const ConversationReceiptEventSchema = z.object({
+  conversationId: z.uuid(),
+  upToSequence: ReadMarkerSchema,
+});
+
+export type ConversationReceiptEvent = z.infer<typeof ConversationReceiptEventSchema>;
 
 /** Pushed to every current Member of a Group (the added User included) when a User is added. */
 export const GroupMemberAddedEventSchema = z.object({
@@ -96,6 +108,7 @@ export const RealtimeEventSchemas = {
   [RealtimeEvent.MESSAGE_CREATED]: MessageCreatedEventSchema,
   [RealtimeEvent.CONVERSATION_CREATED]: ConversationCreatedEventSchema,
   [RealtimeEvent.CONVERSATION_READ]: ConversationReadEventSchema,
+  [RealtimeEvent.CONVERSATION_RECEIPT]: ConversationReceiptEventSchema,
   [RealtimeEvent.GROUP_MEMBER_ADDED]: GroupMemberAddedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_REMOVED]: GroupMemberRemovedEventSchema,
   [RealtimeEvent.GROUP_MEMBER_LEFT]: GroupMemberLeftEventSchema,
