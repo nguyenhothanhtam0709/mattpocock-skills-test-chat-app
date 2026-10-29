@@ -12,7 +12,15 @@ Today `packages/contracts` (Zod) is shared by the API and SPA, but endpoints are
 
 ## Scale out the API
 
-The API runs as a single instance (ADR [0006](adr/0006-api-runs-as-a-single-instance.md)): commit ordering uses an in-process serializer and Socket.IO rooms are in memory. To run more than one instance, add the Socket.IO Redis adapter and move ordering to the database. Turn that into a spec before starting.
+The API runs as a single instance (ADR [0006](adr/0006-api-runs-as-a-single-instance.md)): commit ordering uses an in-process serializer and Socket.IO rooms are in memory. To run more than one instance, add the Socket.IO Redis adapter and move ordering to the database. Turn that into a spec before starting. Once Presence exists (ADR [0009](adr/0009-client-signals-are-http-writes-with-socket-push.md)), its in-memory connection counts have to move to Redis in the same change.
+
+## Presence
+
+Online and offline status, the later slice of Live Signals (spec 00007). Open questions: how multiple tabs and devices count as online, who can see a User's presence (there are no contacts, so it would mean everyone who shares a Conversation with them), and the offline timeout. It keeps in-memory connection state, so it has to move to Redis together with "Scale out the API" (ADR [0009](adr/0009-client-signals-are-http-writes-with-socket-push.md)). Turn it into a spec after 00007 ships.
+
+## Stored Unread Count
+
+The Unread Count is computed when the Conversation list is fetched, capped at 100 ("99+"), from an index range scan on `(conversation_id, sequence)` starting at the Member's Read Marker. If the list query turns out slow, store a per-Member counter instead. Cost to weigh: up to 255 extra row updates per Message in a Group, inside the Conversation row lock.
 
 ## Refresh-token rotation can end a session if a refresh is cancelled mid-flight
 

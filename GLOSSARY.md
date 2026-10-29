@@ -59,3 +59,21 @@ _Avoid_: Post, chat
 **System Message**:
 A Message the system stores to record a membership change in a Group ("Bob was added", "Bob was removed", "Bob left", and "Bob is now the Owner" when the Owner leaves and ownership passes to Bob); it has a kind and a subject User, and takes a place in the sequence like any Message.
 _Avoid_: Notification, event, note (as a stored thing)
+
+## Reading and live signals
+
+**Read Marker**:
+The position in a Conversation up to which a Member has read, kept per Member and only ever moving forward; a new Member starts with nothing before their joining unread, and sending a Message moves the sender's own marker past it.
+_Avoid_: Last seen, read cursor, read timestamp
+
+**Unread Count**:
+The number of Messages from other Members that sit after a Member's Read Marker; System Messages and a Member's own Messages never count, and a Former Member or anyone reading a Closed Group has none.
+_Avoid_: Badge, notification count
+
+**Read Receipt**:
+The sign shown to a User in a Direct Conversation that the other User has read up to a given Message of theirs; shown only when both Users share receipts, and not available in Groups.
+_Avoid_: Seen status, read status
+
+**Typing Indicator**:
+A short-lived sign that another Member is currently writing a Message in a Conversation; it is never stored and fades by itself unless refreshed or replaced by the Message.
+_Avoid_: Typing status, composing
