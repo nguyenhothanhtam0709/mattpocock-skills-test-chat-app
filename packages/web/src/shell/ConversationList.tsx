@@ -1,9 +1,10 @@
 import type { ConversationSummary } from '@chat/contracts';
-import { LAST_MESSAGE_PREVIEW_MAX } from '@chat/contracts';
+import { LAST_MESSAGE_PREVIEW_MAX, UNREAD_COUNT_MAX } from '@chat/contracts';
 import { MessageSquare } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   Empty,
   EmptyDescription,
@@ -33,6 +34,10 @@ function activityLabel(iso: string): string {
 const previewOf = (body: string): string =>
   [...body.trim().replace(/\s+/g, ' ')].slice(0, LAST_MESSAGE_PREVIEW_MAX).join('');
 
+/** The Unread Count as the badge shows it; the server stops counting at the cap. */
+const unreadLabel = (count: number): string =>
+  count >= UNREAD_COUNT_MAX ? `${UNREAD_COUNT_MAX - 1}+` : String(count);
+
 function ListSkeleton() {
   return (
     <div role="status" aria-label="Loading conversations" className="grid gap-2 p-2">
@@ -54,12 +59,20 @@ function ListSkeleton() {
  * `refreshKey` changes, e.g. after a Message is sent.
  */
 export function ConversationList({
+  userId,
   selectedId,
+  readingId,
   refreshKey,
   onLoaded,
   onSelect,
 }: {
+  userId: string;
   selectedId: string | undefined;
+  /**
+   * The Conversation the User is reading right now: open, in a visible tab, at its latest
+   * Message. New Messages there are seen as they arrive, so they add nothing to its count.
+   */
+  readingId: string | undefined;
   refreshKey: number;
   /** Called with every list the server returns (first load, reloads, reconnects). */
   onLoaded?: (list: ConversationSummary[]) => void;
@@ -120,8 +133,13 @@ export function ConversationList({
           setPushedReloads((n) => n + 1);
           return;
         }
+        const unread =
+          message.senderId !== userId && message.conversationId !== readingId
+            ? Math.min(known.unreadCount + 1, UNREAD_COUNT_MAX)
+            : known.unreadCount;
         const updated = {
           ...known,
+          unreadCount: unread,
           lastMessage: {
             senderId: message.senderId,
             preview: previewOf(message.body),
@@ -130,7 +148,7 @@ export function ConversationList({
         };
         setState({ status: 'ready', list: [updated, ...listed.filter((c) => c !== known)] });
       },
-      [listed],
+      [listed, userId, readingId],
     ),
   );
 
@@ -169,7 +187,13 @@ export function ConversationList({
             </Avatar>
             <div className="grid min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate font-medium">{conversation.name}</span>
+                <span
+                  className={
+                    conversation.unreadCount > 0 ? 'truncate font-semibold' : 'truncate font-medium'
+                  }
+                >
+                  {conversation.name}
+                </span>
                 {conversation.lastMessage && (
                   <time
                     dateTime={conversation.lastMessage.createdAt}
@@ -179,9 +203,23 @@ export function ConversationList({
                   </time>
                 )}
               </div>
-              <span className="truncate text-xs text-muted-foreground">
-                {conversation.lastMessage?.preview ?? 'No messages yet'}
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={
+                    conversation.unreadCount > 0
+                      ? 'truncate text-xs font-medium text-foreground'
+                      : 'truncate text-xs text-muted-foreground'
+                  }
+                >
+                  {conversation.lastMessage?.preview ?? 'No messages yet'}
+                </span>
+                {conversation.unreadCount > 0 && (
+                  <Badge className="h-4 min-w-4 px-1 tabular-nums">
+                    <span aria-hidden>{unreadLabel(conversation.unreadCount)}</span>
+                    <span className="sr-only">{` ${unreadLabel(conversation.unreadCount)} unread`}</span>
+                  </Badge>
+                )}
+              </div>
             </div>
           </SidebarMenuButton>
         </SidebarMenuItem>
