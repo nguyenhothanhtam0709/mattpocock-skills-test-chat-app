@@ -38,7 +38,7 @@ const summary = (
   isMember: true,
   closed: false,
   unreadCount: 0,
-  lastMessage: { senderId: peer.id, preview, createdAt },
+  lastMessage: { sequence: 1, senderId: peer.id, preview, createdAt },
 });
 
 const message = (over: Partial<Record<string, unknown>>) => ({

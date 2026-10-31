@@ -32,7 +32,7 @@ const summary = (preview: string, unreadCount: number) => ({
   isMember: true,
   closed: false,
   unreadCount,
-  lastMessage: { senderId: bob.id, preview, createdAt: '2020-03-04T10:00:00Z' },
+  lastMessage: { sequence: 1, senderId: bob.id, preview, createdAt: '2020-03-04T10:00:00Z' },
 });
 
 let nextSequence = 1;
@@ -277,6 +277,7 @@ describe('Marking read when things go wrong or do not apply', () => {
               closed: false,
               unreadCount: 0,
               lastMessage: {
+                sequence: 1,
                 senderId: bob.id,
                 preview: 'message',
                 createdAt: '2020-03-04T10:00:00Z',

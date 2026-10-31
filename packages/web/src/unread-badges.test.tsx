@@ -38,7 +38,7 @@ const summary = (id: string, peer: Peer, preview: string, unreadCount: number) =
   isMember: true,
   closed: false,
   unreadCount,
-  lastMessage: { senderId: peer.id, preview, createdAt: '2020-03-04T10:00:00Z' },
+  lastMessage: { sequence: 1, senderId: peer.id, preview, createdAt: '2020-03-04T10:00:00Z' },
 });
 
 /** Signed in as Alice; the list answers with whatever `conversations` holds at the time. */

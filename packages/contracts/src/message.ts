@@ -208,6 +208,8 @@ export const ConversationSummarySchema = z.object({
   lastMessage: z
     .object({
       senderId: z.uuid(),
+      /** Where it sits in the Conversation: a pushed Message at or below this is already counted. */
+      sequence: z.number().int().positive(),
       /** Whitespace collapsed, at most 100 characters. */
       preview: z.string().max(LAST_MESSAGE_PREVIEW_MAX),
       createdAt: z.iso.datetime(),

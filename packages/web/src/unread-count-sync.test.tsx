@@ -52,7 +52,11 @@ const summary = (
   id: string,
   peer: Peer,
   unreadCount: number,
-  last: { body: string; createdAt: string } = { body: 'from before', createdAt: BEFORE },
+  last: { sequence: number; body: string; createdAt: string } = {
+    sequence: 5,
+    body: 'from before',
+    createdAt: BEFORE,
+  },
 ) => ({
   id,
   kind: 'direct' as const,
@@ -61,7 +65,12 @@ const summary = (
   isMember: true,
   closed: false,
   unreadCount,
-  lastMessage: { senderId: peer.id, preview: last.body, createdAt: last.createdAt },
+  lastMessage: {
+    senderId: peer.id,
+    sequence: last.sequence,
+    preview: last.body,
+    createdAt: last.createdAt,
+  },
 });
 
 interface ServerList {
@@ -314,8 +323,9 @@ describe('A list response and the pushes around it', () => {
     await row(/Bob/);
     const respond = await reloadHeld(list, fake);
 
-    const older = message(withBob, bob.id, { createdAt: AT });
-    const newest = message(withBob, bob.id, { createdAt: AFTER });
+    // Same timestamp for all three: only the sequence tells them apart.
+    const older = message(withBob, bob.id);
+    const newest = message(withBob, bob.id);
     await answer(respond, [summary(withBob, bob, 2, newest)]);
     expect(await row(/Bob/)).toHaveAccessibleName(/2 unread/);
 
@@ -324,13 +334,74 @@ describe('A list response and the pushes around it', () => {
     expect(await row(new RegExp(`Bob.*${newest.body}`))).toHaveAccessibleName(/2 unread/);
 
     // Past what the response reflected, Messages count again.
+    act(() => fake.emit({ type: 'message.created', message: message(withBob, bob.id) }));
+    expect(await row(/Bob/)).toHaveAccessibleName(/3 unread/);
+  });
+
+  it('counts a Message newer than the response even if its timestamp is older (concurrent senders)', async () => {
+    // A Message's timestamp is taken before it wins its sequence.
+    const last = { sequence: 5, body: 'won the lock first', createdAt: AFTER };
+    signedIn([summary(withBob, bob, 1, last)]);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    expect(await row(/Bob/)).toHaveAccessibleName(/1 unread/);
+
+    const arrived = message(withBob, bob.id, { body: 'started first', createdAt: AT });
+    act(() => fake.emit({ type: 'message.created', message: arrived }));
+
+    expect(await row(/Bob.*started first/)).toHaveAccessibleName(/2 unread/);
+  });
+
+  it('counts a new Message with the same sender, text and timestamp as the last one', async () => {
+    const last = { sequence: 5, body: 'ok', createdAt: AT };
+    signedIn([summary(withBob, bob, 1, last)]);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    expect(await row(/Bob/)).toHaveAccessibleName(/1 unread/);
+
+    const again = message(withBob, bob.id, { body: 'ok', createdAt: AT });
+    act(() => fake.emit({ type: 'message.created', message: again }));
+
+    expect(await row(/Bob/)).toHaveAccessibleName(/2 unread/);
+  });
+
+  it('asks the server when a conversation.read does not cover a newer Message the response already counted', async () => {
+    const list = signedIn([summary(withBob, bob, 0)]);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await row(/Bob/);
+    const respond = await reloadHeld(list, fake);
+
+    const pushed = message(withBob, bob.id);
+    const notYetPushed = message(withBob, bob.id);
+    act(() => fake.emit({ type: 'message.created', message: pushed }));
+    await answer(respond, [summary(withBob, bob, 2, notYetPushed)]);
+    expect(await row(/Bob/)).toHaveAccessibleName(/2 unread/);
+
+    list.holding = false;
+    list.current = [summary(withBob, bob, 1, notYetPushed)];
     act(() =>
       fake.emit({
-        type: 'message.created',
-        message: message(withBob, bob.id, { createdAt: AFTER }),
+        type: 'conversation.read',
+        conversationId: withBob,
+        upToSequence: pushed.sequence,
       }),
     );
-    expect(await row(/Bob/)).toHaveAccessibleName(/3 unread/);
+    act(() => fake.emit({ type: 'message.created', message: notYetPushed }));
+
+    await waitFor(async () => expect(await row(/Bob/)).toHaveAccessibleName(/1 unread/));
+  });
+
+  it('clears the badge without asking when a conversation.read covers what the response counted', async () => {
+    const list = signedIn([summary(withBob, bob, 2)]);
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    expect(await row(/Bob/)).toHaveAccessibleName(/2 unread/);
+
+    act(() => fake.emit({ type: 'conversation.read', conversationId: withBob, upToSequence: 5 }));
+
+    expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/);
+    expect(list.fetches).toBe(1);
   });
 
   it('does not let an older response undo a conversation.read that landed in flight', async () => {
@@ -381,8 +452,8 @@ describe('A Message the open Conversation was expected to mark read', () => {
     expect(list.marked).not.toContain(arrived.sequence);
   });
 
-  it('shows as unread when the mark-read fails', async () => {
-    const list = signedIn([summary(withBob, bob, 0)]);
+  it('shows as unread once the User leaves after the mark-read failed all its retries', async () => {
+    const list = signedIn([summary(withBob, bob, 0), summary(withCarol, carol, 0)]);
     list.markReadStatus = 500;
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
@@ -392,28 +463,32 @@ describe('A Message the open Conversation was expected to mark read', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const arrived = message(withBob, bob.id);
     act(() => fake.emit({ type: 'message.created', message: arrived }));
+    // The first try and the retries at 1s, 3s and 9s, each answered before the next is due.
+    for (let second = 0; second < 40 && list.marked.length < 4; second += 1) {
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+    }
+    expect(list.marked).toEqual(Array.from({ length: 4 }, () => arrived.sequence));
+    vi.useRealTimers();
+    // Still reading it: no badge, and nothing to ask the server yet.
     expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/);
+    expect(list.fetches).toBe(1);
 
-    list.current = [summary(withBob, bob, 1, arrived)];
-    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    list.current = [summary(withBob, bob, 1, arrived), summary(withCarol, carol, 0)];
+    await userEvent.setup().click(await row(/carol/));
 
-    await waitFor(() => expect(list.marked).toContain(arrived.sequence));
-    expect(await row(/Bob/)).toHaveAccessibleName(/1 unread/);
+    await waitFor(async () => expect(await row(/Bob/)).toHaveAccessibleName(/1 unread/));
   });
 
-  it('asks the server nothing when the conversation.read arrives', async () => {
-    const list = signedIn([summary(withBob, bob, 0)]);
+  it('asks the server nothing on leaving when the conversation.read has arrived', async () => {
+    const list = signedIn([summary(withBob, bob, 0), summary(withCarol, carol, 0)]);
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
     await openBob();
     await waitFor(() => expect(list.fetches).toBe(1));
 
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     const arrived = message(withBob, bob.id);
     act(() => fake.emit({ type: 'message.created', message: arrived }));
-    await act(() => vi.advanceTimersByTimeAsync(400));
     await waitFor(() => expect(list.marked).toContain(arrived.sequence));
-
     act(() =>
       fake.emit({
         type: 'conversation.read',
@@ -421,7 +496,9 @@ describe('A Message the open Conversation was expected to mark read', () => {
         upToSequence: arrived.sequence,
       }),
     );
-    await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+    await userEvent.setup().click(await row(/carol/));
+    await screen.findByRole('heading', { name: 'carol' });
 
     expect(list.fetches).toBe(1);
     expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/);

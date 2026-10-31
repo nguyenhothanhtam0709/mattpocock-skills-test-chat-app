@@ -38,6 +38,7 @@ function formerMemberOf(isMember: boolean) {
             closed: false,
             unreadCount: 0,
             lastMessage: {
+              sequence: 1,
               senderId: bob.id,
               preview: 'see you all',
               createdAt: '2026-10-20T09:30:00.000Z',

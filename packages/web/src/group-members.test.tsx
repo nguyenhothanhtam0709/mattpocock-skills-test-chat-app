@@ -255,6 +255,7 @@ describe('System Messages', () => {
               isMember: true,
               unreadCount: 0,
               lastMessage: {
+                sequence: 1,
                 senderId: bob.id,
                 preview: 'hello everyone',
                 createdAt: '2020-03-04T10:00:00.000Z',

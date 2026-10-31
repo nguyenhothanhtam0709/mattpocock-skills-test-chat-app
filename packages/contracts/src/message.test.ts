@@ -85,6 +85,23 @@ describe('ConversationSummarySchema', () => {
     lastMessage: null,
   };
 
+  it.each([
+    [1, true],
+    [0, false],
+    [1.5, false],
+    [undefined, false],
+  ])('lastMessage with sequence %s parses: %s', (sequence, valid) => {
+    const lastMessage = {
+      senderId: id,
+      sequence,
+      preview: 'hi',
+      createdAt: '2020-03-04T10:00:00.000Z',
+    };
+    expect(
+      ConversationSummarySchema.safeParse({ ...summary, unreadCount: 0, lastMessage }).success,
+    ).toBe(valid);
+  });
+
   it('carries an Unread Count from 0 up to the cap of 100', () => {
     expect(UNREAD_COUNT_MAX).toBe(100);
     for (const unreadCount of [0, 1, 100]) {

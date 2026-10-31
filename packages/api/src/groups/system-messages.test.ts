@@ -3,6 +3,7 @@ import {
   GetMessagesResponseSchema,
   ListConversationsResponseSchema,
   MessageCreatedEventSchema,
+  SendMessageResponseSchema,
 } from '@chat/contracts';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -142,10 +143,15 @@ describe('stored system messages', () => {
       const bob = await signUp(app, 'Bob');
       const group = await createGroup(app, alice);
       expect((await summaryOf(app, alice, group.id))?.lastMessage).toBeNull();
-      await post(app, alice, group.id, 'hello there');
+      const sent = SendMessageResponseSchema.parse(
+        (await post(app, alice, group.id, 'hello there')).json(),
+      );
       await addMember(app, alice, group.id, bob.id);
 
-      expect((await summaryOf(app, alice, group.id))?.lastMessage?.preview).toBe('hello there');
+      expect((await summaryOf(app, alice, group.id))?.lastMessage).toMatchObject({
+        preview: 'hello there',
+        sequence: sent.message.sequence,
+      });
       expect((await summaryOf(app, bob, group.id))?.lastMessage).toBeNull();
     });
   });
