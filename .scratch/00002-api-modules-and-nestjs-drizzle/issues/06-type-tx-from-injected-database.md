@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-info
+**Status:** wontfix
 
 **Question for the human:** a schema-typed `Tx` breaks `src/db/seed.ts`, whose schema-less `drizzle(pool)` transaction is not assignable to it (tried in the review-fixes work). The spec says the seed CLI keeps using `drizzle` directly. Is it OK to change `seed.ts` (and any test setup) to build its database with `{ schema }`, or should the `any` stay?
 
@@ -13,3 +13,5 @@
 - [ ] Typecheck, lint and all existing tests pass without edits to test behaviour
 
 ## Comments
+
+2026-10-31, the human's decision: closed here because the Spec is resolved. The work continues in [00008, ticket 01](../../00008-typed-transaction/issues/01-type-tx-from-database.md).
