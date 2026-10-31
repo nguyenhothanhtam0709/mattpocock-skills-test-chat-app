@@ -15,7 +15,7 @@ Rules for `packages/web`. [General conventions](general.md) also apply. Paths be
 ## Components
 
 - Hand-written UI lives in its feature folder (`auth/`, `shell/`, `health/`), next to what uses it. Route pages are thin. Shadcn blocks stay in `components/`, and the feature's page wraps them. Example: [LoginPage.tsx](../../packages/web/src/auth/LoginPage.tsx) wraps [login-form.tsx](../../packages/web/src/components/login-form.tsx).
-- Build UI from `@/components/ui/*` (shadcn, style `base-nova`, lucide icons). Add components only with the shadcn CLI and never hand-edit the generated files (lint ignores them). See [components.json](../../packages/web/components.json). Example: [NewConversationDialog.tsx](../../packages/web/src/shell/NewConversationDialog.tsx).
+- Build UI from `@/components/ui/*` (shadcn, style `base-nova`, lucide icons). Add components only with the shadcn CLI and never hand-edit the generated files (lint ignores them). The CLI also adds the `cn` npm package, so a Ticket that adds a component needs it in Allowed packages. See [components.json](../../packages/web/components.json). Example: [NewConversationDialog.tsx](../../packages/web/src/shell/NewConversationDialog.tsx).
 - Style only with Tailwind classes in `className`. No `style={{}}` outside ui components. Only ui components use `cn()`. See [utils.ts](../../packages/web/src/lib/utils.ts).
 - Before sending a form, `safeParse` its input with the contracts schema. Example: [ProfileDialog.tsx](../../packages/web/src/shell/ProfileDialog.tsx).
 
