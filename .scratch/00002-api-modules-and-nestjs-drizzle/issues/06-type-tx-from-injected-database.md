@@ -14,4 +14,4 @@
 
 ## Comments
 
-2026-10-31, the human's decision: closed here because the Spec is resolved. The work continues in [00008, ticket 01](../../00008-typed-transaction/issues/01-type-tx-from-database.md).
+2026-10-31, the human's decision: closed here because the Spec is resolved. The question moves to a [brief](../../00008-typed-transaction/brief.md), for a grilling session after spec 00007.
