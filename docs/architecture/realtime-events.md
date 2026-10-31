@@ -49,6 +49,7 @@ Socket.IO events pushed from server to client (the socket is push-only, ADR 0001
     closed: boolean;
     lastMessage: {
       senderId: string; // uuid
+      sequence: number; // integer
       preview: string;
       createdAt: string; // date-time
     } | null;

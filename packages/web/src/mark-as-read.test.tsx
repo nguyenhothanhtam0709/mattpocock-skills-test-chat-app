@@ -32,10 +32,10 @@ const summary = (preview: string, unreadCount: number) => ({
   isMember: true,
   closed: false,
   unreadCount,
-  lastMessage: { senderId: bob.id, preview, createdAt: '2020-03-04T10:00:00Z' },
+  lastMessage: { sequence: 1, senderId: bob.id, preview, createdAt: '2020-03-04T10:00:00Z' },
 });
 
-let nextSequence = 1;
+let nextSequence = 2;
 const message = (senderId: string = bob.id) => {
   const sequence = nextSequence++;
   const n = String(sequence).padStart(4, '0');
@@ -277,6 +277,7 @@ describe('Marking read when things go wrong or do not apply', () => {
               closed: false,
               unreadCount: 0,
               lastMessage: {
+                sequence: 1,
                 senderId: bob.id,
                 preview: 'message',
                 createdAt: '2020-03-04T10:00:00Z',
@@ -353,16 +354,16 @@ describe('conversation.read from another tab or device', () => {
     expect(await row(/1 unread/)).toBeInTheDocument();
   });
 
-  it('takes the count from the server when this tab knows no newer Message than the list it loaded', async () => {
+  it('takes the count from the server when it does not cover the last Message of the list it loaded', async () => {
     const list = { current: [summary('message', 3)] };
     signedIn(list);
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
     await row(/3 unread/);
-    list.current = [summary('message', 0)];
+    list.current = [summary('message', 2)];
 
-    act(() => fake.emit({ type: 'conversation.read', conversationId: withBob, upToSequence: 1 }));
+    act(() => fake.emit({ type: 'conversation.read', conversationId: withBob, upToSequence: 0 }));
 
-    await waitFor(async () => expect(await row(/Bob/)).not.toHaveAccessibleName(/unread/));
+    await waitFor(async () => expect(await row(/Bob/)).toHaveAccessibleName(/2 unread/));
   });
 });

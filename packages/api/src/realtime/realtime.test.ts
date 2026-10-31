@@ -175,7 +175,12 @@ describe('real-time push', () => {
         id: conversation.id,
         kind: 'direct',
         name: 'Alice',
-        lastMessage: { senderId: alice.id, preview: 'hello bob', createdAt: message.createdAt },
+        lastMessage: {
+          senderId: alice.id,
+          sequence: message.sequence,
+          preview: 'hello bob',
+          createdAt: message.createdAt,
+        },
       });
       expect(created.conversation.members.map((m) => m.id).sort()).toEqual(
         [alice.id, bob.id].sort(),

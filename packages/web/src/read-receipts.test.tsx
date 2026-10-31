@@ -31,7 +31,12 @@ const summary = {
   isMember: true,
   closed: false,
   unreadCount: 0,
-  lastMessage: { senderId: alice.id, preview: 'hi', createdAt: '2020-03-04T10:00:00Z' },
+  lastMessage: {
+    sequence: 1,
+    senderId: alice.id,
+    preview: 'hi',
+    createdAt: '2020-03-04T10:00:00Z',
+  },
 };
 
 const message = (sequence: number, senderId: string) => {

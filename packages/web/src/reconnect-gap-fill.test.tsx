@@ -55,6 +55,7 @@ function openConversation() {
             closed: false,
             unreadCount: 0,
             lastMessage: {
+              sequence: 1,
               senderId: bob.id,
               preview: `message ${total.n}`,
               createdAt: '2020-03-04T10:00:00Z',

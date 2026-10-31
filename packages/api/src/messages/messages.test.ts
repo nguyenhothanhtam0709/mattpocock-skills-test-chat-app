@@ -538,7 +538,7 @@ describe('GET /conversations', () => {
       expect(conversations.map((c) => c.name)).toEqual(['Bobby B', 'Carol']);
       expect(conversations[0]).toMatchObject({
         kind: 'direct',
-        lastMessage: { senderId: bob.id, preview: 'line one line two' },
+        lastMessage: { senderId: bob.id, sequence: 2, preview: 'line one line two' },
       });
       expect(conversations[1]!.lastMessage?.preview).toBe('carol here');
       expect(conversations[0]!.members.map((m) => m.id).sort()).toEqual([alice.id, bob.id].sort());

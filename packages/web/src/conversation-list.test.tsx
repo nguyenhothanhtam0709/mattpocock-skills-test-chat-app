@@ -34,6 +34,7 @@ const summaries = [
     closed: false,
     unreadCount: 0,
     lastMessage: {
+      sequence: 1,
       senderId: bob.id,
       preview: 'see you at noon',
       createdAt: '2020-03-04T10:00:00Z',
@@ -47,7 +48,12 @@ const summaries = [
     isMember: true,
     closed: false,
     unreadCount: 0,
-    lastMessage: { senderId: alice.id, preview: 'thanks!', createdAt: '2020-03-03T10:00:00Z' },
+    lastMessage: {
+      sequence: 1,
+      senderId: alice.id,
+      preview: 'thanks!',
+      createdAt: '2020-03-03T10:00:00Z',
+    },
   },
 ];
 

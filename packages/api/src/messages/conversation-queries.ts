@@ -56,6 +56,7 @@ export class ConversationQueries {
         kind: conversations.kind,
         groupName: groups.name,
         senderId: messages.senderId,
+        sequence: messages.sequence,
         preview: sql<
           string | null
         >`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
@@ -110,10 +111,14 @@ export class ConversationQueries {
         isMember: row.isMember,
         closed: row.groupName !== null && all.length === 0,
         lastMessage:
-          row.senderId === null || row.preview === null || row.createdAt === null
+          row.senderId === null ||
+          row.sequence === null ||
+          row.preview === null ||
+          row.createdAt === null
             ? null
             : {
                 senderId: row.senderId,
+                sequence: row.sequence,
                 preview: row.preview,
                 createdAt: row.createdAt.toISOString(),
               },
