@@ -23,6 +23,16 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-reads.ts\""
           }
         ]
+      },
+      {
+        "matcher": "mcp__github__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-pr.ts\"",
+            "timeout": 120
+          }
+        ]
       }
     ]
   }
