@@ -4,14 +4,14 @@ kind: intent
 
 # Testing policy
 
-Which tests a change needs. How to run them is in [setup](setup.md). Where test files go is in [general conventions](../conventions/general.md#tests).
+Which tests a change needs, and how often to run them. Commands are in [setup](setup.md#tests), if the package's `AGENTS.md` doesn't have them.
 
 ## Kinds of test
 
-- **API behaviour test**: drives the real app over HTTP or socket with the app harness against real Postgres. Example: [groups.test.ts](../../packages/api/src/groups/groups.test.ts), harness in [app-harness.ts](../../packages/api/test/app-harness.ts).
-- **Web behaviour test**: renders `<App />`, acts as a user with Testing Library and fakes only the network. Example: [login.test.tsx](../../packages/web/src/login.test.tsx).
-- **Contracts test**: schemas and shared helpers in contracts. Example: [group.test.ts](../../packages/contracts/src/group.test.ts).
-- **Script test**: `node --test` tests for `scripts/`. Example: [scripts/docs/](../../scripts/docs/).
+- **API behaviour test**: drives the real app over HTTP or socket with the app harness (`packages/api/test/app-harness.ts`) against real Postgres.
+- **Web behaviour test**: renders `<App />`, acts as a user with Testing Library and fakes only the network.
+- **Contracts test**: schemas and shared helpers in contracts.
+- **Script test**: `node --test` tests for `scripts/`.
 - **Unit test**: one function, class or hook on its own, with its collaborators replaced by test doubles. An extra, never a replacement for a behaviour test.
 - **Browser check**: a manual run of the real app in a browser (Chrome DevTools MCP). Not automated.
 
@@ -24,6 +24,14 @@ Which tests a change needs. How to run them is in [setup](setup.md). Where test 
 - A change to docs, comments, config or formatting alone needs no automated test; review checks it (links resolve, front matter present).
 - A refactor needs no new test, as long as the existing tests stay green and none is weakened.
 - There is no coverage target. Write the right test, not a percentage.
+
+## How often
+
+- While working, run the test file you changed, then its package. Don't run `pnpm test` yet.
+- Before opening the PR, merge the Feature Branch tip in, then run the full checks in the [definition of done](definition-of-done.md) once.
+- If a check fails, fix it and re-run only what failed. Then run the full checks once more.
+- Cut test output with `| tail -n 40`, and look at it in full only on a failure. It stays in the context for the rest of the run.
+- Browser checks: [browser check](browser-check.md).
 
 ## Test first
 

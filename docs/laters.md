@@ -1,6 +1,6 @@
 # Laters
 
-Notes for a later MVP, not commitments. Any agent may append an entry. Remove an entry when it becomes a spec.
+Notes for a later MVP, not commitments. Any agent may append an entry with `cat >> docs/laters.md`. Remove an entry when it becomes a spec. To find an entry, run `grep -n '^## ' docs/laters.md` and read only that section: whole-file reads are denied.
 
 ## Conversation URLs
 
@@ -56,7 +56,6 @@ The doc and convention rules are not enforced yet; agents follow them by reading
 - **Required CI checks:** lint, typecheck, tests with Postgres, migration drift, generated-doc drift, and a front matter and link check. Back them with branch protection and a required human approval.
 - **`covers:` check:** a PR that touches code covered by a Descriptive Doc without updating that doc fails, unless the PR body justifies it.
 - **Stop hook:** run the fast checks when the agent stops.
-- **Merge permission:** remove the agent's pre-approved PR merge permission.
 - **Drift audit:** a periodic audit of docs against code that opens Tickets for each drift found.
 
 ## Review the mocks in tests
@@ -146,3 +145,7 @@ MVP1 has only the Owner role and no renaming, deletion or invitations needing ac
 ## CI pipeline and deployment
 
 CI, deployment and OpenAPI docs were out of scope for MVP1. The required CI checks are already listed under "Enforce the doc and convention rules" and OpenAPI under "Contract-first development"; this entry is the rest: a hosting target, environment config and a deploy pipeline.
+
+## Skill names in the Factory docs
+
+`docs/factory/sdlc.md` names `grill-with-docs`, `to-spec`, `to-tickets`, `triage` and `retro`, which may not match the installed skills. Check them against what is installed and decide who owns that check: a script, a review step or the Reviewer. A link and front matter check belongs with the drift audit under "Enforce the doc and convention rules".
