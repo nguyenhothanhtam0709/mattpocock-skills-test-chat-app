@@ -21,7 +21,9 @@
     "format": "prettier --write .",
     "docs:generate": "pnpm build:contracts && pnpm --filter @chat/api build && node scripts/docs/generate.ts",
     "typecheck": "pnpm build:contracts && pnpm -r typecheck",
-    "test:scripts": "node --test scripts/docs/*.test.ts"
+    "test:scripts": "node --test scripts/*/*.test.ts",
+    "docs:check": "pnpm docs:generate && git diff --exit-code docs/architecture && node scripts/docs/check.ts",
+    "metrics:tokens": "node scripts/metrics/token-report.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

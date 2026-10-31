@@ -29,7 +29,7 @@ Every new Ticket has these fields, in this order. Where Tickets live and how the
 ## Fields
 
 - **Title**: the Ticket's two-digit number and a short name.
-- **What to build**: the change and the workspace packages (api, web, contracts, scripts) it touches.
+- **What to build**: the change and the workspace packages (api, web, contracts, scripts) it touches. The Ticket states every rule it needs, so the Implementer doesn't have to read the whole Spec; name a Spec section where more detail may be needed.
 - **Allowed packages**: npm dependency changes this Ticket may make, each with its version (for example `add zod-to-json-schema@^3`). `None` by default. See [no assumptions](no-assumptions.md).
 - **Blocked by**: the numbers of the Tickets that must be `resolved` first (`NN, NN`), or `None`.
 - **Status**: one of the five labels in [triage labels](../agents/triage-labels.md), or `resolved`.

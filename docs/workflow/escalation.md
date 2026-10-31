@@ -10,9 +10,10 @@ What to do when stuck on a Ticket: ask, then stop. Never guess.
 
 - A question the Ticket, spec, ADRs and code don't settle.
 - A dependency change the Ticket's Allowed packages don't cover.
-- A fix that would widen the scope, including code that contradicts an Intent Doc when fixing it falls outside the Ticket.
+- A fix that would widen the scope ([no assumptions](no-assumptions.md)), including code that contradicts an Intent Doc when fixing it falls outside the Ticket. [ADR 0008](../adr/0008-documents-are-classed-by-how-they-are-maintained.md) says which side is the defect.
 - An exception to the [testing policy](testing-policy.md): a mock in a behaviour test, or a weakened or deleted test.
-- A flaky test.
+- A flaky test ([testing policy](testing-policy.md#changing-existing-tests)).
+- Two Tickets that want contradicting things: escalate on the later Ticket, and the human edits the Tickets.
 - Failures that come from outside the Ticket.
 - A Ticket this one is blocked by that is not `resolved`.
 - A denied prompt to edit a skill-generated file.
@@ -26,6 +27,14 @@ What to do when stuck on a Ticket: ask, then stop. Never guess.
 5. Stop.
 
 Stop means no further work on that Ticket and no proceeding on a guess. Other unblocked Tickets may continue.
+
+## A wrong Spec
+
+Stop and set `needs-info` on each affected Ticket. The human fixes the Spec through a PR to `main`, then `main` is merged into the Feature Branch.
+
+## A stuck Implementer
+
+When an Implementer reaches its stop condition without a PR, the Orchestrator stops it and reports to the human. It never retries blind.
 
 ## Resuming
 

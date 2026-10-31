@@ -4,7 +4,7 @@ kind: descriptive
 
 # Setup
 
-From a clean checkout to green tests. Run every command from the repo root. Which tests a change needs is in the [testing policy](testing-policy.md).
+From a clean checkout to green tests. Run every command from the repo root.
 
 ## Prerequisites
 
@@ -48,16 +48,7 @@ Gotcha: `db:up` fails if something else already listens on port 5432. Stop that 
 
 ## A second worktree
 
-`node_modules` and `packages/api/.env` are git-ignored, so a new worktree has neither. From the new worktree's root:
-
-```sh
-pnpm install
-cp "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/packages/api/.env" packages/api/.env   # from the main checkout
-```
-
-If the main checkout has no `.env` either, create one as in [Environment](#environment).
-
-Gotcha: every worktree uses the same ports: 3000 (API), 5173 (web) and 5432 (Postgres). Only one dev stack runs at a time. Stop it (`dev:api`, `dev:web`, then `pnpm db:down` in the worktree that started it) before starting one in another worktree. Docker Compose names the project after the folder, so each worktree's `db:up` gets its own `pgdata` volume: migrate and seed again there. `pnpm test` is not affected: the API tests start their own Postgres on a random port.
+When working outside the main checkout: [worktree](worktree.md).
 
 ## Adding a dependency
 
@@ -72,18 +63,7 @@ pnpm --filter @chat/<package> add -D <name>   # dev dependency
 
 ## Browser check
 
-When one is needed: [testing policy](testing-policy.md). It runs the real API in dev mode against the local database. Nothing is mocked. Each of the last two commands keeps running, so give each its own terminal or background process.
-
-```sh
-pnpm db:up
-pnpm build:contracts
-pnpm db:migrate
-pnpm db:seed    # the seeded Users to log in as
-pnpm dev:api    # http://localhost:3000/api/v1
-pnpm dev:web    # http://localhost:5173
-```
-
-Then open http://localhost:5173 with the Chrome DevTools MCP. The seeded Users are `alice`, `bob`, `carol`, `dave` and `erin`, all with the password `password123` ([seed.ts](../../packages/api/src/db/seed.ts)). When done, stop `dev:api` and `dev:web`, then `pnpm db:down`.
+When the Ticket needs one: [browser check](browser-check.md).
 
 ## Tests
 
@@ -100,7 +80,13 @@ It builds contracts first, runs each package's tests one package at a time, then
 | `packages/web`, `packages/contracts`    | Nothing. No database, no Docker. The web tests fake the network with MSW ([server.ts](../../packages/web/src/test/server.ts)).                                          |
 | `scripts/docs` (`pnpm test:scripts`)    | Nothing. Node's built-in test runner.                                                                                                                                   |
 
-To run one package: `pnpm build:contracts`, then `pnpm --filter @chat/<package> test`.
+While working, run only one test file or one package, as the [testing policy](testing-policy.md#how-often) says:
+
+```sh
+pnpm build:contracts                                     # once, and again after a contracts change
+pnpm --filter @chat/<package> exec vitest run <file>     # one file, path relative to the package
+pnpm --filter @chat/<package> test                       # one package
+```
 
 ## Other checks
 
@@ -108,6 +94,7 @@ To run one package: `pnpm build:contracts`, then `pnpm --filter @chat/<package> 
 pnpm lint            # ESLint and Prettier check
 pnpm typecheck       # builds contracts, then tsc in every package
 pnpm docs:generate   # rewrites the Generated Docs in docs/architecture/
+pnpm docs:check      # Generated Docs match the code, links resolve, docs declare a kind, resolved Specs have no open Ticket
 ```
 
 `pnpm format` fixes Prettier issues. See [package.json](../../package.json) for every script.
