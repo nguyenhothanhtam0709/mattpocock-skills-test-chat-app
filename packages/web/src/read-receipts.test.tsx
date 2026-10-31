@@ -66,6 +66,9 @@ function signedIn(receipt: { current: number | undefined }) {
   server.use(
     http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: token })),
     http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
+    http.patch('*/api/v1/users/me', async ({ request }) =>
+      HttpResponse.json({ user: { ...alice, ...((await request.json()) as object) } }),
+    ),
     http.get('*/api/v1/conversations', () => HttpResponse.json({ conversations: [summary] })),
     http.get(`*/api/v1/conversations/${withBob}/messages`, () =>
       HttpResponse.json({ messages: [...history].reverse(), hasMore: false }),
@@ -178,5 +181,28 @@ describe('Read Receipts in a Direct Conversation', () => {
     act(() => fake.reconnect());
 
     await waitFor(() => expect(seenUnder(viewport)).toBe('message 5'));
+  });
+
+  it('hides "Seen" at once when sharing is turned off in the Profile dialog, and shows it again when turned on', async () => {
+    signedIn({ current: 3 });
+    render(<App createRealtime={() => fakeRealtime().realtime} />);
+    const viewport = await openBob();
+    await waitFor(() => expect(seenUnder(viewport)).toBe('message 2'));
+    const user = userEvent.setup();
+
+    const toggleSharing = async () => {
+      await user.click(screen.getByRole('button', { name: /alice/i }));
+      await user.click(await screen.findByRole('menuitem', { name: /profile/i }));
+      const dialog = await screen.findByRole('dialog', { name: /profile/i });
+      await user.click(within(dialog).getByRole('switch', { name: /share read receipts/i }));
+      await user.click(within(dialog).getByRole('button', { name: /save/i }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    };
+
+    await toggleSharing();
+    await waitFor(() => expect(within(viewport).queryByText('Seen')).toBeNull());
+
+    await toggleSharing();
+    await waitFor(() => expect(seenUnder(viewport)).toBe('message 2'));
   });
 });
