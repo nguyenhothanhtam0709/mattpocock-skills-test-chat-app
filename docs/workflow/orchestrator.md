@@ -48,11 +48,12 @@ Model: sonnet | opus, because <reason>
 Latest migration: <number, if the Ticket changes the schema>
 Decisions since the Ticket was written: <human answers, packages allowed, or None>
 Handoff notes to read: <absolute paths, only Tickets in Blocked by, or None>
-Notes folder: <absolute path>
+Handoff note: <absolute path>/<NNNNN>-<NN>.md
 
 Rules:
 
-- Read only what this brief names. A link in a doc is not an instruction to read it: follow it only when the condition beside it holds, or when stuck.
+- Read what this brief names, plus a doc from the root AGENTS.md table when you reach its step. A link in a doc is not an instruction to read it: follow it only when the condition beside it holds, or when stuck.
+- Docs outside your read scope are denied when read whole, and so is the whole Spec. Grep and read the section you need, and say so in the PR body if it wasn't in this brief.
 - Stop when the PR is open. Do not merge. When stuck, follow docs/workflow/escalation.md.
 - Commit work in progress and update your note at each milestone.
 - Handoff note, at most 15 lines: new helpers or seams with paths, migration number, gotchas, what is unfinished. Do not retell the work.

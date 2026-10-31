@@ -26,6 +26,8 @@ test('a whole read of an always-guarded file is denied on any branch', () => {
   assert.ok(decide(read('pnpm-lock.yaml'), noScope));
   assert.ok(decide(read('packages/api/drizzle/meta/0001_snapshot.json'), noScope));
   assert.ok(decide(read('docs/laters.md', 500), noScope));
+  assert.match(decide(read('docs/laters.md'), noScope) ?? '', /cat >>/);
+  assert.doesNotMatch(decide(read('pnpm-lock.yaml'), noScope) ?? '', /cat >>/);
 });
 
 test('a short read of an always-guarded file is allowed', () => {

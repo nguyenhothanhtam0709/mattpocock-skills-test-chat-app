@@ -97,7 +97,7 @@ const guardedGlob = (glob: string, context: ReadContext): boolean => {
 const denial = (path: string, context: ReadContext): string =>
   `${path} is not needed whole${context.scope === null ? '' : ' for this Ticket'}. ` +
   `Run grep -n '^#' on it and read only the section you need (Read with a limit of at most ${MAX_READ_LINES} lines). ` +
-  `To add to docs/laters.md, append with cat >>. ` +
+  (path === 'docs/laters.md' ? `To add an entry, append with cat >>. ` : '') +
   `If you read a file outside your scope, say so in the PR body so the scope can be fixed.`;
 
 const decideBash = (command: string, context: ReadContext): string | null => {
