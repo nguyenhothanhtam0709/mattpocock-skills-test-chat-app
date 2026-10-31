@@ -145,3 +145,7 @@ MVP1 has only the Owner role and no renaming, deletion or invitations needing ac
 ## CI pipeline and deployment
 
 CI, deployment and OpenAPI docs were out of scope for MVP1. The required CI checks are already listed under "Enforce the doc and convention rules" and OpenAPI under "Contract-first development"; this entry is the rest: a hosting target, environment config and a deploy pipeline.
+
+## Skill names in the Factory docs
+
+`docs/factory/sdlc.md` names `grill-with-docs`, `to-spec`, `to-tickets`, `triage` and `retro`, which may not match the installed skills. Check them against what is installed and decide who owns that check: a script, a review step or the Reviewer. A link and front matter check belongs with the drift audit under "Enforce the doc and convention rules".
