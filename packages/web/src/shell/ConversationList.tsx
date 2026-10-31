@@ -1,4 +1,4 @@
-import type { ConversationSummary } from '@chat/contracts';
+import type { ConversationSummary, Message } from '@chat/contracts';
 import { LAST_MESSAGE_PREVIEW_MAX, UNREAD_COUNT_MAX } from '@chat/contracts';
 import { MessageSquare } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -37,6 +37,44 @@ const previewOf = (body: string): string =>
 /** The Unread Count as the badge shows it; the server stops counting at the cap. */
 const unreadLabel = (count: number): string =>
   count >= UNREAD_COUNT_MAX ? `${UNREAD_COUNT_MAX - 1}+` : String(count);
+
+/**
+ * How long the open Conversation gets to confirm a mark-read (its 300ms debounce, the request and
+ * the push back) before the list asks the server: the request may have failed.
+ */
+const MARK_READ_GRACE_MS = 5000;
+
+interface PushedMessage {
+  message: Message;
+  /** Whether the Conversation was being read when it arrived, so it adds nothing to the count. */
+  reading: boolean;
+}
+
+interface AwaitedRead {
+  conversationId: string;
+  sequence: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Whether an entry fresh from the server (a list response, `conversation.created`) already counts
+ * a pushed Message: it is the entry's last Message ('same'), or older than it ('older', with more
+ * of what the entry reflects still to come). The summary carries no sequence, so this goes by the
+ * last Message's content and time. Times are only comparable against that fresh entry: they are
+ * taken before a Message wins its sequence, so pushes among themselves can be out of order.
+ */
+function reflects(entry: ConversationSummary, message: Message): 'same' | 'older' | 'no' {
+  const last = entry.lastMessage;
+  if (!last) return 'no';
+  const sent = Date.parse(message.createdAt);
+  const newest = Date.parse(last.createdAt);
+  if (sent < newest) return 'older';
+  const same =
+    sent === newest &&
+    message.senderId === last.senderId &&
+    previewOf(message.body) === last.preview;
+  return same ? 'same' : 'no';
+}
 
 function ListSkeleton() {
   return (
@@ -81,100 +119,155 @@ export function ConversationList({
   const { listConversations } = useAuth();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [pushedReloads, setPushedReloads] = useState(0);
+  const reload = useCallback(() => setPushedReloads((n) => n + 1), []);
+  // The list as of the last push: two events can land before React renders either of them.
+  const current = useRef<ConversationSummary[] | undefined>(undefined);
+  const show = useCallback((list: ConversationSummary[]) => {
+    current.current = list;
+    setState({ status: 'ready', list });
+  }, []);
   // The newest sequence pushed since the list was last loaded, per Conversation: what a
   // `conversation.read` must cover to clear the count without asking the server.
   const newestPushed = useRef(new Map<string, number>());
+  // Conversations whose entry already moved past what the server last told us (see `reflects`).
+  const pastSnapshot = useRef(new Set<string>());
+  // Messages pushed while a list request is in flight, to replay onto its response.
+  const inFlight = useRef<PushedMessage[] | undefined>(undefined);
+  // The Message left uncounted because the open Conversation is expected to mark it read.
+  const awaitedRead = useRef<AwaitedRead | undefined>(undefined);
+  const stopAwaitingRead = useCallback(() => {
+    clearTimeout(awaitedRead.current?.timer);
+    awaitedRead.current = undefined;
+  }, []);
   const onLoadedRef = useRef(onLoaded);
   useLayoutEffect(() => {
     onLoadedRef.current = onLoaded;
   });
 
+  /** The list with one pushed Message applied. Pushes come in sequence order per Conversation. */
+  const applyMessage = useCallback(
+    (list: ConversationSummary[], { message, reading }: PushedMessage): ConversationSummary[] => {
+      const id = message.conversationId;
+      newestPushed.current.set(id, Math.max(newestPushed.current.get(id) ?? 0, message.sequence));
+      // Membership notes do not touch the preview or the order (spec: only Messages do).
+      if (message.kind !== 'text') return list;
+      const known = list.find((c) => c.id === id);
+      if (!known) {
+        // Not listed (e.g. the sender's other tab started it): the server knows the rest.
+        reload();
+        return list;
+      }
+      const fromOther = message.senderId !== userId;
+      if (fromOther && reading) {
+        stopAwaitingRead();
+        awaitedRead.current = {
+          conversationId: id,
+          sequence: message.sequence,
+          timer: setTimeout(() => {
+            awaitedRead.current = undefined;
+            reload();
+          }, MARK_READ_GRACE_MS),
+        };
+      }
+      const reflected = pastSnapshot.current.has(id) ? 'no' : reflects(known, message);
+      if (reflected !== 'older') pastSnapshot.current.add(id);
+      if (reflected !== 'no') return list;
+      const updated = {
+        ...known,
+        unreadCount:
+          fromOther && !reading
+            ? Math.min(known.unreadCount + 1, UNREAD_COUNT_MAX)
+            : known.unreadCount,
+        lastMessage: {
+          senderId: message.senderId,
+          preview: previewOf(message.body),
+          createdAt: message.createdAt,
+        },
+      };
+      return [updated, ...list.filter((c) => c !== known)];
+    },
+    [userId, reload, stopAwaitingRead],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
+    const pushes: PushedMessage[] = [];
+    inFlight.current = pushes;
     void (async () => {
       const result = await listConversations(controller.signal);
       if (controller.signal.aborted) return;
-      if (result.ok) {
-        newestPushed.current.clear();
-        onLoadedRef.current?.(result.conversations);
+      inFlight.current = undefined;
+      if (!result.ok) {
+        current.current = undefined;
+        setState({ status: 'error', error: result.error });
+        return;
       }
-      setState(
-        result.ok
-          ? { status: 'ready', list: result.conversations }
-          : { status: 'error', error: result.error },
-      );
+      newestPushed.current.clear();
+      pastSnapshot.current.clear();
+      stopAwaitingRead();
+      onLoadedRef.current?.(result.conversations);
+      show(pushes.reduce(applyMessage, result.conversations));
     })();
     return () => controller.abort();
-  }, [listConversations, refreshKey, pushedReloads]);
+  }, [listConversations, refreshKey, pushedReloads, applyMessage, show, stopAwaitingRead]);
 
-  useReconnected(() => setPushedReloads((n) => n + 1));
+  useEffect(() => stopAwaitingRead, [stopAwaitingRead]);
 
-  const listed = state.status === 'ready' ? state.list : undefined;
+  // Moved away before the mark-read was confirmed: it may never be sent, so ask the server.
+  useEffect(() => {
+    if (!awaitedRead.current || awaitedRead.current.conversationId === readingId) return;
+    stopAwaitingRead();
+    reload();
+  }, [readingId, reload, stopAwaitingRead]);
+
+  useReconnected(reload);
+
   useRealtimeEvents(
     useCallback(
       (event) => {
-        // Until the first load finishes, the fetch itself will include whatever was pushed.
-        if (!listed) return;
+        const list = current.current;
         if (event.type === 'conversation.created') {
           const { conversation } = event;
+          // A response in flight may predate it; one asked for now cannot.
+          if (inFlight.current) reload();
+          if (!list) return;
+          pastSnapshot.current.delete(conversation.id);
           // An ID already listed is replaced (a re-added Former Member's entry is stale).
-          setState({
-            status: 'ready',
-            list: [conversation, ...listed.filter((c) => c.id !== conversation.id)],
-          });
+          show([conversation, ...list.filter((c) => c.id !== conversation.id)]);
           return;
         }
         if (event.type === 'group.closed' || event.type === 'group.membership_ended') {
           // Both flip the entry to read-only; the server knows the rest.
-          setPushedReloads((n) => n + 1);
+          reload();
           return;
         }
         if (event.type === 'conversation.read') {
+          const { conversationId, upToSequence } = event;
+          const awaited = awaitedRead.current;
+          if (awaited?.conversationId === conversationId && upToSequence >= awaited.sequence) {
+            stopAwaitingRead();
+          }
+          // A response in flight may predate it; one asked for now cannot.
+          if (inFlight.current) reload();
           // The User read on another tab or device (or this one). The event carries a
           // position, not a count: only one that covers everything known here clears it.
-          const known = listed.find((c) => c.id === event.conversationId);
-          if (!known || known.unreadCount === 0) return;
-          const newest = newestPushed.current.get(event.conversationId);
-          if (newest === undefined || event.upToSequence < newest) {
-            setPushedReloads((n) => n + 1);
+          const known = list?.find((c) => c.id === conversationId);
+          if (!list || !known || known.unreadCount === 0) return;
+          const newest = newestPushed.current.get(conversationId);
+          if (newest === undefined || upToSequence < newest) {
+            reload();
             return;
           }
-          setState({
-            status: 'ready',
-            list: listed.map((c) => (c === known ? { ...c, unreadCount: 0 } : c)),
-          });
+          show(list.map((c) => (c === known ? { ...c, unreadCount: 0 } : c)));
           return;
         }
         if (event.type !== 'message.created') return;
         const { message } = event;
-        newestPushed.current.set(
-          message.conversationId,
-          Math.max(newestPushed.current.get(message.conversationId) ?? 0, message.sequence),
-        );
-        // Membership notes do not touch the preview or the order (spec: only Messages do).
-        if (message.kind !== 'text') return;
-        const known = listed.find((c) => c.id === message.conversationId);
-        if (!known) {
-          // Not listed (e.g. the sender's other tab started it): the server knows the rest.
-          setPushedReloads((n) => n + 1);
-          return;
-        }
-        const unread =
-          message.senderId !== userId && message.conversationId !== readingId
-            ? Math.min(known.unreadCount + 1, UNREAD_COUNT_MAX)
-            : known.unreadCount;
-        const updated = {
-          ...known,
-          unreadCount: unread,
-          lastMessage: {
-            senderId: message.senderId,
-            preview: previewOf(message.body),
-            createdAt: message.createdAt,
-          },
-        };
-        setState({ status: 'ready', list: [updated, ...listed.filter((c) => c !== known)] });
+        const push = { message, reading: message.conversationId === readingId };
+        inFlight.current?.push(push);
+        if (list) show(applyMessage(list, push));
       },
-      [listed, userId, readingId],
+      [readingId, applyMessage, reload, show, stopAwaitingRead],
     ),
   );
 
