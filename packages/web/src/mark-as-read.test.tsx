@@ -55,7 +55,13 @@ const message = (senderId: string = bob.id) => {
  * Signed in as Alice. The list answers with whatever `list` holds at the time (and counts its
  * fetches), Bob's history with `history`, and every mark-read is recorded and answered.
  */
-function signedIn(list: { current: unknown[] }, history: ReturnType<typeof message>[] = []) {
+function signedIn(
+  list: { current: unknown[] },
+  history: ReturnType<typeof message>[] = [],
+  /** Answers each mark-read; the default accepts it. */
+  answer: (upToSequence: number) => Response = (upToSequence) =>
+    HttpResponse.json({ upToSequence }),
+) {
   const token = fakeAccessToken();
   const marked: number[] = [];
   const fetches = { count: 0 };
@@ -72,7 +78,7 @@ function signedIn(list: { current: unknown[] }, history: ReturnType<typeof messa
     http.put(`*/api/v1/conversations/${withBob}/read`, async ({ request }) => {
       const { upToSequence } = (await request.json()) as { upToSequence: number };
       marked.push(upToSequence);
-      return HttpResponse.json({ upToSequence });
+      return answer(upToSequence);
     }),
   );
   return { marked, fetches };
@@ -174,6 +180,132 @@ describe('Marking a Conversation as read', () => {
     } finally {
       unstubLayout();
     }
+  });
+});
+
+describe('Marking read when things go wrong or do not apply', () => {
+  it('retries a mark-read that failed with a server error', async () => {
+    const history = [message()];
+    let calls = 0;
+    const { marked } = signedIn(
+      { current: [summary('message', 1)] },
+      history,
+      (upToSequence) =>
+        ++calls === 1
+          ? new HttpResponse(null, { status: 503 })
+          : HttpResponse.json({ upToSequence }),
+    );
+    render(<App createRealtime={() => fakeRealtime().realtime} />);
+
+    await openBob(history[0]!.body);
+
+    await waitFor(() => expect(marked).toHaveLength(2), { timeout: 4000 });
+    expect(marked).toEqual([history[0]!.sequence, history[0]!.sequence]);
+  });
+
+  it('retries a failed mark-read once the connection is back', async () => {
+    const history = [message()];
+    let failing = true;
+    const { marked } = signedIn(
+      { current: [summary('message', 1)] },
+      history,
+      (upToSequence) =>
+        failing ? new HttpResponse(null, { status: 429 }) : HttpResponse.json({ upToSequence }),
+    );
+    const fake = fakeRealtime();
+    render(<App createRealtime={() => fake.realtime} />);
+    await openBob(history[0]!.body);
+    await waitFor(() => expect(marked).toHaveLength(1));
+
+    failing = false;
+    act(() => fake.disconnect());
+    act(() => fake.reconnect());
+
+    await waitFor(() => expect(marked).toHaveLength(2));
+  });
+
+  it('does not retry a mark-read the server refused', async () => {
+    const history = [message()];
+    const { marked } = signedIn({ current: [summary('message', 1)] }, history, () =>
+      HttpResponse.json({ message: 'Forbidden' }, { status: 403 }),
+    );
+    render(<App createRealtime={() => fakeRealtime().realtime} />);
+
+    await openBob(history[0]!.body);
+    await waitFor(() => expect(marked).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    expect(marked).toHaveLength(1);
+  });
+
+  it('stays unread when a Message arrives while the User reads older history', async () => {
+    stubLayout();
+    try {
+      const history = Array.from({ length: 6 }, () => message());
+      const { marked } = signedIn({ current: [summary('message', 6)] }, history);
+      const fake = fakeRealtime();
+      render(<App createRealtime={() => fake.realtime} />);
+      const viewport = await openBob(history[5]!.body);
+      await waitFor(() => expect(marked).toEqual([history[5]!.sequence]));
+      viewport.scrollTop = 0;
+      fireEvent.scroll(viewport);
+      const jump = screen.getByRole('button', { name: /jump to latest/i });
+      await waitFor(() => expect(jump).toHaveAttribute('data-active', 'true'));
+
+      const arrived = message();
+      act(() => fake.emit({ type: 'message.created', message: arrived }));
+      await within(viewport).findByText(arrived.body);
+      await pastDebounce();
+
+      expect(viewport.scrollTop).toBe(0);
+      expect(marked).toEqual([history[5]!.sequence]);
+    } finally {
+      unstubLayout();
+    }
+  });
+
+  it('sends nothing for a Group the User is no longer a Member of', async () => {
+    const group = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b90';
+    const token = fakeAccessToken();
+    const marked: number[] = [];
+    const sent = message();
+    sent.conversationId = group;
+    server.use(
+      http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: token })),
+      http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
+      http.get('*/api/v1/conversations', () =>
+        HttpResponse.json({
+          conversations: [
+            {
+              id: group,
+              kind: 'group',
+              name: 'Old crew',
+              members: [],
+              isMember: false,
+              closed: false,
+              unreadCount: 0,
+              lastMessage: { senderId: bob.id, preview: 'message', createdAt: '2020-03-04T10:00:00Z' },
+            },
+          ],
+        }),
+      ),
+      http.get(`*/api/v1/conversations/${group}/messages`, () =>
+        HttpResponse.json({ messages: [sent], hasMore: false }),
+      ),
+      http.put(`*/api/v1/conversations/${group}/read`, async ({ request }) => {
+        const { upToSequence } = (await request.json()) as { upToSequence: number };
+        marked.push(upToSequence);
+        return HttpResponse.json({ message: 'Forbidden' }, { status: 403 });
+      }),
+    );
+    render(<App createRealtime={() => fakeRealtime().realtime} />);
+
+    await userEvent.setup().click(await row(/Old crew/));
+    const viewport = await screen.findByRole('region', { name: /messages/i });
+    await within(viewport).findByText(sent.body);
+    await pastDebounce();
+
+    expect(marked).toEqual([]);
   });
 });
 

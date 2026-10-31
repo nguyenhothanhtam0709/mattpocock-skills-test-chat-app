@@ -139,9 +139,3 @@ MVP1 has only the Owner role and no renaming, deletion or invitations needing ac
 ## CI pipeline and deployment
 
 CI, deployment and OpenAPI docs were out of scope for MVP1. The required CI checks are already listed under "Enforce the doc and convention rules" and OpenAPI under "Contract-first development"; this entry is the rest: a hosting target, environment config and a deploy pipeline.
-
-## New Messages pull a scrolled-up reader to the latest
-
-- **Seen (ticket 00006-03):** every Message item in `ConversationView` is a `scrollAnchor`, and the shadcn `MessageScroller` scrolls a newly added anchor into view even when the User has scrolled up. So a Message that arrives while the User reads older history moves the view to it. The view is then at the latest Message, so it is marked read (the Conversation list counted it as unread for a moment).
-- **Why it matters:** spec 00006 says scrolling back through history marks nothing read (user story 15). Mark-read follows the live-edge rule correctly; the scroller is what ends the scrolled-up state.
-- **Not done:** out of scope for 00006-03. The idea is to make only the User's own Messages scroll anchors, or to anchor only while the view is at the live edge, and to check that Messages arriving while scrolled up stay unread.

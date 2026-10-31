@@ -13,7 +13,9 @@ export type ListConversationsResult =
 export type ReadReceiptResult =
   { ok: true; readUpToSequence: number | undefined } | { ok: false; error: string };
 
-export type MarkReadResult = { ok: true; upToSequence: number } | { ok: false; error: string };
+/** `retryable`: the failure may pass by itself (a 5xx, a 429 or no network), so trying again can work. */
+export type MarkReadResult =
+  { ok: true; upToSequence: number } | { ok: false; error: string; retryable?: true };
 
 export type MessagesCursor = { before?: number; after?: number };
 
@@ -114,9 +116,16 @@ export async function markRead(
       },
     );
   } catch {
-    return { ok: false, error: 'Could not reach the server. Try again.' };
+    return { ok: false, error: 'Could not reach the server. Try again.', retryable: true };
   }
-  if (!res.ok) return { ok: false, error: 'Something went wrong. Try again.' };
+  if (!res.ok) {
+    const retryable = res.status >= 500 || res.status === 429;
+    return {
+      ok: false,
+      error: 'Something went wrong. Try again.',
+      ...(retryable ? { retryable: true as const } : {}),
+    };
+  }
   const parsed = MarkReadResponseSchema.safeParse(await res.json().catch(() => undefined));
   return parsed.success
     ? { ok: true, upToSequence: parsed.data.upToSequence }
