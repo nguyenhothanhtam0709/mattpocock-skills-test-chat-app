@@ -175,14 +175,22 @@ describe('real-time push', () => {
         id: conversation.id,
         kind: 'direct',
         name: 'Alice',
-        lastMessage: { senderId: alice.id, preview: 'hello bob', createdAt: message.createdAt },
+        lastMessage: {
+          senderId: alice.id,
+          sequence: message.sequence,
+          preview: 'hello bob',
+          createdAt: message.createdAt,
+        },
       });
       expect(created.conversation.members.map((m) => m.id).sort()).toEqual(
         [alice.id, bob.id].sort(),
       );
+      await settle();
+      // Sending moved Alice's Read Marker, and both share read receipts: Bob gets it (spec 00006).
       expect(bobSocket.received.map(([event]) => event)).toEqual([
         'conversation.created',
         'message.created',
+        'conversation.receipt',
       ]);
     });
   });
@@ -204,7 +212,11 @@ describe('real-time push', () => {
       expect(await seen1).toEqual({ message });
       expect(await seen2).toEqual({ message });
       await settle();
-      expect(tab1.received.map(([event]) => event)).toEqual(['message.created']);
+      // Sending also moved the sender's Read Marker: that syncs their tabs too (spec 00006).
+      expect(tab1.received.map(([event]) => event)).toEqual([
+        'message.created',
+        'conversation.read',
+      ]);
     });
   });
 
@@ -235,7 +247,11 @@ describe('real-time push', () => {
       expect(await toBob).toEqual(forAlice);
       await settle();
       expect(carolSocket.received).toEqual([]);
-      expect(aliceSocket.received.map(([event]) => event)).toEqual(['message.created']);
+      // Bob's send moved his Read Marker, and both share read receipts (spec 00006).
+      expect(aliceSocket.received.map(([event]) => event)).toEqual([
+        'message.created',
+        'conversation.receipt',
+      ]);
     });
   });
 
@@ -371,6 +387,16 @@ describe('real-time push', () => {
         expect.objectContaining({
           event: 'message.created',
           targetUsers: 2,
+          conversationId: conversation.id,
+        }),
+        expect.objectContaining({
+          event: 'conversation.read',
+          targetUsers: 1,
+          conversationId: conversation.id,
+        }),
+        expect.objectContaining({
+          event: 'conversation.receipt',
+          targetUsers: 1,
           conversationId: conversation.id,
         }),
       ]);

@@ -11,6 +11,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
@@ -45,7 +46,9 @@ function serverWith(state: ServerGroup) {
     http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
     http.get('*/api/v1/conversations', () =>
       HttpResponse.json({
-        conversations: [{ ...group(), isMember: state.isMember, lastMessage: null }],
+        conversations: [
+          { ...group(), isMember: state.isMember, unreadCount: 0, lastMessage: null },
+        ],
       }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
@@ -220,6 +223,7 @@ describe('the Member count while a slower list reload is in flight', () => {
               members: snapshot.members,
               closed: snapshot.closed,
               isMember: snapshot.isMember,
+              unreadCount: 0,
               lastMessage: null,
             },
           ],

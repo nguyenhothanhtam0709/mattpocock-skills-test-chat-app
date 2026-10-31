@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
 const carol = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b62', username: 'carol', nickname: null };
@@ -31,7 +32,9 @@ const summaries = [
     members: [aliceMember, bob],
     isMember: true,
     closed: false,
+    unreadCount: 0,
     lastMessage: {
+      sequence: 1,
       senderId: bob.id,
       preview: 'see you at noon',
       createdAt: '2020-03-04T10:00:00Z',
@@ -44,7 +47,13 @@ const summaries = [
     members: [aliceMember, carol],
     isMember: true,
     closed: false,
-    lastMessage: { senderId: alice.id, preview: 'thanks!', createdAt: '2020-03-03T10:00:00Z' },
+    unreadCount: 0,
+    lastMessage: {
+      sequence: 1,
+      senderId: alice.id,
+      preview: 'thanks!',
+      createdAt: '2020-03-03T10:00:00Z',
+    },
   },
 ];
 

@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: 'Ali',
+  shareReadReceipts: true,
 };
 
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };

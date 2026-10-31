@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
 const groupId = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b80';
@@ -35,7 +36,9 @@ function formerMemberOf(isMember: boolean) {
             members: [bob],
             isMember,
             closed: false,
+            unreadCount: 0,
             lastMessage: {
+              sequence: 1,
               senderId: bob.id,
               preview: 'see you all',
               createdAt: '2026-10-20T09:30:00.000Z',

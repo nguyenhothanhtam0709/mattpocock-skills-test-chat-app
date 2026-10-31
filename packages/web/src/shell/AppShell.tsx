@@ -1,6 +1,6 @@
 import type { ConversationSummary, User } from '@chat/contracts';
 import { ChevronsUpDown, LogOut, Moon, SquarePen, Sun, UserRound, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -47,6 +47,17 @@ function ConnectionAlert() {
       </AlertDescription>
     </Alert>
   );
+}
+
+/** Whether this tab is visible, following the browser's `visibilitychange`. */
+function useTabVisible(): boolean {
+  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
+  useEffect(() => {
+    const update = () => setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', update);
+    return () => document.removeEventListener('visibilitychange', update);
+  }, []);
+  return visible;
 }
 
 function UserMenu({ user }: { user: User }) {
@@ -100,6 +111,10 @@ export function AppShell({ user }: { user: User }) {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [open, setOpen] = useState<{ target: ConversationTarget; conversationId?: string }>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [atLatest, setAtLatest] = useState(true);
+  const tabVisible = useTabVisible();
+  // Open, visible and at the latest Message: what arrives there is read as it arrives.
+  const readingId = tabVisible && atLatest ? open?.conversationId : undefined;
   return (
     // h-svh: the message scroller sizes its spacer from its viewport, so the frame needs a
     // definite height; with only min-h-svh the pane grows with the spacer without bound.
@@ -150,7 +165,9 @@ export function AppShell({ user }: { user: User }) {
           <SidebarGroup>
             <SidebarGroupLabel>Conversations</SidebarGroupLabel>
             <ConversationList
+              userId={user.id}
               selectedId={open?.conversationId}
+              readingId={readingId}
               refreshKey={refreshKey}
               onLoaded={(list) =>
                 // A reload hands the open Group's view the server's latest count and flags.
@@ -185,6 +202,8 @@ export function AppShell({ user }: { user: User }) {
               target={open.target}
               conversationId={open.conversationId}
               onLeft={() => setRefreshKey((k) => k + 1)}
+              onAtLatestChange={setAtLatest}
+              reading={tabVisible && atLatest}
               onSent={(conversationId) => {
                 setOpen((current) => current && { ...current, conversationId });
                 setRefreshKey((k) => k + 1);

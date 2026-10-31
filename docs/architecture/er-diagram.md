@@ -13,6 +13,7 @@ erDiagram
   conversation_members {
     uuid conversation_id PK, FK
     uuid user_id PK, FK
+    integer read_marker
     timestamptz created_at
   }
   conversations {
@@ -73,6 +74,7 @@ erDiagram
     text email
     text password_hash
     text nickname "nullable"
+    boolean share_read_receipts
     timestamptz created_at
   }
   conversations ||--o{ conversation_members : "conversation_id"

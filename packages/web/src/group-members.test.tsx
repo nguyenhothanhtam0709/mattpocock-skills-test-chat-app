@@ -11,6 +11,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
@@ -42,7 +43,9 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>) {
     http.post('*/api/v1/auth/refresh', () => HttpResponse.json({ accessToken: fakeAccessToken() })),
     http.get('*/api/v1/users/me', () => HttpResponse.json({ user: alice })),
     http.get('*/api/v1/conversations', () =>
-      HttpResponse.json({ conversations: [{ ...current, isMember: true, lastMessage: null }] }),
+      HttpResponse.json({
+        conversations: [{ ...current, isMember: true, unreadCount: 0, lastMessage: null }],
+      }),
     ),
     http.get(`*/api/v1/conversations/${groupId}`, () =>
       HttpResponse.json({
@@ -250,7 +253,9 @@ describe('System Messages', () => {
             {
               ...groupOwnedBy(bob.id, [aliceMember, bob]),
               isMember: true,
+              unreadCount: 0,
               lastMessage: {
+                sequence: 1,
                 senderId: bob.id,
                 preview: 'hello everyone',
                 createdAt: '2020-03-04T10:00:00.000Z',

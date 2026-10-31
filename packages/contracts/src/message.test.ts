@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ConversationSummarySchema,
+  GetConversationResponseSchema,
   GetMessagesQuerySchema,
+  MarkReadRequestSchema,
+  MarkReadResponseSchema,
+  UNREAD_COUNT_MAX,
   MessageBodySchema,
   SendDirectMessageRequestSchema,
   SendMessageRequestSchema,
@@ -66,5 +71,101 @@ describe('GetMessagesQuerySchema', () => {
     { before: '1', after: '2' },
   ])('rejects %j', (query) => {
     expect(GetMessagesQuerySchema.safeParse(query).success).toBe(false);
+  });
+});
+
+describe('ConversationSummarySchema', () => {
+  const summary = {
+    id,
+    kind: 'direct',
+    name: 'Bob',
+    members: [],
+    isMember: true,
+    closed: false,
+    lastMessage: null,
+  };
+
+  it.each([
+    [1, true],
+    [0, false],
+    [1.5, false],
+    [undefined, false],
+  ])('lastMessage with sequence %s parses: %s', (sequence, valid) => {
+    const lastMessage = {
+      senderId: id,
+      sequence,
+      preview: 'hi',
+      createdAt: '2020-03-04T10:00:00.000Z',
+    };
+    expect(
+      ConversationSummarySchema.safeParse({ ...summary, unreadCount: 0, lastMessage }).success,
+    ).toBe(valid);
+  });
+
+  it('carries an Unread Count from 0 up to the cap of 100', () => {
+    expect(UNREAD_COUNT_MAX).toBe(100);
+    for (const unreadCount of [0, 1, 100]) {
+      expect(ConversationSummarySchema.parse({ ...summary, unreadCount }).unreadCount).toBe(
+        unreadCount,
+      );
+    }
+  });
+
+  it.each([[-1], [101], [1.5], [undefined]])('rejects an Unread Count of %j', (unreadCount) => {
+    expect(ConversationSummarySchema.safeParse({ ...summary, unreadCount }).success).toBe(false);
+  });
+});
+
+describe('mark-read schemas', () => {
+  it.each([[0], [1], [2_147_483_647]])('accepts upToSequence %j', (upToSequence) => {
+    expect(MarkReadRequestSchema.parse({ upToSequence })).toEqual({ upToSequence });
+    expect(MarkReadResponseSchema.parse({ upToSequence })).toEqual({ upToSequence });
+  });
+
+  it.each([[-1], [1.5], ['3'], [2_147_483_648], [undefined], [null]])(
+    'rejects upToSequence %j',
+    (upToSequence) => {
+      expect(MarkReadRequestSchema.safeParse({ upToSequence }).success).toBe(false);
+      expect(MarkReadResponseSchema.safeParse({ upToSequence }).success).toBe(false);
+    },
+  );
+});
+
+describe('GetConversationResponseSchema', () => {
+  const member = { id, username: 'Bob', nickname: null };
+  const direct = { id, kind: 'direct', members: [member] };
+
+  it("lets a Direct Conversation carry the other User's Read Marker, or omit it", () => {
+    expect(
+      GetConversationResponseSchema.parse({ conversation: { ...direct, readUpToSequence: 3 } }),
+    ).toEqual({ conversation: { ...direct, readUpToSequence: 3 } });
+    expect(GetConversationResponseSchema.parse({ conversation: direct })).toEqual({
+      conversation: direct,
+    });
+  });
+
+  it.each([[-1], [1.5], ['3'], [null]])('rejects readUpToSequence %j', (readUpToSequence) => {
+    expect(
+      GetConversationResponseSchema.safeParse({ conversation: { ...direct, readUpToSequence } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('never gives a Group a readUpToSequence', () => {
+    const group = {
+      id,
+      kind: 'group',
+      name: 'Team',
+      ownerId: id,
+      members: [member],
+      closed: false,
+      isMember: true,
+    };
+    expect(GetConversationResponseSchema.parse({ conversation: group })).toEqual({
+      conversation: group,
+    });
+    expect(
+      GetConversationResponseSchema.parse({ conversation: { ...group, readUpToSequence: 3 } }),
+    ).not.toHaveProperty('conversation.readUpToSequence');
   });
 });

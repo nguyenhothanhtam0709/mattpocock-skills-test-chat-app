@@ -10,6 +10,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
 const withBob = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b70';
@@ -37,7 +38,9 @@ beforeEach(() => {
             members: [aliceMember, bob],
             isMember: true,
             closed: false,
+            unreadCount: 0,
             lastMessage: {
+              sequence: 1,
               senderId: bob.id,
               preview: 'hello',
               createdAt: '2020-03-04T10:00:00Z',

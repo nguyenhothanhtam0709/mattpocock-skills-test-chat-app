@@ -131,6 +131,22 @@ export const GetMessagesResponseSchema = z.object({
 
 export type GetMessagesResponse = z.infer<typeof GetMessagesResponseSchema>;
 
+/** A Read Marker: the sequence up to which a Member has read (0 before the first Message). */
+export const ReadMarkerSchema = z.int().min(0).max(SEQUENCE_MAX);
+
+/**
+ * `PUT /conversations/:id/read`. Forward-only: the marker becomes the larger of the current
+ * one and `upToSequence`, clamped to the Conversation's last sequence.
+ */
+export const MarkReadRequestSchema = z.object({ upToSequence: ReadMarkerSchema });
+
+export type MarkReadRequest = z.input<typeof MarkReadRequestSchema>;
+
+/** `PUT /conversations/:id/read`: the caller's Read Marker after the request. */
+export const MarkReadResponseSchema = z.object({ upToSequence: ReadMarkerSchema });
+
+export type MarkReadResponse = z.infer<typeof MarkReadResponseSchema>;
+
 /** A Member as other Members see them: never an email. */
 export const ConversationMemberSchema = UserSearchResultSchema;
 
@@ -158,6 +174,11 @@ export const GetConversationResponseSchema = z.object({
       id: z.uuid(),
       kind: z.literal('direct'),
       members: z.array(ConversationMemberSchema),
+      /**
+       * The other User's Read Marker (their Read Receipt). Present only when both Users share
+       * read receipts. Groups never carry it.
+       */
+      readUpToSequence: ReadMarkerSchema.optional(),
     }),
     GroupSchema.extend({
       /** Derived for the caller: false for a Former Member (and for a Closed Group). */
@@ -169,6 +190,9 @@ export const GetConversationResponseSchema = z.object({
 export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;
 
 export const LAST_MESSAGE_PREVIEW_MAX = 100;
+
+/** The Unread Count stops counting here; the SPA shows it as "99+". */
+export const UNREAD_COUNT_MAX = 100;
 
 export const ConversationSummarySchema = z.object({
   id: z.uuid(),
@@ -184,11 +208,18 @@ export const ConversationSummarySchema = z.object({
   lastMessage: z
     .object({
       senderId: z.uuid(),
+      /** Where it sits in the Conversation: a pushed Message at or below this is already counted. */
+      sequence: z.number().int().positive(),
       /** Whitespace collapsed, at most 100 characters. */
       preview: z.string().max(LAST_MESSAGE_PREVIEW_MAX),
       createdAt: z.iso.datetime(),
     })
     .nullable(),
+  /**
+   * Other Members' `text` Messages after the caller's Read Marker, capped at 100. Always 0 for
+   * a Former Member and a Closed Group.
+   */
+  unreadCount: z.int().min(0).max(UNREAD_COUNT_MAX),
 });
 
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;

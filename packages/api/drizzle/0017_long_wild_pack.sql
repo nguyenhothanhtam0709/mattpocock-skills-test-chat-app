@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "share_read_receipts" boolean DEFAULT true NOT NULL;

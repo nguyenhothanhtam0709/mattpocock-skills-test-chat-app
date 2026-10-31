@@ -101,9 +101,10 @@ export class GroupsService {
         'the new Conversation',
       );
       await tx.insert(groups).values({ conversationId: created.id, name, ownerId });
+      // Every period, and so every Read Marker, starts at the Group's start.
       await tx
         .insert(conversationMembers)
-        .values(memberIds.map((userId) => ({ conversationId: created.id, userId })));
+        .values(memberIds.map((userId) => ({ conversationId: created.id, userId, readMarker: 0 })));
       await tx.insert(membershipPeriods).values(
         memberIds.map((userId) => ({
           conversationId: created.id,
@@ -152,7 +153,6 @@ export class GroupsService {
           );
         }
         if (current.length >= GROUP_MEMBERS_MAX) throw groupFull();
-        await tx.insert(conversationMembers).values({ conversationId: groupId, userId });
         const systemMessage = await insertSystemMessage(
           tx,
           groupId,
@@ -160,12 +160,15 @@ export class GroupsService {
           member,
           'member_added',
         );
-        // Messages up to now stay out of reach; the new period starts just before its own System Message.
-        await tx.insert(membershipPeriods).values({
-          conversationId: groupId,
-          userId,
-          startSequence: systemMessage.sequence - 1,
-        });
+        // Messages up to now stay out of reach; the new period starts just before its own System
+        // Message, and so does the Read Marker (nothing from before joining is unread).
+        const startSequence = systemMessage.sequence - 1;
+        await tx
+          .insert(conversationMembers)
+          .values({ conversationId: groupId, userId, readMarker: startSequence });
+        await tx
+          .insert(membershipPeriods)
+          .values({ conversationId: groupId, userId, startSequence });
         return { systemMessage, member };
       },
       async ({ systemMessage, member }) => {

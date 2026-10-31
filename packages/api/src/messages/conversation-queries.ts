@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   LAST_MESSAGE_PREVIEW_MAX,
+  UNREAD_COUNT_MAX,
   type ConversationMember,
   type ConversationSummary,
 } from '@chat/contracts';
@@ -31,9 +32,23 @@ export class ConversationQueries {
         and vm.kind = 'text'
         and vm.sequence > vp.start_sequence and vm.sequence <= vp.end_sequence
     )`;
+    // Other Members' `text` Messages after the caller's Read Marker, counting at most the cap.
+    // A Former Member (and so every reader of a Closed Group) has no Member row, so none.
+    const unreadCount = sql<number>`(
+      select count(*)::int from (
+        select 1 from messages um
+        join conversation_members ucm
+          on ucm.conversation_id = um.conversation_id and ucm.user_id = ${userId}
+        where um.conversation_id = ${conversations.id}
+          and um.kind = 'text' and um.sender_id <> ${userId}
+          and um.sequence > ucm.read_marker
+        limit ${UNREAD_COUNT_MAX}
+      ) unread
+    )`;
     const rows = await this.db
       .select({
         id: conversations.id,
+        unreadCount,
         isMember: sql<boolean>`exists (
           select 1 from conversation_members cm
           where cm.conversation_id = ${conversations.id} and cm.user_id = ${userId}
@@ -41,6 +56,7 @@ export class ConversationQueries {
         kind: conversations.kind,
         groupName: groups.name,
         senderId: messages.senderId,
+        sequence: messages.sequence,
         preview: sql<
           string | null
         >`left(regexp_replace(trim(${messages.body}), '\\s+', ' ', 'g'), ${LAST_MESSAGE_PREVIEW_MAX})`,
@@ -95,13 +111,18 @@ export class ConversationQueries {
         isMember: row.isMember,
         closed: row.groupName !== null && all.length === 0,
         lastMessage:
-          row.senderId === null || row.preview === null || row.createdAt === null
+          row.senderId === null ||
+          row.sequence === null ||
+          row.preview === null ||
+          row.createdAt === null
             ? null
             : {
                 senderId: row.senderId,
+                sequence: row.sequence,
                 preview: row.preview,
                 createdAt: row.createdAt.toISOString(),
               },
+        unreadCount: row.unreadCount,
       };
     });
   }

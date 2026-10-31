@@ -11,6 +11,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
@@ -46,6 +47,7 @@ function signedIn(initial: ReturnType<typeof groupOwnedBy>, isMember = true) {
             ...current,
             isMember:
               isMember && current.members.some((m) => (m as { id: string }).id === alice.id),
+            unreadCount: 0,
             lastMessage: null,
           },
         ],
@@ -207,6 +209,7 @@ describe('Members leaving, seen by the others', () => {
               ...groupOwnedBy(bob.id, stillMember ? [aliceMember, bob] : [bob]),
               isMember: stillMember,
               closed: false,
+              unreadCount: 0,
               lastMessage: null,
             },
           ],

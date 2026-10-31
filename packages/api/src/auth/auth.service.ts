@@ -35,7 +35,15 @@ const publicUser = {
   username: users.username,
   email: users.email,
   nickname: users.nickname,
+  shareReadReceipts: users.shareReadReceipts,
 };
+
+/** The profile fields a User can change; an absent field is left as it is. */
+export interface ProfileChanges {
+  /** `null` clears the Nickname. */
+  nickname?: string | null | undefined;
+  shareReadReceipts?: boolean | undefined;
+}
 
 @Injectable()
 export class AuthService {
@@ -79,7 +87,13 @@ export class AuthService {
       );
     }
 
-    const user = { id: row.id, username: row.username, email: row.email, nickname: row.nickname };
+    const user = {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      nickname: row.nickname,
+      shareReadReceipts: row.shareReadReceipts,
+    };
     const refreshToken = this.tokens.newRefreshToken();
     const [created] = await this.db
       .insert(sessions)
@@ -182,11 +196,11 @@ export class AuthService {
       .limit(20);
   }
 
-  /** Sets or (with `null`) clears the Nickname; the only profile field a User can change. */
-  async updateNickname(userId: string, nickname: string | null): Promise<RegisterResponse['user']> {
+  /** Changes the Nickname and/or the share read receipts setting; pushes nothing. */
+  async updateProfile(userId: string, changes: ProfileChanges): Promise<RegisterResponse['user']> {
     const [user] = await this.db
       .update(users)
-      .set({ nickname })
+      .set({ nickname: changes.nickname, shareReadReceipts: changes.shareReadReceipts })
       .where(eq(users.id, userId))
       .returning(publicUser);
     if (!user) {
@@ -210,12 +224,7 @@ export class AuthService {
           passwordHash,
           nickname: input.nickname ?? null,
         })
-        .returning({
-          id: users.id,
-          username: users.username,
-          email: users.email,
-          nickname: users.nickname,
-        });
+        .returning(publicUser);
       return { user: row! };
     } catch (error) {
       throw translateUniqueViolation(error) ?? error;

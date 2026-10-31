@@ -10,6 +10,7 @@ Which tests a change needs, and how often to run them. Commands are in [setup](s
 
 - **API behaviour test**: drives the real app over HTTP or socket with the app harness (`packages/api/test/app-harness.ts`) against real Postgres.
 - **Web behaviour test**: renders `<App />`, acts as a user with Testing Library and fakes only the network.
+- **Migration test**: gives the test its own fresh database in the run's Postgres (`packages/api/test/migration-database.ts`), migrates it up to a named migration, seeds rows with plain SQL, applies the remaining migrations and checks the rows.
 - **Contracts test**: schemas and shared helpers in contracts.
 - **Script test**: `node --test` tests for `scripts/`.
 - **Unit test**: one function, class or hook on its own, with its collaborators replaced by test doubles. An extra, never a replacement for a behaviour test.
@@ -19,6 +20,7 @@ Which tests a change needs, and how often to run them. Commands are in [setup](s
 
 - Every change in behaviour gets at least one test at the outermost layer where a user or client can see it: an API change gets an API behaviour test, a UI change gets a web behaviour test.
 - A contract change gets a contracts test, plus the API and web behaviour tests for what it changes.
+- A migration that rewrites or backfills existing rows gets a migration test.
 - Add a unit test only for logic that is hard or slow to reach through a behaviour test: many branches, error paths such as a database or network failure, retries, timing, edge cases a behaviour test can't set up.
 - A change a user can see (layout, styling, a new screen or flow) also needs a browser check. Record what you checked in the PR's verification section.
 - A change to docs, comments, config or formatting alone needs no automated test; review checks it (links resolve, front matter present).

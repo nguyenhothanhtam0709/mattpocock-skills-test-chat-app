@@ -1,6 +1,7 @@
 import { CONVERSATION_KINDS, MESSAGE_KINDS } from '@chat/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -30,6 +31,8 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     nickname: text('nickname'),
+    /** Share read receipts: on by default, reciprocal (off also hides the other User's). */
+    shareReadReceipts: boolean('share_read_receipts').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -97,6 +100,12 @@ export const conversationMembers = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * The Member's Read Marker: the sequence up to which they have read. Only moves forward.
+     * Starts at their membership period's start; the row (and so the marker) is deleted on
+     * leave or removal, so a re-added Member starts fresh.
+     */
+    readMarker: integer('read_marker').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

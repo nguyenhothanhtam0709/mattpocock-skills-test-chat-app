@@ -2,6 +2,7 @@ import type {
   CreateGroupRequest,
   SendDirectMessageRequest,
   SendMessageRequest,
+  UpdateProfileRequest,
   User,
 } from '@chat/contracts';
 import {
@@ -24,7 +25,11 @@ import {
 } from '@/api/auth';
 import {
   listConversations,
+  markRead,
   messagesPage,
+  readReceipt,
+  type MarkReadResult,
+  type ReadReceiptResult,
   type MessagesCursor,
   type MessagesPageResult,
   type ListConversationsResult,
@@ -40,7 +45,7 @@ import {
   type GroupResult,
 } from '@/api/groups';
 import { sendDirectMessage, sendMessage, type SendResult } from '@/api/messages';
-import { updateNickname, type UpdateNicknameResult } from '@/api/profile';
+import { updateProfile as patchProfile, type UpdateProfileResult } from '@/api/profile';
 import { searchUsers, type SearchUsersResult } from '@/api/users';
 
 export type AuthState =
@@ -49,8 +54,8 @@ export type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn(identifier: string, password: string): Promise<LoginResult>;
-  /** Sets (or with `null` clears) the Nickname; on success the signed-in User is updated. */
-  setNickname(nickname: string | null): Promise<UpdateNicknameResult>;
+  /** Changes the Nickname (`null` clears it) and/or sharing read receipts; updates the User. */
+  updateProfile(changes: UpdateProfileRequest): Promise<UpdateProfileResult>;
   /** Server-side Username-prefix search with the current access token. */
   searchUsers(q: string, signal?: AbortSignal): Promise<SearchUsersResult>;
   /** Sends to a User, creating the Direct Conversation if it does not exist yet. */
@@ -78,6 +83,10 @@ interface AuthContextValue {
     cursor?: MessagesCursor,
     signal?: AbortSignal,
   ): Promise<MessagesPageResult>;
+  /** The other User's Read Marker in a Direct Conversation, when both share read receipts. */
+  readReceipt(conversationId: string, signal?: AbortSignal): Promise<ReadReceiptResult>;
+  /** Marks the Conversation read up to `upToSequence` (forward only). */
+  markRead(conversationId: string, upToSequence: number): Promise<MarkReadResult>;
   /** The current access token (renewed in the background), if signed in. */
   getAccessToken(): string | undefined;
   /** Signs out here only, because the server already ended the session. */
@@ -154,10 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
-  const setNickname = useCallback(async (nickname: string | null) => {
+  const updateProfile = useCallback(async (changes: UpdateProfileRequest) => {
     const accessToken = accessTokenRef.current;
     if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
-    const result = await updateNickname(accessToken, nickname);
+    const result = await patchProfile(accessToken, changes);
     if (result.ok) setState({ status: 'signedIn', user: result.user });
     return result;
   }, []);
@@ -228,6 +237,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const receipt = useCallback(async (conversationId: string, signal?: AbortSignal) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return readReceipt(accessToken, conversationId, signal);
+  }, []);
+
+  const read = useCallback(async (conversationId: string, upToSequence: number) => {
+    const accessToken = accessTokenRef.current;
+    if (!accessToken) return { ok: false, error: 'You are signed out. Log in again.' } as const;
+    return markRead(accessToken, conversationId, upToSequence);
+  }, []);
+
   const getAccessToken = useCallback(() => accessTokenRef.current, []);
 
   const logOut = useCallback(async () => {
@@ -240,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       signIn,
-      setNickname,
+      updateProfile,
       searchUsers: searchUsersByPrefix,
       sendDirectMessage: sendDirect,
       sendMessage: sendToConversation,
@@ -251,6 +272,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       leaveGroup: leave,
       listConversations: conversationList,
       messagesPage: page,
+      readReceipt: receipt,
+      markRead: read,
       getAccessToken,
       endSession: signOut,
       logOut,
@@ -258,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       state,
       signIn,
-      setNickname,
+      updateProfile,
       searchUsersByPrefix,
       sendDirect,
       sendToConversation,
@@ -269,6 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       leave,
       conversationList,
       page,
+      receipt,
+      read,
       getAccessToken,
       signOut,
       logOut,

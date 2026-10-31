@@ -4,19 +4,19 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { server } from './test/server';
+import { stubLayout, unstubLayout } from './test/layout';
 
 const alice = {
   id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b60',
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
 const withBob = '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b70';
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 
-const ITEM_HEIGHT = 100;
-const VIEWPORT_HEIGHT = 300;
 const TOTAL = 25;
 
 function fakeAccessToken() {
@@ -52,7 +52,9 @@ function openLongConversation() {
             members: [aliceMember, bob],
             isMember: true,
             closed: false,
+            unreadCount: 0,
             lastMessage: {
+              sequence: 1,
               senderId: bob.id,
               preview: `message ${TOTAL}`,
               createdAt: '2020-03-04T10:00:00Z',
@@ -76,60 +78,6 @@ function openLongConversation() {
   return requests;
 }
 
-/**
- * jsdom has no layout, so give it a simple one: every item in the scroller's content is
- * ITEM_HEIGHT tall, stacked from the top of the content, offset by the viewport's scrollTop.
- */
-function stubLayout() {
-  const original = HTMLElement.prototype.getBoundingClientRect;
-  const rect = (top: number, height: number) =>
-    ({
-      top,
-      bottom: top + height,
-      height,
-      left: 0,
-      right: 100,
-      width: 100,
-      x: 0,
-      y: top,
-      toJSON: () => ({}),
-    }) as DOMRect;
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-    this: HTMLElement,
-  ) {
-    if (this.dataset.slot === 'message-scroller-viewport') return rect(0, VIEWPORT_HEIGHT);
-    const content = this.parentElement;
-    if (content?.dataset.slot === 'message-scroller-content') {
-      const viewport = content.closest<HTMLElement>('[data-slot="message-scroller-viewport"]')!;
-      const items = Array.from(content.children).filter(
-        (child) => !(child as HTMLElement).hasAttribute('data-message-scroller-spacer'),
-      );
-      return rect(items.indexOf(this) * ITEM_HEIGHT - viewport.scrollTop, ITEM_HEIGHT);
-    }
-    return original.call(this);
-  });
-  // jsdom has no scrollTo; the scroller uses it to follow the bottom.
-  HTMLElement.prototype.scrollTo = function (this: HTMLElement, options?: unknown) {
-    this.scrollTop = (options as ScrollToOptions).top ?? 0;
-  } as typeof HTMLElement.prototype.scrollTo;
-  const isViewport = (el: HTMLElement) => el.dataset.slot === 'message-scroller-viewport';
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-    configurable: true,
-    get() {
-      return isViewport(this as HTMLElement) ? VIEWPORT_HEIGHT : 0;
-    },
-  });
-  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
-    configurable: true,
-    get() {
-      const el = this as HTMLElement;
-      return isViewport(el)
-        ? el.querySelectorAll('[data-slot="message-scroller-item"]').length * ITEM_HEIGHT
-        : 0;
-    },
-  });
-}
-
 async function openConversation() {
   const user = userEvent.setup();
   render(<App />);
@@ -145,10 +93,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
-  Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight');
-  Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
-  Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight');
+  unstubLayout();
 });
 
 describe('History pagination', () => {

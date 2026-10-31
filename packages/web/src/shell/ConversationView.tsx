@@ -37,6 +37,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScrollerScrollable,
 } from '@/components/ui/message-scroller';
 
 /** Show the counter once the text is within this many characters of the limit. */
@@ -66,6 +67,10 @@ interface Row {
   outgoing?: Outgoing;
   /** Set for a stored membership systemMessage ("Bob was added"): rendered as a `Marker`, not a bubble. */
   systemMessage?: string;
+  /** The Read Receipt sits under this Message: "Seen". */
+  seen?: true;
+  /** The User's own Message: it always scrolls into view, even from older history. */
+  own?: true;
 }
 
 const SYSTEM_MESSAGE_VERBS: Record<SystemMessageKind, string> = {
@@ -80,6 +85,12 @@ const systemMessageText = (m: ChatMessage): string | undefined =>
   m.kind === 'text' || !m.subject
     ? undefined
     : `${displayName(m.subject)} ${SYSTEM_MESSAGE_VERBS[m.kind]}`;
+
+/** Mark-read waits this long for the view to settle, so a burst of changes sends one call. */
+const MARK_READ_DEBOUNCE_MS = 300;
+
+/** A failed mark-read is tried again after these waits, then given up on until the next change. */
+const MARK_READ_RETRY_MS = [1000, 3000, 9000];
 
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
@@ -174,6 +185,16 @@ function Composer({ onSend }: { onSend: (body: string) => void }) {
   );
 }
 
+/**
+ * Reports whether the view is at its live edge: the latest Message is in view, so nothing is
+ * left to scroll towards the end (also true while there is nothing to scroll at all).
+ */
+function LiveEdge({ onChange }: { onChange: ((atLatest: boolean) => void) | undefined }) {
+  const { end } = useMessageScrollerScrollable();
+  useEffect(() => onChange?.(!end), [end, onChange]);
+  return null;
+}
+
 /** What the server last told us about the Group; events and refetches keep it current. */
 interface GroupInfo {
   memberCount: number;
@@ -192,6 +213,8 @@ export function ConversationView({
   conversationId: initialConversationId,
   onSent,
   onLeft,
+  onAtLatestChange,
+  reading = false,
 }: {
   user: User;
   target: ConversationTarget;
@@ -201,8 +224,16 @@ export function ConversationView({
   onSent?: (conversationId: string) => void;
   /** Called after the User left the Group, so the Conversation list can follow. */
   onLeft?: () => void;
+  /** Called whenever the view reaches or leaves the latest Message. */
+  onAtLatestChange?: (atLatest: boolean) => void;
+  /**
+   * The User is reading this view right now: the tab is visible and the view is at its latest
+   * Message. Then everything on screen is marked read.
+   */
+  reading?: boolean;
 }) {
-  const { sendDirectMessage, sendMessage, messagesPage, getGroup } = useAuth();
+  const { sendDirectMessage, sendMessage, messagesPage, getGroup, markRead, readReceipt } =
+    useAuth();
   // Only the Conversation this view was opened with is loaded; a later change of the prop is
   // just the first send reporting the Conversation it created.
   const [openedWith] = useState(initialConversationId);
@@ -213,6 +244,17 @@ export function ConversationView({
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const viewportRef = useRef<HTMLDivElement>(null);
+  // Only a Message the User sent, or one arriving while they are at the latest Message, scrolls
+  // into view. One arriving while they read older history waits (the scroller scrolls every
+  // new anchor into view, so the others are not anchors).
+  const [atLatest, setAtLatest] = useState(true);
+  const onLiveEdge = useCallback(
+    (latest: boolean) => {
+      setAtLatest(latest);
+      onAtLatestChange?.(latest);
+    },
+    [onAtLatestChange],
+  );
 
   useEffect(() => {
     if (!openedWith) return;
@@ -296,12 +338,60 @@ export function ConversationView({
     refreshGroup();
   }, [refreshGroup]);
 
+  // The other User's Read Marker in a Direct Conversation, known only while both share read
+  // receipts: from the Conversation on open (and on reconnect, for a missed push), then from
+  // `conversation.receipt`. It only moves forward. Only the newest request counts.
+  const isDirect = target.kind === 'direct';
+  const [otherMarker, setOtherMarker] = useState<number | undefined>(undefined);
+  const receiptRequests = useRef(0);
+  const sharing = user.shareReadReceipts;
+  const refreshReceipt = useCallback(() => {
+    if (!conversationId || !isDirect) return;
+    const mine = ++receiptRequests.current;
+    // Not sharing: the other User's marker is not ours to see. Clear it, and drop any answer on its way.
+    if (!sharing) {
+      setOtherMarker(undefined);
+      return;
+    }
+    void (async () => {
+      const result = await readReceipt(conversationId);
+      if (!result.ok || mine !== receiptRequests.current) return;
+      const fetched = result.readUpToSequence;
+      setOtherMarker((current) =>
+        fetched === undefined ? undefined : Math.max(current ?? 0, fetched),
+      );
+    })();
+  }, [conversationId, isDirect, sharing, readReceipt]);
+
+  useEffect(() => {
+    refreshReceipt();
+  }, [refreshReceipt]);
+
+  useRealtimeEvents(
+    useCallback(
+      (event) => {
+        if (
+          event.type !== 'conversation.receipt' ||
+          event.conversationId !== conversationId ||
+          !sharing
+        ) {
+          return;
+        }
+        setOtherMarker((current) => Math.max(current ?? 0, event.upToSequence));
+      },
+      [conversationId, sharing],
+    ),
+  );
+
   // Messages pushed while the connection was down are gone for good: fetch what came after the
   // last one seen, page by page. Duplicates with pushes are merged by ID.
   useReconnected(() => {
     const id = conversationId;
     if (!id) return;
     refreshGroup();
+    refreshReceipt();
+    markFailures.current = 0;
+    setMarkAttempt((n) => n + 1);
     void (async () => {
       // Resume from the page's own newest Message, not the newest seen: a push that lands
       // meanwhile must not make the fetch skip the Messages before it.
@@ -316,6 +406,41 @@ export function ConversationView({
       }
     })();
   });
+
+  // While the User is reading, the newest Message on screen is read: tell the server (debounced,
+  // and only past what it already acknowledged; sending moved the marker by itself). A Former
+  // Member or a closed Group has no marker to move: the server would refuse. A failure that may
+  // pass is tried again a few times, and again on reconnect.
+  const newestSequence = messages.at(-1)?.sequence;
+  const acknowledged = useRef(0);
+  const markFailures = useRef(0);
+  const [markAttempt, setMarkAttempt] = useState(0);
+  const mayMark = info === undefined || (info.isMember && !info.closed);
+  useEffect(() => {
+    if (!reading || !mayMark || !conversationId || newestSequence === undefined) return;
+    if (newestSequence <= acknowledged.current) return;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const result = await markRead(conversationId, newestSequence);
+        if (result.ok) {
+          markFailures.current = 0;
+          acknowledged.current = Math.max(acknowledged.current, result.upToSequence);
+          return;
+        }
+        const wait = MARK_READ_RETRY_MS[markFailures.current];
+        if (cancelled || !result.retryable || wait === undefined) return;
+        markFailures.current += 1;
+        retry = setTimeout(() => setMarkAttempt((n) => n + 1), wait);
+      })();
+    }, MARK_READ_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(retry);
+    };
+  }, [reading, mayMark, conversationId, newestSequence, markRead, markAttempt]);
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -393,6 +518,7 @@ export function ConversationView({
       return;
     }
     const id = result.conversation?.id ?? result.message.conversationId;
+    acknowledged.current = Math.max(acknowledged.current, result.message.sequence);
     setConversationId(id);
     onSent?.(id);
     setOutgoing((current) => current.filter((o) => o.clientMessageId !== clientMessageId));
@@ -434,6 +560,15 @@ export function ConversationView({
   const memberCount = info?.memberCount ?? 0;
   const canPost = target.kind !== 'group' || (!!info?.isMember && !closed);
 
+  // "Seen" goes under the newest of the User's own Messages the other User has read.
+  const seenId =
+    !sharing || otherMarker === undefined
+      ? undefined
+      : [...messages]
+          .reverse()
+          .find((m) => m.kind === 'text' && m.senderId === user.id && m.sequence <= otherMarker)
+          ?.id;
+
   const rows: Row[] = [
     ...messages.map((m) => {
       const systemMessage = systemMessageText(m);
@@ -443,6 +578,8 @@ export function ConversationView({
         createdAt: m.createdAt,
         body: m.body,
         ...(systemMessage === undefined ? {} : { systemMessage }),
+        ...(m.id === seenId ? { seen: true as const } : {}),
+        ...(m.senderId === user.id && systemMessage === undefined ? { own: true as const } : {}),
       };
     }),
     ...outgoing.map((o) => ({
@@ -451,6 +588,7 @@ export function ConversationView({
       createdAt: o.createdAt,
       body: o.body,
       outgoing: o,
+      own: true as const,
     })),
   ];
 
@@ -509,15 +647,16 @@ export function ConversationView({
         )}
       </header>
       <div className="relative min-h-0 flex-1">
-        {rows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            No messages yet.{' '}
-            {target.kind === 'group'
-              ? 'Say hello to the Group.'
-              : `Say hello to ${displayName(target.peer)}.`}
-          </p>
-        ) : (
-          <MessageScrollerProvider>
+        <MessageScrollerProvider>
+          <LiveEdge onChange={onLiveEdge} />
+          {rows.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">
+              No messages yet.{' '}
+              {target.kind === 'group'
+                ? 'Say hello to the Group.'
+                : `Say hello to ${displayName(target.peer)}.`}
+            </p>
+          ) : (
             <MessageScroller>
               <MessageScrollerViewport ref={viewportRef} onScroll={onScroll}>
                 <MessageScrollerContent className="p-4">
@@ -525,7 +664,7 @@ export function ConversationView({
                     <MessageScrollerItem
                       key={m.key}
                       messageId={m.key}
-                      scrollAnchor
+                      scrollAnchor={m.own === true || atLatest}
                       className={continuesRun ? '-mt-4' : undefined}
                     >
                       {day && (
@@ -572,6 +711,7 @@ export function ConversationView({
                               </Button>
                             </MessageFooter>
                           )}
+                          {m.seen && <MessageFooter>Seen</MessageFooter>}
                         </Message>
                       )}
                     </MessageScrollerItem>
@@ -583,8 +723,8 @@ export function ConversationView({
                 <span className="sr-only">Jump to latest</span>
               </MessageScrollerButton>
             </MessageScroller>
-          </MessageScrollerProvider>
-        )}
+          )}
+        </MessageScrollerProvider>
       </div>
       {canPost ? (
         <Composer onSend={send} />

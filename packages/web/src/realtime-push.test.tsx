@@ -11,6 +11,7 @@ const alice = {
   username: 'Alice',
   email: 'alice@example.com',
   nickname: null,
+  shareReadReceipts: true,
 };
 const aliceMember = { id: alice.id, username: alice.username, nickname: alice.nickname };
 const bob = { id: '0198a2b4-7c3e-7a52-9f31-5d2f4c1e8b61', username: 'bobby', nickname: 'Bob' };
@@ -36,7 +37,8 @@ const summary = (
   members: [aliceMember, { id: peer.id, username: peer.username, nickname: peer.nickname }],
   isMember: true,
   closed: false,
-  lastMessage: { senderId: peer.id, preview, createdAt },
+  unreadCount: 0,
+  lastMessage: { sequence: 1, senderId: peer.id, preview, createdAt },
 });
 
 const message = (over: Partial<Record<string, unknown>>) => ({
