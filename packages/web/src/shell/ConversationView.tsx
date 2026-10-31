@@ -69,6 +69,8 @@ interface Row {
   systemMessage?: string;
   /** The Read Receipt sits under this Message: "Seen". */
   seen?: true;
+  /** The User's own Message: it always scrolls into view, even from older history. */
+  own?: true;
 }
 
 const SYSTEM_MESSAGE_VERBS: Record<SystemMessageKind, string> = {
@@ -86,6 +88,9 @@ const systemMessageText = (m: ChatMessage): string | undefined =>
 
 /** Mark-read waits this long for the view to settle, so a burst of changes sends one call. */
 const MARK_READ_DEBOUNCE_MS = 300;
+
+/** A failed mark-read is tried again after these waits, then given up on until the next change. */
+const MARK_READ_RETRY_MS = [1000, 3000, 9000];
 
 /** Reaching within this many pixels of the top counts as the top. */
 const TOP_THRESHOLD = 48;
@@ -239,6 +244,17 @@ export function ConversationView({
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const viewportRef = useRef<HTMLDivElement>(null);
+  // Only a Message the User sent, or one arriving while they are at the latest Message, scrolls
+  // into view. One arriving while they read older history waits (the scroller scrolls every
+  // new anchor into view, so the others are not anchors).
+  const [atLatest, setAtLatest] = useState(true);
+  const onLiveEdge = useCallback(
+    (latest: boolean) => {
+      setAtLatest(latest);
+      onAtLatestChange?.(latest);
+    },
+    [onAtLatestChange],
+  );
 
   useEffect(() => {
     if (!openedWith) return;
@@ -328,9 +344,15 @@ export function ConversationView({
   const isDirect = target.kind === 'direct';
   const [otherMarker, setOtherMarker] = useState<number | undefined>(undefined);
   const receiptRequests = useRef(0);
+  const sharing = user.shareReadReceipts;
   const refreshReceipt = useCallback(() => {
     if (!conversationId || !isDirect) return;
     const mine = ++receiptRequests.current;
+    // Not sharing: the other User's marker is not ours to see. Clear it, and drop any answer on its way.
+    if (!sharing) {
+      setOtherMarker(undefined);
+      return;
+    }
     void (async () => {
       const result = await readReceipt(conversationId);
       if (!result.ok || mine !== receiptRequests.current) return;
@@ -339,7 +361,7 @@ export function ConversationView({
         fetched === undefined ? undefined : Math.max(current ?? 0, fetched),
       );
     })();
-  }, [conversationId, isDirect, readReceipt]);
+  }, [conversationId, isDirect, sharing, readReceipt]);
 
   useEffect(() => {
     refreshReceipt();
@@ -348,12 +370,16 @@ export function ConversationView({
   useRealtimeEvents(
     useCallback(
       (event) => {
-        if (event.type !== 'conversation.receipt' || event.conversationId !== conversationId) {
+        if (
+          event.type !== 'conversation.receipt' ||
+          event.conversationId !== conversationId ||
+          !sharing
+        ) {
           return;
         }
         setOtherMarker((current) => Math.max(current ?? 0, event.upToSequence));
       },
-      [conversationId],
+      [conversationId, sharing],
     ),
   );
 
@@ -364,6 +390,8 @@ export function ConversationView({
     if (!id) return;
     refreshGroup();
     refreshReceipt();
+    markFailures.current = 0;
+    setMarkAttempt((n) => n + 1);
     void (async () => {
       // Resume from the page's own newest Message, not the newest seen: a push that lands
       // meanwhile must not make the fetch skip the Messages before it.
@@ -380,22 +408,39 @@ export function ConversationView({
   });
 
   // While the User is reading, the newest Message on screen is read: tell the server (debounced,
-  // and only past what it already acknowledged; sending moved the marker by itself).
+  // and only past what it already acknowledged; sending moved the marker by itself). A Former
+  // Member or a closed Group has no marker to move: the server would refuse. A failure that may
+  // pass is tried again a few times, and again on reconnect.
   const newestSequence = messages.at(-1)?.sequence;
   const acknowledged = useRef(0);
+  const markFailures = useRef(0);
+  const [markAttempt, setMarkAttempt] = useState(0);
+  const mayMark = info === undefined || (info.isMember && !info.closed);
   useEffect(() => {
-    if (!reading || !conversationId || newestSequence === undefined) return;
+    if (!reading || !mayMark || !conversationId || newestSequence === undefined) return;
     if (newestSequence <= acknowledged.current) return;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
       void (async () => {
         const result = await markRead(conversationId, newestSequence);
         if (result.ok) {
+          markFailures.current = 0;
           acknowledged.current = Math.max(acknowledged.current, result.upToSequence);
+          return;
         }
+        const wait = MARK_READ_RETRY_MS[markFailures.current];
+        if (cancelled || !result.retryable || wait === undefined) return;
+        markFailures.current += 1;
+        retry = setTimeout(() => setMarkAttempt((n) => n + 1), wait);
       })();
     }, MARK_READ_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [reading, conversationId, newestSequence, markRead]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(retry);
+    };
+  }, [reading, mayMark, conversationId, newestSequence, markRead, markAttempt]);
 
   const [outgoing, setOutgoing] = useState<Outgoing[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -517,7 +562,7 @@ export function ConversationView({
 
   // "Seen" goes under the newest of the User's own Messages the other User has read.
   const seenId =
-    otherMarker === undefined
+    !sharing || otherMarker === undefined
       ? undefined
       : [...messages]
           .reverse()
@@ -534,6 +579,7 @@ export function ConversationView({
         body: m.body,
         ...(systemMessage === undefined ? {} : { systemMessage }),
         ...(m.id === seenId ? { seen: true as const } : {}),
+        ...(m.senderId === user.id && systemMessage === undefined ? { own: true as const } : {}),
       };
     }),
     ...outgoing.map((o) => ({
@@ -542,6 +588,7 @@ export function ConversationView({
       createdAt: o.createdAt,
       body: o.body,
       outgoing: o,
+      own: true as const,
     })),
   ];
 
@@ -601,7 +648,7 @@ export function ConversationView({
       </header>
       <div className="relative min-h-0 flex-1">
         <MessageScrollerProvider>
-          <LiveEdge onChange={onAtLatestChange} />
+          <LiveEdge onChange={onLiveEdge} />
           {rows.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
               No messages yet.{' '}
@@ -617,7 +664,7 @@ export function ConversationView({
                     <MessageScrollerItem
                       key={m.key}
                       messageId={m.key}
-                      scrollAnchor
+                      scrollAnchor={m.own === true || atLatest}
                       className={continuesRun ? '-mt-4' : undefined}
                     >
                       {day && (
