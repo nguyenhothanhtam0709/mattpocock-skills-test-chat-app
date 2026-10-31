@@ -4,11 +4,11 @@ kind: intent
 
 # Contracts package
 
-The Zod schemas and types that api and web share: HTTP bodies, error codes and realtime events. Both import it from `dist`. How it fits with api and web: [architecture overview](../../docs/architecture/overview.md).
+The Zod schemas and types that api and web share: HTTP bodies, error codes and realtime events. Both import it from `dist`. Only when a change crosses packages: [architecture overview](../../docs/architecture/overview.md).
 
 ## Commands
 
-Run from the repo root. Setup and what each test run needs: [setup](../../docs/workflow/setup.md).
+Run from the repo root. Only when the environment isn't ready: [setup](../../docs/workflow/setup.md).
 
 - `pnpm build:contracts`: rebuilds `dist`. Run it after a change so api and web see it.
 - `pnpm --filter @chat/contracts test`: needs nothing. No database, no Docker.
@@ -16,9 +16,11 @@ Run from the repo root. Setup and what each test run needs: [setup](../../docs/w
 
 ## Rules
 
-- [Contracts conventions](../../docs/conventions/contracts.md) and [general conventions](../../docs/conventions/general.md).
-- Which tests a change needs: [testing policy](../../docs/workflow/testing-policy.md).
-- ADRs: [0001 server-push-only WebSocket](../../docs/adr/0001-websocket-is-server-push-only.md), [0002 validate input, encode output](../../docs/adr/0002-validate-input-encode-output-no-sanitizer.md).
+- When writing code here: [contracts conventions](../../docs/conventions/contracts.md) and [general conventions](../../docs/conventions/general.md).
+- When writing tests: [testing policy](../../docs/workflow/testing-policy.md).
+- ADRs, only when the change touches their subject:
+  - Realtime events: [0001 server-push-only WebSocket](../../docs/adr/0001-websocket-is-server-push-only.md).
+  - Validating input: [0002 validate input, encode output](../../docs/adr/0002-validate-input-encode-output-no-sanitizer.md).
 
 ## Never
 
@@ -26,6 +28,8 @@ Run from the repo root. Setup and what each test run needs: [setup](../../docs/w
 
 ## Reference files
 
+Open these when you need the pattern:
+
 - Exports: [index.ts](src/index.ts). Errors: [error.ts](src/error.ts). Realtime events: [realtime.ts](src/realtime.ts).
-- Example test: [group.test.ts](src/group.test.ts).
-- Generated Doc from this package: [realtime events](../../docs/architecture/realtime-events.md).
+- Writing tests: [group.test.ts](src/group.test.ts).
+- Looking up events without reading code: Generated Doc [realtime events](../../docs/architecture/realtime-events.md).
