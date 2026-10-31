@@ -187,13 +187,8 @@ describe('Marking read when things go wrong or do not apply', () => {
   it('retries a mark-read that failed with a server error', async () => {
     const history = [message()];
     let calls = 0;
-    const { marked } = signedIn(
-      { current: [summary('message', 1)] },
-      history,
-      (upToSequence) =>
-        ++calls === 1
-          ? new HttpResponse(null, { status: 503 })
-          : HttpResponse.json({ upToSequence }),
+    const { marked } = signedIn({ current: [summary('message', 1)] }, history, (upToSequence) =>
+      ++calls === 1 ? new HttpResponse(null, { status: 503 }) : HttpResponse.json({ upToSequence }),
     );
     render(<App createRealtime={() => fakeRealtime().realtime} />);
 
@@ -206,11 +201,8 @@ describe('Marking read when things go wrong or do not apply', () => {
   it('retries a failed mark-read once the connection is back', async () => {
     const history = [message()];
     let failing = true;
-    const { marked } = signedIn(
-      { current: [summary('message', 1)] },
-      history,
-      (upToSequence) =>
-        failing ? new HttpResponse(null, { status: 429 }) : HttpResponse.json({ upToSequence }),
+    const { marked } = signedIn({ current: [summary('message', 1)] }, history, (upToSequence) =>
+      failing ? new HttpResponse(null, { status: 429 }) : HttpResponse.json({ upToSequence }),
     );
     const fake = fakeRealtime();
     render(<App createRealtime={() => fake.realtime} />);
@@ -284,7 +276,11 @@ describe('Marking read when things go wrong or do not apply', () => {
               isMember: false,
               closed: false,
               unreadCount: 0,
-              lastMessage: { senderId: bob.id, preview: 'message', createdAt: '2020-03-04T10:00:00Z' },
+              lastMessage: {
+                senderId: bob.id,
+                preview: 'message',
+                createdAt: '2020-03-04T10:00:00Z',
+              },
             },
           ],
         }),
