@@ -30,8 +30,19 @@ What holds on the main paths today and can't be seen by reading one file. Hand-w
 - The first Message to a User with no Direct Conversation goes to `POST /direct-messages`, which creates the Direct Conversation in the same transaction and pushes `conversation.created` to the recipient before the Message.
 - Pushes for a Group go to its room, and for a Direct Conversation to each Member's User room.
 
+## Read state
+
+- A Member's Read Marker is a column on their membership row, so leaving or removal deletes it and a re-added Member starts fresh. It starts at the start of their membership period, so nothing from before joining is unread.
+- `PUT /conversations/:id/read` moves the marker to the larger of the current one and `upToSequence`, clamped to the Conversation's last sequence, in one conditional UPDATE. It takes no Conversation lock and does not wait on `CommitOrder`. A Former Member has no row and gets `403`.
+- Sending also moves the sender's own marker to the new Message, in the send transaction.
+- Only a move pushes anything: `conversation.read` to the reader's own User room, which syncs their other tabs, and in a Direct Conversation `conversation.receipt` to the other User when both share read receipts. The setting is read after the commit, so turning it off stops later receipts. Like every push, these are best effort.
+- The Unread Count is computed per Conversation in the list query: other Members' `text` Messages after the marker, capped at 100. A Former Member and a Closed Group always get 0.
+- The web app marks read, debounced and retried, only while the tab is visible and the view is at its latest Message. A Message pushed while the User is reading adds nothing to the count.
+- A `conversation.read` that covers the entry's last Message clears its badge. One that doesn't, or a push that overlaps a list fetch, makes the list reload from the server.
+- A Direct Conversation's open view gets the other User's marker from `GET /conversations/:id` (`readUpToSequence`, present only when both share receipts) on open and after a reconnect, then from `conversation.receipt`. It only moves forward.
+
 ## Loading a Conversation and its history
 
 - A reader sees only Messages whose sequence falls inside one of their membership periods. That is how a Former Member keeps what they were present for and nothing later.
-- The Conversation list stays current from pushes. It reloads when a push names a Conversation it doesn't list, or when a Group ends for the User.
+- The Conversation list stays current from pushes, including each entry's last-Message preview and Unread Count. It reloads when a push names a Conversation it doesn't list, or when a Group ends for the User.
 - After the socket reconnects, the web app reloads the list and fetches the open Conversation's Messages with `?after=` its newest sequence, page by page, merging by ID.
