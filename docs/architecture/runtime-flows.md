@@ -38,7 +38,7 @@ What holds on the main paths today and can't be seen by reading one file. Hand-w
 - Only a move pushes anything: `conversation.read` to the reader's own User room, which syncs their other tabs, and in a Direct Conversation `conversation.receipt` to the other User when both share read receipts. The setting is read after the commit, so turning it off stops later receipts. Like every push, these are best effort.
 - The Unread Count is computed per Conversation in the list query: other Members' `text` Messages after the marker, capped at 100. A Former Member and a Closed Group always get 0.
 - The web app marks read, debounced and retried, only while the tab is visible and the view is at its latest Message. A Message pushed while the User is reading adds nothing to the count.
-- A `conversation.read` that covers the entry's last Message clears its badge. One that doesn't, or a push that overlaps a list fetch, makes the list reload from the server.
+- A `conversation.read` that covers the entry's last Message clears its badge. One that doesn't makes the list reload from the server, as does a `conversation.read` or `conversation.created` that lands during a list request. A `message.created` that lands during a list request is replayed onto its response, and one at or below the entry's last sequence is already counted.
 - A Direct Conversation's open view gets the other User's marker from `GET /conversations/:id` (`readUpToSequence`, present only when both share receipts) on open and after a reconnect, then from `conversation.receipt`. It only moves forward.
 
 ## Loading a Conversation and its history
