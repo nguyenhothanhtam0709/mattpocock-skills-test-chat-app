@@ -65,6 +65,7 @@ Rules:
 - **Reviewer**: the diff range, the Spec path and that the scope is the whole Feature Branch. It returns findings with `file:line`.
 - **Implementer fixing findings**: the approved findings. It does not re-read the Tickets.
 - **Explorer**: one specific question and the path of the note to write.
+- **Doc Sync**: the diff range, the Spec path and the hand-written docs to compare, as in [Doc Sync](#doc-sync).
 
 ### Resume or respawn
 
@@ -86,6 +87,17 @@ The Orchestrator merges task PRs itself and spawns no merger sub-agent:
 4. Delete the Task Branch.
 
 On a conflict or a missing Feature Branch tip, send the PR back to its Implementer. The Orchestrator writes no product code.
+
+## Doc Sync
+
+After the review findings are fixed and before the feature PR, run `pnpm docs:check`, then decide whether the change needs a Doc Sync agent on Sonnet. A script can't tell whether new code made a hand-written doc wrong.
+
+- **Run it** when the diff changes behaviour, a runtime flow or a term, or adds a new pattern.
+- **Skip it** when the diff only changes tests, refactors without changing behaviour, or only changes docs. Say why in the feature PR.
+- **Compare against:** [runtime flows](../architecture/runtime-flows.md), the [architecture overview](../architecture/overview.md), the [glossary](../../GLOSSARY.md) and the [conventions](../conventions/general.md).
+- **A Descriptive Doc that is wrong:** it fixes the doc in a task PR on `agent/<NNNNN>-doc-sync`.
+- **An Intent Doc that contradicts the code:** it reports this and changes nothing, because the code may be the defect ([ADR 0008](../adr/0008-documents-are-classed-by-how-they-are-maintained.md)). Take it to the human.
+- It changes no Spec and no code.
 
 ## Keeping the main session small
 

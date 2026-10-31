@@ -50,7 +50,7 @@ The Unread Count is computed when the Conversation list is fetched, capped at 10
 
 ## Enforce the doc and convention rules
 
-The doc and convention rules are not enforced yet; agents follow them by reading. Enforcement to build in a later MVP:
+`pnpm docs:check` covers the Generated Docs, links, `kind` and Ticket Status, and a hook runs it when an agent opens a PR. Nothing checks a human's PR, and the other rules are followed by reading. Enforcement to build in a later MVP:
 
 - **Enforcement tags:** tag each rule with how it is enforced, and apply "broken twice, automate it": once a rule is broken a second time, replace the prose with an automated check.
 - **Required CI checks:** lint, typecheck, tests with Postgres, migration drift, generated-doc drift, and a front matter and link check. Back them with branch protection and a required human approval.
@@ -63,12 +63,6 @@ The doc and convention rules are not enforced yet; agents follow them by reading
 - **Seen:** while extracting conventions (spec 00004, ticket 05). The [testing policy](workflow/testing-policy.md#mocking) says to test through public seams and to mock only where no seam exists. Four files use `vi.mock` or `vi.spyOn`: `api/src/groups/group-rooms.test.ts`, `api/src/db/database.module.test.ts`, `web/src/realtime/socket-realtime.test.ts` and `web/src/history-pagination.test.tsx`.
 - **Not done:** nobody checked whether each mock is needed.
 - **Idea:** for each file, switch to a public seam or note why there is none.
-
-## The one `any` in the API
-
-- **Seen:** while extracting conventions (spec 00004, ticket 05). `api/src/messages/message-rows.ts:11` turns off `@typescript-eslint/no-explicit-any` for the `Tx` type, with a comment saying why.
-- **Not done:** left as it is.
-- **Idea:** type `Tx` without `any`, or keep the disable and its comment as the accepted exception.
 
 ## One shared uuid path pipe in the API
 
@@ -145,7 +139,3 @@ MVP1 has only the Owner role and no renaming, deletion or invitations needing ac
 ## CI pipeline and deployment
 
 CI, deployment and OpenAPI docs were out of scope for MVP1. The required CI checks are already listed under "Enforce the doc and convention rules" and OpenAPI under "Contract-first development"; this entry is the rest: a hosting target, environment config and a deploy pipeline.
-
-## Skill names in the Factory docs
-
-`docs/factory/sdlc.md` names `grill-with-docs`, `to-spec`, `to-tickets`, `triage` and `retro`, which may not match the installed skills. Check them against what is installed and decide who owns that check: a script, a review step or the Reviewer. A link and front matter check belongs with the drift audit under "Enforce the doc and convention rules".
