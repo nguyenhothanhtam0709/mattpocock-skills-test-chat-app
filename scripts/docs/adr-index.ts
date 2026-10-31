@@ -23,13 +23,18 @@ function title(content: string): string {
   return /^# (.+)$/m.exec(content)?.[1]?.trim() ?? '';
 }
 
+/** A link written next to the ADRs points at a sibling; the index lives in another folder. */
+function fromIndex(sentence: string): string {
+  return sentence.replace(/\]\((?![a-z][a-z+.-]*:|\.\.?\/|#|\/)/g, '](../adr/');
+}
+
 /** Markdown index of the ADRs: number, title and first sentence of each, linked. */
 export function renderAdrIndex(adrs: readonly AdrSource[]): string {
   const lines = [...adrs]
     .sort((a, b) => a.file.localeCompare(b.file))
     .map(({ file, content }) => {
       const number = file.slice(0, 4);
-      return `- [${number}: ${title(content)}](../adr/${file}): ${firstSentence(content)}`;
+      return `- [${number}: ${title(content)}](../adr/${file}): ${fromIndex(firstSentence(content))}`;
     });
   return [
     ...generatedDocHeader({ generator: GENERATOR, source: SOURCE, title: 'ADR index' }),
