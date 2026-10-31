@@ -36,3 +36,15 @@ test('ADR index declares itself generated', () => {
 test('ADR index is stable when the input order changes', () => {
   assert.equal(renderAdrIndex([...adrs].reverse()), renderAdrIndex(adrs));
 });
+
+test('a relative link in a first sentence still resolves from the index', () => {
+  const index = renderAdrIndex([
+    {
+      file: '0002-b.md',
+      content: '# B\n\nADR [0001](0001-a.md) and [c](../c.md) and [w](https://x.dev) apply.\n',
+    },
+  ]);
+  assert.match(index, /\[0001\]\(\.\.\/adr\/0001-a\.md\)/);
+  assert.match(index, /\[c\]\(\.\.\/c\.md\)/);
+  assert.match(index, /\[w\]\(https:\/\/x\.dev\)/);
+});
