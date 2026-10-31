@@ -38,13 +38,14 @@ When doing a Ticket, read each doc only when you reach its step:
 | About to open the PR                    | [Definition of done](docs/workflow/definition-of-done.md), [git workflow](docs/workflow/git-workflow.md) |
 | Stuck                                   | [Escalation](docs/workflow/escalation.md)                                                                |
 | Writing a Ticket or changing its fields | [Ticket template](docs/workflow/ticket-template.md)                                                      |
+| Changing a Ticket's Status              | [Ticket status](docs/workflow/ticket-status.md)                                                          |
 | The environment isn't ready             | [Setup](docs/workflow/setup.md)                                                                          |
 
 An Implementer doesn't need `docs/factory/`, other Specs or `docs/architecture/` unless the Ticket names them.
 
 Orchestrator: read [orchestrator](docs/workflow/orchestrator.md). Never spawn a merger sub-agent, even when `implement-spec` says to.
 
-The pipeline from idea to merge (Stages, Agent Roles, Gates): [factory overview](docs/factory/overview.md).
+The pipeline from idea to merge (Stages, Agent Roles, Gates): [SDLC](docs/factory/sdlc.md).
 
 ## Skill-generated files
 
