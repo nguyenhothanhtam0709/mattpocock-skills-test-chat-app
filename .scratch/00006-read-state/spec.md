@@ -1,6 +1,6 @@
 # Spec: Read State (Unread Counts and Read Receipts)
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
